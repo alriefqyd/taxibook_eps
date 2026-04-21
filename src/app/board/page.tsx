@@ -60,7 +60,7 @@ export default function BoardPage() {
   }, [])
 
   function navigate(dir: number) {
-    setCursor(prev => {
+    setCursor((prev: Date) => {
       const d = new Date(prev)
       if (view === 'day')   d.setDate(d.getDate() + dir)
       if (view === 'week')  d.setDate(d.getDate() + dir * 7)
@@ -79,10 +79,10 @@ export default function BoardPage() {
   }
 
   const today = new Date()
-  const activeCount   = bookings.filter(b => ['on_trip','waiting_trip'].includes(b.status)).length
-  const bookedCount   = bookings.filter(b => b.status === 'booked').length
-  const pendingCount  = bookings.filter(b => b.status.includes('pending')).length
-  const availTaxis    = taxis.filter(t => t.is_available && t.driver_id).length
+  const activeCount   = bookings.filter((b: any) => ['on_trip','waiting_trip'].includes(b.status)).length
+  const bookedCount   = bookings.filter((b: any) => b.status === 'booked').length
+  const pendingCount  = bookings.filter((b: any) => b.status.includes('pending')).length
+  const availTaxis    = taxis.filter((t: any) => t.is_available && t.driver_id).length
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, background: '#F4F3EF' }}>
@@ -195,7 +195,7 @@ export default function BoardPage() {
             <WeekView bookings={bookings} cursor={cursor} today={today} tooltip={tooltip} setTooltip={setTooltip} />
           )}
           {view === 'month' && (
-            <MonthView bookings={bookings} cursor={cursor} today={today} onDayClick={d => { setCursor(d); setView('day') }} />
+            <MonthView bookings={bookings} cursor={cursor} today={today} onDayClick={(d: Date) => { setCursor(d); setView('day') }} />
           )}
         </div>
       </div>

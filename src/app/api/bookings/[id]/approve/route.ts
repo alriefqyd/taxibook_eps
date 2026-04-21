@@ -93,7 +93,7 @@ export async function POST(
         )
 
         const candidates = avail
-          .filter(({ freeAt }) => freeAt <= scheduledTime)
+          .filter(({ freeAt }: any) => freeAt <= scheduledTime)
           .sort((a, b) => {
             if (a.tripsToday !== b.tripsToday) return a.tripsToday - b.tripsToday
             return a.freeAt.getTime() - b.freeAt.getTime()

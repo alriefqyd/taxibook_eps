@@ -126,8 +126,8 @@ export async function POST(
 
       // Only consider taxis that are FREE
       const freeTaxis = availableAtTime
-        .filter(({ isFree }) => isFree)
-        .map(({ taxi }) => taxi)
+        .filter(({ isFree }: any) => isFree)
+        .map(({ taxi }: any) => taxi)
 
       if (!freeTaxis.length) {
         // All taxis are busy at that time — notify coordinator
@@ -173,12 +173,12 @@ export async function POST(
       )
 
       // Sort: fewest trips → longest idle (lowest idleSince = free longest)
-      freeTaxisRanked.sort((a, b) => {
+      freeTaxisRanked.sort((a: any, b: any) => {
         if (a.tripsToday !== b.tripsToday) return a.tripsToday - b.tripsToday
         return a.idleSince - b.idleSince // longest idle wins if trips tied
       })
 
-      const rankedTaxis = freeTaxisRanked.map(r => r.taxi)
+      const rankedTaxis = freeTaxisRanked.map((r: any) => r.taxi)
 
       // ── Round-robin among ranked free taxis ──
       const { data: declineHistory } = await admin
