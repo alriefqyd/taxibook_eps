@@ -694,7 +694,7 @@ function WeekView({ bookings, cursor }: { bookings: BookingDetail[]; cursor: Dat
 
 // ── Staff booking detail + cancel sheet ────────────────────
 // Add this to the bottom of the file and wire it into the header
-export function StaffBookingSheet({ booking, onClose, onCancelled }: {
+function StaffBookingSheet({ booking, onClose, onCancelled }: {
   booking: any
   onClose: () => void
   onCancelled: () => void
