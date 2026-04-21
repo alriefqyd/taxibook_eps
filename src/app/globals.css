@@ -1,0 +1,149 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-dm-sans: 'DM Sans', system-ui, sans-serif;
+    --font-dm-mono: 'DM Mono', monospace;
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: var(--font-dm-sans);
+    min-height: 100dvh;
+    overscroll-behavior: none;
+  }
+
+  /* PWA safe areas */
+  .safe-top    { padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+@layer components {
+
+  /* ── Status badges ── */
+  .badge {
+    @apply inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap;
+  }
+  .badge-submitted   { @apply bg-blue-100 text-blue-900; }
+  .badge-pending     { @apply bg-amber-100 text-amber-900; }
+  .badge-booked      { @apply bg-green-100 text-green-900; }
+  .badge-on-trip     { @apply bg-green-100 text-green-900; }
+  .badge-waiting     { @apply bg-purple-100 text-purple-900; }
+  .badge-completed   { @apply bg-slate-100 text-slate-600; }
+  .badge-rejected    { @apply bg-red-100 text-red-900; }
+  .badge-drop        { @apply bg-blue-100 text-blue-900; }
+  .badge-wait        { @apply bg-purple-100 text-purple-900; }
+
+  /* ── Cards ── */
+  .card {
+    @apply bg-white border border-stone-200 rounded-2xl p-4;
+  }
+
+  .card-surface {
+    @apply bg-stone-50 rounded-2xl p-4;
+  }
+
+  /* ── Mobile bottom nav ── */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 flex z-50;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .nav-item {
+    @apply flex-1 flex flex-col items-center gap-1 py-2 text-[10px] font-bold
+           tracking-wide uppercase text-stone-400 no-underline;
+  }
+
+  .nav-item.active {
+    @apply text-stone-900;
+  }
+
+  /* ── Buttons ── */
+  .btn-primary {
+    @apply w-full py-3.5 px-4 bg-stone-900 text-white rounded-xl
+           text-sm font-bold tracking-tight
+           active:scale-[0.98] transition-transform;
+  }
+
+  .btn-secondary {
+    @apply w-full py-3 px-4 bg-transparent text-stone-900 rounded-xl
+           text-sm font-semibold border border-stone-200
+           active:bg-stone-50 transition-colors;
+  }
+
+  .btn-success {
+    @apply w-full py-3 px-4 bg-green-600 text-white rounded-xl
+           text-sm font-bold active:opacity-90 transition-opacity;
+  }
+
+  .btn-danger {
+    @apply w-full py-3 px-4 bg-red-50 text-red-900 rounded-xl
+           text-sm font-bold border border-red-200
+           active:bg-red-100 transition-colors;
+  }
+
+  /* ── Form elements ── */
+  .input {
+    @apply w-full px-3.5 py-3 text-sm bg-white border border-stone-200
+           rounded-xl text-stone-900 placeholder-stone-400
+           focus:outline-none focus:border-stone-900
+           transition-colors;
+  }
+
+  .select {
+    @apply w-full px-3.5 py-3 text-sm bg-white border border-stone-200
+           rounded-xl text-stone-900
+           focus:outline-none focus:border-stone-900
+           transition-colors appearance-none;
+  }
+
+  .label {
+    @apply block text-[10px] font-bold tracking-widest uppercase
+           text-stone-400 mb-1.5;
+  }
+
+  /* ── Section label ── */
+  .section-label {
+    @apply text-[10px] font-bold tracking-[0.08em] uppercase text-stone-400 mb-2;
+  }
+
+  /* ── Trip card ── */
+  .trip-card {
+    @apply bg-white border border-stone-200 rounded-2xl p-3.5 mb-2
+           active:bg-stone-50 transition-colors cursor-pointer;
+  }
+
+  /* ── Web sidebar ── */
+  .sidebar {
+    @apply bg-white border-r border-stone-200 flex flex-col;
+    width: 220px;
+    min-height: 100vh;
+  }
+
+  .sidebar-item {
+    @apply flex items-center gap-3 px-5 py-2.5 text-sm font-medium
+           text-stone-500 no-underline transition-colors hover:bg-stone-50;
+  }
+
+  .sidebar-item.active {
+    @apply text-stone-900 font-semibold bg-stone-50
+           border-l-2 border-stone-900 pl-[18px];
+  }
+}
+
+@layer utilities {
+  .font-mono { font-family: var(--font-dm-mono); }
+}
