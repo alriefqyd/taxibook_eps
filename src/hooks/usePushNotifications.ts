@@ -53,5 +53,5 @@ function urlBase64ToUint8Array(base64String: string) {
     .replace(/-/g, '+')
     .replace(/_/g, '/')
   const rawData = window.atob(base64)
-  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)))
+  return Uint8Array.from(Array.from(rawData).map(c => c.charCodeAt(0)))
 }
