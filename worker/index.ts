@@ -1,13 +1,12 @@
-// Custom service worker code — next-pwa merges this automatically
-declare const self: ServiceWorkerGlobalScope
+// Push notification handler for TaxiBook PWA
 
-self.addEventListener('push', (event: PushEvent) => {
+self.addEventListener('push', (event: any) => {
   if (!event.data) return
   const data  = event.data.json()
   const title = data.title || 'TaxiBook'
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body:    data.body  || '',
+    (self as any).registration.showNotification(title, {
+      body:    data.body || '',
       icon:    '/icon-192.png',
       badge:   '/icon-192.png',
       vibrate: [200, 100, 200],
@@ -16,15 +15,15 @@ self.addEventListener('push', (event: PushEvent) => {
   )
 })
 
-self.addEventListener('notificationclick', (event: NotificationEvent) => {
+self.addEventListener('notificationclick', (event: any) => {
   event.notification.close()
   const url = event.notification.data?.url || '/'
   event.waitUntil(
-    self.clients.matchAll({ type: 'window' }).then(clients => {
+    (self as any).clients.matchAll({ type: 'window' }).then((clients: any[]) => {
       for (const client of clients) {
         if ('focus' in client) { client.navigate(url); return client.focus() }
       }
-      return self.clients.openWindow(url)
+      return (self as any).clients.openWindow(url)
     })
   )
 })
