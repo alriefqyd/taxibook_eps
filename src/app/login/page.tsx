@@ -101,7 +101,7 @@ export default function LoginPage() {
             TaxiBook
           </h1>
           <p style={{ fontSize: '13px', color: '#6B6963', margin: 0 }}>
-            Company fleet management
+            Book your taxi easily and quickly
           </p>
         </div>
 
