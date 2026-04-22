@@ -14,28 +14,31 @@ export function usePushNotifications() {
         if (!('PushManager' in window)) return
 
         const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-        if (!vapidKey) { console.log('[Push] No VAPID key'); return }
+        if (!vapidKey) return
 
         const permission = await Notification.requestPermission()
         if (permission !== 'granted') return
 
-        // Register SW explicitly instead of waiting for ready
-        let reg = await navigator.serviceWorker.getRegistration('/')
+        // Get all registrations and find active one
+        const regs = await navigator.serviceWorker.getRegistrations()
+        console.log('[Push] SW registrations:', regs.length)
+
+        let reg = regs.find(r => r.active) || regs[0]
+
         if (!reg) {
+          // No SW found — register sw.js directly
           reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
-          // Wait for it to install
-          await new Promise<void>(resolve => {
-            if (reg!.installing) {
-              reg!.installing.addEventListener('statechange', function() {
-                if (this.state === 'activated') resolve()
-              })
-            } else {
-              resolve()
-            }
-          })
+          // Give it time to activate
+          await new Promise(r => setTimeout(r, 2000))
+          reg = await navigator.serviceWorker.getRegistration('/') || reg
         }
 
-        console.log('[Push] Registration:', reg.scope)
+        if (!reg) { console.log('[Push] No SW found'); return }
+        console.log('[Push] Using SW:', reg.scope, 'active:', !!reg.active)
+
+        // Use active or installing worker
+        const worker = reg.active || reg.installing || reg.waiting
+        if (!worker) { console.log('[Push] No SW worker'); return }
 
         let sub = await reg.pushManager.getSubscription()
         if (!sub) {
@@ -43,9 +46,9 @@ export function usePushNotifications() {
             userVisibleOnly:      true,
             applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
           })
-          console.log('[Push] Subscribed:', sub.endpoint.slice(0, 50))
+          console.log('[Push] New subscription created')
         } else {
-          console.log('[Push] Already subscribed')
+          console.log('[Push] Existing subscription found')
         }
 
         const { data: { session } } = await supabase.auth.getSession()
@@ -59,18 +62,17 @@ export function usePushNotifications() {
           },
           body: JSON.stringify({ subscription: sub }),
         })
-        console.log('[Push] Saved:', res.status)
+        console.log('[Push] Saved to DB:', res.status)
 
       } catch (err) {
         console.error('[Push] Error:', err)
       }
     }
 
-    // Run after page fully loaded
     if (document.readyState === 'complete') {
-      setTimeout(subscribe, 1000)
+      setTimeout(subscribe, 2000)
     } else {
-      window.addEventListener('load', () => setTimeout(subscribe, 1000), { once: true })
+      window.addEventListener('load', () => setTimeout(subscribe, 2000), { once: true })
     }
   }, [])
 }
