@@ -28,6 +28,8 @@ export default function ProfilePage({ role }: Props) {
   const [loading,      setLoading]      = useState(true)
   const [loggingOut,   setLoggingOut]   = useState(false)
   const [showConfirm,  setShowConfirm]  = useState(false)
+  const [pushResult,   setPushResult]   = useState<string | null>(null)
+  const [testingPush,  setTestingPush]  = useState(false)
 
   useEffect(() => {
     async function init() {
@@ -84,6 +86,59 @@ export default function ProfilePage({ role }: Props) {
     }
     init()
   }, [])
+
+  async function testPush() {
+    setTestingPush(true)
+    setPushResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setPushResult('❌ Not logged in'); setTestingPush(false); return }
+
+      // First ensure subscribed
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        const reg = await navigator.serviceWorker.ready
+        let sub = await reg.pushManager.getSubscription()
+        if (!sub) {
+          const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+          if (vapidKey) {
+            const perm = await Notification.requestPermission()
+            if (perm === 'granted') {
+              sub = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(vapidKey),
+              })
+              await fetch('/api/push/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                body: JSON.stringify({ subscription: sub }),
+              })
+            }
+          }
+        }
+      }
+
+      const res  = await fetch('/api/push/test', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      })
+      const data = await res.json()
+      if (data.success) {
+        setPushResult('✅ Test push sent! Check your notifications.')
+      } else {
+        setPushResult(`❌ ${data.error || 'Failed'} — ${data.hint || ''}`)
+      }
+    } catch (err: any) {
+      setPushResult('❌ Error: ' + err.message)
+    }
+    setTestingPush(false)
+  }
+
+  function urlBase64ToUint8Array(base64String: string): Uint8Array {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4)
+    const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+    const rawData = window.atob(base64)
+    return Uint8Array.from(Array.from(rawData).map(c => c.charCodeAt(0)))
+  }
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -189,6 +244,26 @@ export default function ProfilePage({ role }: Props) {
               <span style={{ fontSize: 13, fontWeight: 600, color: '#A8A6A0' }}>{row.value}</span>
             </div>
           ))}
+        </div>
+
+        {/* Push notification test */}
+        <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#A8A6A0', margin: '0 0 8px' }}>Push Notifications</p>
+        <div style={{ background: '#fff', border: '1px solid #E0DED8', borderRadius: 14, padding: '14px 16px', marginBottom: 20 }}>
+          <p style={{ fontSize: 13, color: '#6B6963', margin: '0 0 10px' }}>
+            Test if push notifications are working on this device.
+          </p>
+          <button
+            onClick={testPush}
+            disabled={testingPush}
+            style={{ width: '100%', padding: '10px', background: testingPush ? '#E0DED8' : '#0F0F0F', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, marginBottom: pushResult ? 10 : 0 }}
+          >
+            {testingPush ? 'Sending...' : '🔔 Send test notification'}
+          </button>
+          {pushResult && (
+            <div style={{ background: pushResult.startsWith('✅') ? '#D8F3DC' : '#FEE2E2', borderRadius: 8, padding: '8px 12px' }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: pushResult.startsWith('✅') ? '#2D6A4F' : '#991B1B', margin: 0 }}>{pushResult}</p>
+            </div>
+          )}
         </div>
 
         {/* Logout */}
