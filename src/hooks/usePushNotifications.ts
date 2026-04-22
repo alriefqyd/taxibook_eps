@@ -19,26 +19,12 @@ export function usePushNotifications() {
         const permission = await Notification.requestPermission()
         if (permission !== 'granted') return
 
-        // Get all registrations and find active one
-        const regs = await navigator.serviceWorker.getRegistrations()
-        console.log('[Push] SW registrations:', regs.length)
+        // Register OUR minimal SW (not next-pwa's sw.js)
+        const reg = await navigator.serviceWorker.register('/push-sw.js', { scope: '/' })
 
-        let reg = regs.find(r => r.active) || regs[0]
-
-        if (!reg) {
-          // No SW found — register sw.js directly
-          reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
-          // Give it time to activate
-          await new Promise(r => setTimeout(r, 2000))
-          reg = await navigator.serviceWorker.getRegistration('/') || reg
-        }
-
-        if (!reg) { console.log('[Push] No SW found'); return }
-        console.log('[Push] Using SW:', reg.scope, 'active:', !!reg.active)
-
-        // Use active or installing worker
-        const worker = reg.active || reg.installing || reg.waiting
-        if (!worker) { console.log('[Push] No SW worker'); return }
+        // skipWaiting + claim means it activates immediately
+        await navigator.serviceWorker.ready
+        console.log('[Push] SW active:', reg.scope)
 
         let sub = await reg.pushManager.getSubscription()
         if (!sub) {
@@ -46,9 +32,7 @@ export function usePushNotifications() {
             userVisibleOnly:      true,
             applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
           })
-          console.log('[Push] New subscription created')
-        } else {
-          console.log('[Push] Existing subscription found')
+          console.log('[Push] Subscribed')
         }
 
         const { data: { session } } = await supabase.auth.getSession()
@@ -62,7 +46,7 @@ export function usePushNotifications() {
           },
           body: JSON.stringify({ subscription: sub }),
         })
-        console.log('[Push] Saved to DB:', res.status)
+        console.log('[Push] Saved:', res.status)
 
       } catch (err) {
         console.error('[Push] Error:', err)
@@ -70,9 +54,9 @@ export function usePushNotifications() {
     }
 
     if (document.readyState === 'complete') {
-      setTimeout(subscribe, 2000)
+      setTimeout(subscribe, 1000)
     } else {
-      window.addEventListener('load', () => setTimeout(subscribe, 2000), { once: true })
+      window.addEventListener('load', () => setTimeout(subscribe, 1000), { once: true })
     }
   }, [])
 }
