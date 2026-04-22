@@ -8,32 +8,27 @@ export function usePushNotifications() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+    if (!('serviceWorker' in navigator)) return
+    if (!('PushManager' in window)) return
+
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    if (!vapidKey) return // skip if VAPID not configured
 
     async function subscribe() {
       try {
-        // Check/request permission
         const permission = await Notification.requestPermission()
         if (permission !== 'granted') return
 
-        // Get service worker registration
         const reg = await navigator.serviceWorker.ready
-
-        // Check if already subscribed
         let sub = await reg.pushManager.getSubscription()
 
         if (!sub) {
-          // Subscribe with VAPID key
-          const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-          if (!vapidKey) return
-
           sub = await reg.pushManager.subscribe({
             userVisibleOnly:      true,
-            applicationServerKey: urlBase64ToUint8Array(vapidKey),
+            applicationServerKey: urlBase64ToUint8Array(vapidKey!),
           })
         }
 
-        // Send subscription to server
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) return
 
@@ -50,7 +45,6 @@ export function usePushNotifications() {
       }
     }
 
-    // Small delay to not block initial load
     setTimeout(subscribe, 3000)
   }, [])
 }
