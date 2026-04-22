@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { sendPushToUser } from '@/lib/push'
 
 export async function POST(request: NextRequest) {
   try {
@@ -77,6 +78,8 @@ export async function POST(request: NextRequest) {
           body:       `${passenger?.name} → ${destination} at ${time}`,
           type:       'driver_assigned',
         })
+        // Push notification to driver's phone
+        await sendPushToUser(result.taxi.driver_id, '🚗 New trip assigned', `${passenger?.name} → ${destination} at ${time}`, '/driver/home')
 
         return NextResponse.json({
           booking:     { ...booking, taxi_id: result.taxi.id, status: 'pending_driver_approval' },

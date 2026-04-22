@@ -1,57 +1,63 @@
 'use client'
 
 import { useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 export function usePushNotifications() {
+  const supabase = createClient()
+
   useEffect(() => {
+    if (typeof window === 'undefined') return
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
 
-    registerPush()
+    async function subscribe() {
+      try {
+        // Check/request permission
+        const permission = await Notification.requestPermission()
+        if (permission !== 'granted') return
+
+        // Get service worker registration
+        const reg = await navigator.serviceWorker.ready
+
+        // Check if already subscribed
+        let sub = await reg.pushManager.getSubscription()
+
+        if (!sub) {
+          // Subscribe with VAPID key
+          const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+          if (!vapidKey) return
+
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly:      true,
+            applicationServerKey: urlBase64ToUint8Array(vapidKey),
+          })
+        }
+
+        // Send subscription to server
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+
+        await fetch('/api/push/subscribe', {
+          method:  'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ subscription: sub }),
+        })
+      } catch (err) {
+        console.error('Push subscription error:', err)
+      }
+    }
+
+    // Small delay to not block initial load
+    setTimeout(subscribe, 3000)
   }, [])
 }
 
-async function registerPush() {
-  try {
-    const registration = await navigator.serviceWorker.ready
-
-    // Check existing subscription
-    let subscription = await registration.pushManager.getSubscription()
-
-    if (!subscription) {
-      // Request permission
-      const permission = await Notification.requestPermission()
-      if (permission !== 'granted') return
-
-      // Subscribe
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(
-          process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
-        ),
-      })
-    }
-
-    // Send subscription to server
-    const sub = subscription.toJSON()
-    await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        endpoint: sub.endpoint,
-        keys: sub.keys,
-      }),
-    })
-
-  } catch (err) {
-    console.error('Push registration failed:', err)
-  }
-}
-
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
-  const base64  = (base64String + padding)
-    .replace(/-/g, '+')
-    .replace(/_/g, '/')
-  const rawData = window.atob(base64)
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64   = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData  = window.atob(base64)
   return Uint8Array.from(Array.from(rawData).map(c => c.charCodeAt(0)))
 }
