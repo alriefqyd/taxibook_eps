@@ -19,12 +19,22 @@ export function usePushNotifications() {
         const permission = await Notification.requestPermission()
         if (permission !== 'granted') return
 
-        // Register OUR minimal SW (not next-pwa's sw.js)
-        const reg = await navigator.serviceWorker.register('/push-sw.js', { scope: '/' })
+        // Always use push-sw.js — simple, no precaching, activates instantly
+        const reg = await navigator.serviceWorker.register('/push-sw.js', { scope: '/push-scope/' })
 
-        // skipWaiting + claim means it activates immediately
-        await navigator.serviceWorker.ready
-        console.log('[Push] SW active:', reg.scope)
+        // Wait for activation with timeout
+        await new Promise<void>(resolve => {
+          if (reg.active) { resolve(); return }
+          const sw = reg.installing || reg.waiting
+          if (sw) {
+            sw.addEventListener('statechange', function(this: ServiceWorker) {
+              if (this.state === 'activated') resolve()
+            })
+          }
+          setTimeout(resolve, 3000)
+        })
+
+        console.log('[Push] SW state:', reg.active ? 'active' : 'not active')
 
         let sub = await reg.pushManager.getSubscription()
         if (!sub) {
@@ -32,7 +42,9 @@ export function usePushNotifications() {
             userVisibleOnly:      true,
             applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
           })
-          console.log('[Push] Subscribed')
+          console.log('[Push] New subscription created')
+        } else {
+          console.log('[Push] Existing subscription found')
         }
 
         const { data: { session } } = await supabase.auth.getSession()
@@ -54,9 +66,9 @@ export function usePushNotifications() {
     }
 
     if (document.readyState === 'complete') {
-      setTimeout(subscribe, 1000)
+      setTimeout(subscribe, 2000)
     } else {
-      window.addEventListener('load', () => setTimeout(subscribe, 1000), { once: true })
+      window.addEventListener('load', () => setTimeout(subscribe, 2000), { once: true })
     }
   }, [])
 }
