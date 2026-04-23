@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { sendPushToUser } from '@/lib/push'
 
 // Vercel cron runs every 5 minutes
 // vercel.json: { "crons": [{ "path": "/api/cron/auto-complete", "schedule": "*/5 * * * *" }] }
@@ -57,6 +58,11 @@ export async function GET(request: NextRequest) {
         }
       }
       if (notifications.length) await admin.from('notifications').insert(notifications)
+      // Send push for each notification
+      for (const notif of notifications) {
+        const url = notif.type?.includes('driver') ? '/driver/home' : '/staff/home'
+        await sendPushToUser(notif.user_id, notif.title, notif.body, url)
+      }
       results.auto_completed = overdueBookings.length
     }
 
@@ -111,6 +117,10 @@ export async function GET(request: NextRequest) {
       }
 
       await admin.from('notifications').insert(notifs)
+      for (const notif of notifs) {
+        const url = notif.type?.includes('driver') ? '/driver/home' : '/staff/home'
+        await sendPushToUser(notif.user_id, notif.title, notif.body, url)
+      }
       results.reminded_15min++
     }
 
@@ -159,6 +169,10 @@ export async function GET(request: NextRequest) {
       }
 
       await admin.from('notifications').insert(notifs)
+      for (const notif of notifs) {
+        const url = notif.type?.includes('driver') ? '/driver/home' : '/staff/home'
+        await sendPushToUser(notif.user_id, notif.title, notif.body, url)
+      }
       results.reminded_start++
     }
 
@@ -246,6 +260,10 @@ export async function GET(request: NextRequest) {
 
       if (notifs.length) {
         await admin.from('notifications').insert(notifs)
+        for (const notif of notifs) {
+          const url = notif.type?.includes('driver') ? '/driver/home' : '/staff/home'
+          await sendPushToUser(notif.user_id, notif.title, notif.body, url)
+        }
         results.reminded_overdue++
       }
     }

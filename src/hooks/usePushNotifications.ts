@@ -19,22 +19,39 @@ export function usePushNotifications() {
         const permission = await Notification.requestPermission()
         if (permission !== 'granted') return
 
-        // Always use push-sw.js — simple, no precaching, activates instantly
-        const reg = await navigator.serviceWorker.register('/push-sw.js', { scope: '/push-scope/' })
+        // Unregister ALL existing service workers first
+        const regs = await navigator.serviceWorker.getRegistrations()
+        for (const reg of regs) {
+          await reg.unregister()
+          console.log('[Push] Unregistered SW:', reg.scope)
+        }
 
-        // Wait for activation with timeout
+        // Register fresh push-sw.js at root scope
+        const reg = await navigator.serviceWorker.register('/push-sw.js')
+        console.log('[Push] Registered:', reg.scope)
+
+        // Wait for active
         await new Promise<void>(resolve => {
           if (reg.active) { resolve(); return }
-          const sw = reg.installing || reg.waiting
-          if (sw) {
-            sw.addEventListener('statechange', function(this: ServiceWorker) {
-              if (this.state === 'activated') resolve()
+          reg.addEventListener('updatefound', () => {
+            const sw = reg.installing
+            if (!sw) { resolve(); return }
+            sw.addEventListener('statechange', () => {
+              if (sw.state === 'activated') resolve()
             })
-          }
-          setTimeout(resolve, 3000)
+          })
+          setTimeout(resolve, 4000)
         })
 
-        console.log('[Push] SW state:', reg.active ? 'active' : 'not active')
+        // Also wait for controller
+        if (!navigator.serviceWorker.controller) {
+          await new Promise<void>(resolve => {
+            navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true })
+            setTimeout(resolve, 2000)
+          })
+        }
+
+        console.log('[Push] Active:', !!reg.active, 'Controller:', !!navigator.serviceWorker.controller)
 
         let sub = await reg.pushManager.getSubscription()
         if (!sub) {
@@ -42,9 +59,9 @@ export function usePushNotifications() {
             userVisibleOnly:      true,
             applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
           })
-          console.log('[Push] New subscription created')
+          console.log('[Push] Subscribed:', sub.endpoint.slice(0, 60))
         } else {
-          console.log('[Push] Existing subscription found')
+          console.log('[Push] Already subscribed')
         }
 
         const { data: { session } } = await supabase.auth.getSession()
@@ -66,9 +83,9 @@ export function usePushNotifications() {
     }
 
     if (document.readyState === 'complete') {
-      setTimeout(subscribe, 2000)
+      setTimeout(subscribe, 1500)
     } else {
-      window.addEventListener('load', () => setTimeout(subscribe, 2000), { once: true })
+      window.addEventListener('load', () => setTimeout(subscribe, 1500), { once: true })
     }
   }, [])
 }
