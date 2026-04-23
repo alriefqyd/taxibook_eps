@@ -303,7 +303,6 @@ async function assignToDriver(admin: any, booking: any, taxi: any, bookingId: st
     body:       `${passenger?.name} → ${booking.destination} at ${time}`,
     type:       'driver_assigned',
   })
-  await sendPushToUser(taxi.driver_id, '🚗 New trip assigned', `${passenger?.name} → ${booking.destination} at ${time}`, '/driver/home')
 }
 
 // ── Notify all coordinators ──────────────────────────────────

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notify } from '@/lib/notify'
+import { sendPushToUser } from '@/lib/push'
 
 // Vercel cron runs every 5 minutes
 // vercel.json: { "crons": [{ "path": "/api/cron/auto-complete", "schedule": "*/5 * * * *" }] }
