@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { sendPushToUser } from '@/lib/push'
+import { notify } from '@/lib/notify'
 
 export async function POST(
   request: NextRequest,
@@ -50,15 +50,13 @@ export async function POST(
       const { data: driver } = await admin
         .from('users').select('name').eq('id', user.id).single()
 
-      await admin.from('notifications').insert({
+      await notify({
         user_id:    booking.passenger_id,
         booking_id: bookingId,
         title:      'Trip confirmed!',
         body:       `Your trip to ${booking.destination} is confirmed — ${booking.taxis?.name} · ${driver?.name}`,
         type:       'booking_confirmed',
       })
-      // Push to passenger
-      await sendPushToUser(booking.passenger_id, '✅ Trip confirmed!', `${booking.taxis?.name} · ${driver?.name} → ${booking.destination}`, '/staff/home')
 
       return NextResponse.json({ success: true, status: 'booked' })
     }
@@ -298,7 +296,7 @@ async function assignToDriver(admin: any, booking: any, taxi: any, bookingId: st
     hour: '2-digit', minute: '2-digit'
   })
 
-  await admin.from('notifications').insert({
+  await notify({
     user_id:    taxi.driver_id,
     booking_id: bookingId,
     title:      'New trip assigned',

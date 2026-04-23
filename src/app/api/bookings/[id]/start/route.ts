@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { notify } from '@/lib/notify'
 
 export async function POST(
   request: NextRequest,
@@ -55,7 +56,7 @@ export async function POST(
       ? `Your driver ${driver?.name} (${booking.taxis?.name}) has arrived and is waiting.`
       : `Your driver ${driver?.name} (${booking.taxis?.name}) has picked you up. Trip started.`
 
-    await admin.from('notifications').insert({
+    await notify({
       user_id:    booking.passenger_id,
       booking_id: bookingId,
       title:      booking.trip_type === 'WAITING' ? 'Driver arrived' : 'Trip started',

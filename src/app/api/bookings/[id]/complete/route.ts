@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { notify } from '@/lib/notify'
 
 export async function POST(
   request: NextRequest,
@@ -53,7 +54,7 @@ export async function POST(
     }
 
     // Notify passenger — inline (no VAPID dependency)
-    await admin.from('notifications').insert({
+    await notify({
       user_id:    booking.passenger_id,
       booking_id: bookingId,
       title:      'Trip completed',
@@ -64,7 +65,7 @@ export async function POST(
     // Notify driver too (confirmation)
     if (isCoord) {
       // If coordinator completed it, notify driver as well
-      await admin.from('notifications').insert({
+      await notify({
         user_id:    booking.taxis?.driver_id,
         booking_id: bookingId,
         title:      'Trip marked as completed',

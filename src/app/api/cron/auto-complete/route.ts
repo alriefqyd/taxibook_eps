@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { sendPushToUser } from '@/lib/push'
+import { notify } from '@/lib/notify'
 
 // Vercel cron runs every 5 minutes
 // vercel.json: { "crons": [{ "path": "/api/cron/auto-complete", "schedule": "*/5 * * * *" }] }
@@ -57,70 +57,7 @@ export async function GET(request: NextRequest) {
           })
         }
       }
-      if (notifications.length) await admin.from('notifications').insert(notifications)
-      // Send push for each notification
-      for (const notif of notifications) {
-        const url = notif.type?.includes('driver') ? '/driver/home' : '/staff/home'
-        await sendPushToUser(notif.user_id, notif.title, notif.body, url)
-      }
-      results.auto_completed = overdueBookings.length
-    }
-
-    // ── 2. 15-MIN REMINDER ─────────────────────────────────
-    // Bookings starting in 10-15 minutes, status = booked
-    const remind15Start = new Date(now.getTime() + 10 * 60 * 1000)
-    const remind15End   = new Date(now.getTime() + 15 * 60 * 1000)
-
-    const { data: upcoming15 } = await admin
-      .from('bookings')
-      .select('id, passenger_id, destination, scheduled_at, taxi_id, taxis!taxi_id(driver_id, name)')
-      .eq('status', 'booked')
-      .gte('scheduled_at', remind15Start.toISOString())
-      .lte('scheduled_at', remind15End.toISOString())
-
-    for (const b of (upcoming15 || []) as any[]) {
-      // Check if 15-min reminder already sent
-      const { count } = await admin
-        .from('notifications')
-        .select('id', { count: 'exact', head: true })
-        .eq('booking_id', b.id)
-        .eq('type', 'reminder_15min')
-
-      if ((count || 0) > 0) continue // already sent
-
-      const time = new Date(b.scheduled_at).toLocaleTimeString('id-ID', {
-        hour: '2-digit', minute: '2-digit'
-      })
-
-      const notifs: any[] = [
-        // Staff reminder
-        {
-          user_id:    b.passenger_id,
-          booking_id: b.id,
-          title:      '⏰ Trip in 15 minutes',
-          body:       `Your trip to ${b.destination} starts at ${time}. Your taxi is on the way.`,
-          type:       'reminder_15min',
-        },
-      ]
-
-      // Driver reminder
-      if (b.taxis?.driver_id) {
-        const { data: passenger } = await admin
-          .from('users').select('name').eq('id', b.passenger_id).single()
-        notifs.push({
-          user_id:    b.taxis.driver_id,
-          booking_id: b.id,
-          title:      '⏰ Trip in 15 minutes',
-          body:       `Pick up ${passenger?.name} → ${b.destination} at ${time}. Get ready.`,
-          type:       'reminder_15min',
-        })
-      }
-
-      await admin.from('notifications').insert(notifs)
-      for (const notif of notifs) {
-        const url = notif.type?.includes('driver') ? '/driver/home' : '/staff/home'
-        await sendPushToUser(notif.user_id, notif.title, notif.body, url)
-      }
+      if (notifications.length) await notify(notifications)
       results.reminded_15min++
     }
 
@@ -168,7 +105,7 @@ export async function GET(request: NextRequest) {
         })
       }
 
-      await admin.from('notifications').insert(notifs)
+      await notify(notifs)
       for (const notif of notifs) {
         const url = notif.type?.includes('driver') ? '/driver/home' : '/staff/home'
         await sendPushToUser(notif.user_id, notif.title, notif.body, url)
@@ -259,7 +196,7 @@ export async function GET(request: NextRequest) {
       }
 
       if (notifs.length) {
-        await admin.from('notifications').insert(notifs)
+        await notify(notifs)
         for (const notif of notifs) {
           const url = notif.type?.includes('driver') ? '/driver/home' : '/staff/home'
           await sendPushToUser(notif.user_id, notif.title, notif.body, url)

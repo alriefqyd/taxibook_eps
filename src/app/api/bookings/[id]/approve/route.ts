@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { notify } from '@/lib/notify'
 
 export async function POST(
   request: NextRequest,
@@ -34,7 +35,7 @@ export async function POST(
         rejection_reason: rejection_reason || null,
       }).eq('id', bookingId)
 
-      await admin.from('notifications').insert({
+      await notify({
         user_id:    booking.passenger_id,
         booking_id: bookingId,
         title:      'Trip request rejected',
@@ -114,7 +115,7 @@ export async function POST(
             hour: '2-digit', minute: '2-digit'
           })
 
-          await admin.from('notifications').insert({
+          await notify({
             user_id:    assignedTaxi.driver_id,
             booking_id: bookingId,
             title:      'New trip assigned',
@@ -123,7 +124,7 @@ export async function POST(
           })
 
           // Notify passenger
-          await admin.from('notifications').insert({
+          await notify({
             user_id:    booking.passenger_id,
             booking_id: bookingId,
             title:      'Trip approved & assigned',

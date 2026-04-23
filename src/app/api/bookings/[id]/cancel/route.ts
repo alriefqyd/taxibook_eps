@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { notify } from '@/lib/notify'
 
 export async function POST(
   request: NextRequest,
@@ -60,7 +61,7 @@ export async function POST(
     const taxiName   = booking.taxis?.name
 
     if (driverId) {
-      await admin.from('notifications').insert({
+      await notify({
         user_id:    driverId,
         booking_id: bookingId,
         title:      'Booking cancelled',

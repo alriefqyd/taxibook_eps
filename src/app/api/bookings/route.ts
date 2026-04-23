@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { sendPushToUser } from '@/lib/push'
+import { notify } from '@/lib/notify'
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,15 +71,13 @@ export async function POST(request: NextRequest) {
           hour: '2-digit', minute: '2-digit'
         })
 
-        await admin.from('notifications').insert({
+        await notify({
           user_id:    result.taxi.driver_id,
           booking_id: booking.id,
           title:      'New trip assigned',
           body:       `${passenger?.name} → ${destination} at ${time}`,
           type:       'driver_assigned',
         })
-        // Push notification to driver's phone
-        await sendPushToUser(result.taxi.driver_id, '🚗 New trip assigned', `${passenger?.name} → ${destination} at ${time}`, '/driver/home')
 
         return NextResponse.json({
           booking:     { ...booking, taxi_id: result.taxi.id, status: 'pending_driver_approval' },
