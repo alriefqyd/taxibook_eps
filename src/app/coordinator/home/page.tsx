@@ -1,4 +1,7 @@
 'use client'
+import React from 'react'
+
+const PRIMARY = '#006064'
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -29,18 +32,41 @@ export default function CoordinatorHomePage() {
   const [bookings,   setBookings]   = useState<BookingDetail[]>([])
   const [taxis,      setTaxis]      = useState<TaxiRow[]>([])
   const [loading,    setLoading]    = useState(true)
-  const [activeTab,  setActiveTab]  = useState<'bookings' | 'fleet' | 'calendar'>('bookings')
+  const [showCalendar, setShowCalendar] = useState(false)
   const [filter,     setFilter]     = useState<'all' | 'pending' | 'booked' | 'completed'>('all')
   const [rejectId,   setRejectId]   = useState<string | null>(null)
   const [rejectNote, setRejectNote] = useState('')
   const [processing, setProcessing] = useState<string | null>(null)
+  const [dateFrom,   setDateFrom]   = useState(new Date().toISOString().slice(0,10))
+  const [dateTo,     setDateTo]     = useState(new Date().toISOString().slice(0,10))
+  const dateFromRef = React.useRef(new Date().toISOString().slice(0,10))
+  const dateToRef   = React.useRef(new Date().toISOString().slice(0,10))
+  const [page,        setPage]        = useState(0)
+  const [hasMore,     setHasMore]     = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [menuOpen,    setMenuOpen]    = useState(false)
+  const PAGE_SIZE = 10
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (from?: string, to?: string, pageNum = 0, append = false) => {
+    const parseDate = (s?: string) => {
+      if (!s || typeof s !== 'string') {
+        const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate())
+      }
+      const d = s.split('-').map(Number)
+      return new Date(d[0], d[1]-1, d[2])
+    }
+    const todayStart = parseDate(from); todayStart.setHours(0, 0, 0, 0)
+    const todayEnd   = parseDate(to);   todayEnd.setHours(23, 59, 59, 999)
+
     const [{ data: bks }, { data: txs }] = await Promise.all([
       supabase
         .from('booking_details')
         .select('*')
-        .order('scheduled_at', { ascending: true }),
+        .gte('scheduled_at', todayStart.toISOString())
+        .lt('scheduled_at', todayEnd.toISOString())
+        .not('status', 'in', '("cancelled","rejected")')
+        .order('scheduled_at', { ascending: true })
+        .range(pageNum * 10, pageNum * 10 + 9),
       supabase
         .from('taxis')
         .select('*, users!driver_id(name)')
@@ -48,8 +74,6 @@ export default function CoordinatorHomePage() {
     ])
 
     // Get trips today + declines today per taxi
-    const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
 
     const enriched = await Promise.all(
       (txs || []).map(async (t: any) => {
@@ -81,7 +105,9 @@ export default function CoordinatorHomePage() {
       })
     )
 
-    setBookings(bks || [])
+    const newBks = bks || []
+    setBookings(prev => append ? [...prev, ...newBks] : newBks)
+    setHasMore(newBks.length === 10)
     setTaxis(enriched)
   }, [supabase])
 
@@ -92,13 +118,15 @@ export default function CoordinatorHomePage() {
       const { data: p } = await supabase.from('users').select('*').eq('id', au.id).single()
       if (p?.role !== 'coordinator') { router.push('/login'); return }
       setUser(p)
-      await loadData()
+      await loadData(new Date().toISOString().slice(0,10), new Date().toISOString().slice(0,10), 0, false)
+      setPage(0)
       setLoading(false)
     }
     init()
 
     const ch = supabase.channel('coord-home')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, loadData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => loadData(dateFromRef.current, dateToRef.current, 0, false))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, () => loadData(dateFromRef.current, dateToRef.current, 0, false))
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
@@ -132,7 +160,7 @@ export default function CoordinatorHomePage() {
         : `🔔 Check notification bell for alerts`)
 
     alert(msg)
-    await loadData()
+    await loadData(dateFrom, dateTo, 0, false)
   }
 
   async function handleApprove(bookingId: string) {
@@ -143,7 +171,7 @@ export default function CoordinatorHomePage() {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ action: 'approve' }),
     })
-    await loadData()
+    await loadData(dateFrom, dateTo, 0, false)
     setProcessing(null)
   }
 
@@ -157,7 +185,7 @@ export default function CoordinatorHomePage() {
     })
     setRejectId(null)
     setRejectNote('')
-    await loadData()
+    await loadData(dateFrom, dateTo, 0, false)
     setProcessing(null)
   }
 
@@ -166,130 +194,207 @@ export default function CoordinatorHomePage() {
       .from('taxis')
       .update({ is_available: !current })
       .eq('id', taxiId)
-    await loadData()
+    await loadData(dateFrom, dateTo, 0, false)
   }
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
-      <p style={{ color: '#A8A6A0' }}>Loading...</p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } } @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
+      <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(0,96,100,0.15)', borderTop: '3px solid #006064', animation: 'spin 0.8s linear infinite' }} />
     </div>
   )
 
   const pendingApproval = bookings.filter(b => b.status === 'pending_coordinator_approval')
-  const filtered = filter === 'all' ? bookings
-    : filter === 'pending' ? bookings.filter(b => ['submitted','pending_coordinator_approval','pending_driver_approval'].includes(b.status))
-    : filter === 'booked'  ? bookings.filter(b => ['booked','on_trip','waiting_trip'].includes(b.status))
-    : bookings.filter(b => b.status === 'completed')
+  // Exclude pending_coordinator_approval from main list — shown separately above
+  const mainBookings = bookings.filter(b => b.status !== 'pending_coordinator_approval')
+  const filtered = filter === 'all'       ? mainBookings
+    : filter === 'pending'  ? mainBookings.filter(b => ['submitted','pending_driver_approval'].includes(b.status))
+    : filter === 'booked'   ? mainBookings.filter(b => ['booked','on_trip','waiting_trip'].includes(b.status))
+    : mainBookings.filter(b => b.status === 'completed')
+
+  const initials = user?.name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') || 'C'
 
   return (
-    <div style={{ fontFamily: 'system-ui,sans-serif', minHeight: '100vh', background: '#F4F3EF' }}>
+    <div style={{ fontFamily: "'Inter', sans-serif", minHeight: '100vh', background: '#F5F5F2' }}>
 
-      {/* Header */}
-      <div style={{ background: '#fff', padding: '20px 20px 0', borderBottom: '1px solid #E0DED8' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-          <div>
-            <h1 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 2px', letterSpacing: '-0.3px' }}>
-              Coordinator
-            </h1>
-            <p style={{ fontSize: '13px', color: '#6B6963', margin: 0 }}>
-              {format(new Date(), 'EEEE, d MMMM yyyy', { locale: idLocale })}
-            </p>
-
+      {/* ── TopAppBar — matches reference design ── */}
+      <header style={{
+        background: '#F5F5F2',
+        borderBottom: '1px solid rgba(0,0,0,0.08)',
+        boxShadow: '0 1px 4px rgba(0,96,100,0.06)',
+        position: 'sticky', top: 0, zIndex: 40,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', height: 64 }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ background: '#006064', borderRadius: 8, padding: '4px 10px', display: 'flex', alignItems: 'center' }}>
+              <span style={{ fontSize: 15, fontWeight: 900, color: '#ffffff', letterSpacing: '2px', fontFamily: 'Arial Black, sans-serif' }}>VALE</span>
+            </div>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#006064', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '0.3px', lineHeight: 1 }}>TaxiBook EPS</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#344500', display: 'inline-block' }} />
+                <span style={{ fontSize: 10, color: '#6f7979', fontWeight: 500 }}>Coordinator</span>
+              </div>
+            </div>
           </div>
-          <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#FEF3C7', color: '#92400E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700 }}>
-            {user?.name?.split(' ').map(n => n[0]).slice(0,2).join('')}
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '16px' }}>
-          <StatCard label="Total" value={bookings.length} />
-          <StatCard label="Approval" value={pendingApproval.length} color="#92400E" bg="#FEF3C7" />
-          <StatCard label="Active" value={bookings.filter(b=>['booked','on_trip','waiting_trip'].includes(b.status)).length} color="#065F46" bg="#D1FAE5" />
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: '0' }}>
-          {(['bookings','fleet','calendar'] as const).map(t => (
-            <button key={t} onClick={() => setActiveTab(t)} style={{
-              flex: 1, padding: '10px', fontSize: '12px', fontWeight: 600,
-              border: 'none', background: 'transparent', cursor: 'pointer',
-              borderBottom: activeTab === t ? '2px solid #0F0F0F' : '2px solid transparent',
-              color: activeTab === t ? '#0F0F0F' : '#A8A6A0',
-              textTransform: 'capitalize',
-            }}>
-              {t === 'bookings' ? `Bookings${bookings.length > 0 ? ` (${bookings.length})` : ''}` : t === 'fleet' ? 'Fleet' : 'Calendar'}
+          {/* Right: bell + avatar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button onClick={() => router.push('/coordinator/notifications')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             </button>
-          ))}
+            <div style={{ position: 'relative' }}>
+              <div onClick={() => setMenuOpen(o => !o)} style={{ width: 36, height: 36, borderRadius: '50%', background: '#006064', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, border: '2px solid rgba(0,96,100,0.3)', cursor: 'pointer' }}>
+                {initials}
+              </div>
+              {menuOpen && (
+                <>
+                  <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 98 }} />
+                  <div style={{ position: 'absolute', top: 44, right: 0, background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 99, minWidth: 220, overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: '#F5F5F2' }}>
+                      <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 2px', color: '#1a1c1b' }}>{user?.name}</p>
+                      <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>Coordinator</p>
+                    </div>
+                    <button onClick={() => { setMenuOpen(false); router.push('/coordinator/profile') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>View profile</p>
+                    </button>
+                    <button onClick={async () => { setMenuOpen(false); await supabase.auth.signOut(); router.push('/login') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ba1a1a" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#ba1a1a' }}>Sign out</p>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      </header>
+
+
 
       <div style={{ padding: '16px' }}>
 
         {/* ── BOOKINGS TAB ── */}
-        {activeTab === 'bookings' && (
+        {!showCalendar && (
           <>
-            {/* Pending approval alert */}
+            {/* Pending approval — pinned at top */}
             {pendingApproval.length > 0 && (
-              <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '12px', padding: '12px 14px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#D97706', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
-                  {pendingApproval.length}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#D97706', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
+                    {pendingApproval.length}
+                  </div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: '#7e5700', margin: 0, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                    Needs approval
+                  </p>
                 </div>
-                <p style={{ fontSize: '13px', fontWeight: 600, color: '#92400E', margin: 0 }}>
-                  {pendingApproval.length} booking{pendingApproval.length > 1 ? 's' : ''} need your approval
-                </p>
+                {pendingApproval.map(b => (
+                  <BookingCard key={b.id} booking={b} isProcessing={processing === b.id} onApprove={() => handleApprove(b.id)} onReject={() => setRejectId(b.id)} onReassign={() => router.push('/coordinator/dispatch')} />
+                ))}
+                <div style={{ height: 1, background: 'rgba(0,0,0,0.08)', margin: '14px 0 16px' }} />
               </div>
             )}
 
-            {/* Filter tabs */}
-            <div style={{ display: 'flex', background: '#ECEAE4', borderRadius: '999px', padding: '3px', gap: '2px', marginBottom: '12px' }}>
-              {(['all','pending','booked','completed'] as const).map(f => (
-                <button key={f} onClick={() => setFilter(f)} style={{
-                  flex: 1, padding: '5px 4px', fontSize: '11px', fontWeight: 600,
-                  border: 'none', borderRadius: '999px', cursor: 'pointer',
-                  background: filter === f ? '#fff' : 'transparent',
-                  color: filter === f ? '#0F0F0F' : '#A8A6A0',
-                  textTransform: 'capitalize',
-                }}>
-                  {f}
+            {/* Status filters + date range in one compact row */}
+            <div style={{ marginBottom: 14 }}>
+              {/* Status pills */}
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10, paddingBottom: 2 }}>
+                {([
+                  { key: 'all',       label: 'All',       count: mainBookings.length },
+                  { key: 'pending',   label: 'Pending',   count: mainBookings.filter(b=>['submitted','pending_driver_approval'].includes(b.status)).length },
+                  { key: 'booked',    label: 'Confirmed', count: mainBookings.filter(b=>['booked','on_trip','waiting_trip'].includes(b.status)).length },
+                  { key: 'completed', label: 'Done',      count: mainBookings.filter(b=>b.status==='completed').length },
+                ] as const).map(f => (
+                  <button key={f.key} onClick={() => setFilter(f.key as any)} style={{
+                    padding: '5px 12px', fontSize: 12, fontWeight: 600, flexShrink: 0,
+                    border: `1.5px solid ${filter === f.key ? '#006064' : 'rgba(0,0,0,0.08)'}`,
+                    borderRadius: 9999, cursor: 'pointer', fontFamily: 'inherit',
+                    background: filter === f.key ? '#006064' : '#fff',
+                    color:      filter === f.key ? '#fff'    : '#3f4949',
+                  }}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Date range — fits content, not full width */}
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, padding: '7px 12px' }}>
+                <span style={{ fontSize: 12, flexShrink: 0 }}>📅</span>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={e => { setDateFrom(e.target.value); dateFromRef.current = e.target.value; setPage(0); loadData(e.target.value, dateToRef.current, 0, false) }}
+                  style={{ width: 130, border: 'none', outline: 'none', fontSize: 13, fontFamily: 'inherit', background: 'transparent', color: '#006064' }}
+                />
+                <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, flexShrink: 0 }}>→</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={e => { setDateTo(e.target.value); dateToRef.current = e.target.value; setPage(0); loadData(dateFromRef.current, e.target.value, 0, false) }}
+                  style={{ width: 130, border: 'none', outline: 'none', fontSize: 13, fontFamily: 'inherit', background: 'transparent', color: '#006064' }}
+                />
+                <button
+                  onClick={() => { const today = new Date().toISOString().slice(0,10); setDateFrom(today); setDateTo(today); dateFromRef.current = today; dateToRef.current = today; setPage(0); loadData(today, today, 0, false) }}
+                  style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9999, border: '1px solid rgba(0,0,0,0.08)', background: '#F5F5F2', color: '#6f7979', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+                >
+                  Today
                 </button>
-              ))}
+              </div>
             </div>
 
-            {/* Booking list */}
+            {/* Booking list with load more */}
             {filtered.length === 0
-              ? <EmptyState label="No bookings" />
-              : filtered.map(b => (
-                <BookingCard
-                  key={b.id}
-                  booking={b}
-                  isProcessing={processing === b.id}
-                  onApprove={() => handleApprove(b.id)}
-                  onReject={() => setRejectId(b.id)}
-                />
-              ))
+              ? <EmptyState label="No bookings for this period" />
+              : <>
+                  {filtered.map(b => (
+                    <BookingCard
+                      key={b.id}
+                      booking={b}
+                      isProcessing={processing === b.id}
+                      onApprove={() => handleApprove(b.id)}
+                      onReject={() => setRejectId(b.id)}
+                      onReassign={() => router.push('/coordinator/dispatch')}
+                    />
+                  ))}
+                  {hasMore && (
+                    <button
+                      disabled={loadingMore}
+                      onClick={async () => {
+                        setLoadingMore(true)
+                        const nextPage = page + 1
+                        setPage(nextPage)
+                        await loadData(dateFrom, dateTo, nextPage, true)
+                        setLoadingMore(false)
+                      }}
+                      style={{ width: '100%', padding: '12px', marginTop: 8, background: '#F5F5F2', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, fontSize: 13, fontWeight: 600, color: loadingMore ? '#9ca3af' : '#006064', cursor: loadingMore ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+                    >
+                      {loadingMore ? 'Loading...' : 'Load more'}
+                    </button>
+                  )}
+                </>
             }
           </>
         )}
 
         {/* ── CALENDAR TAB ── */}
-        {activeTab === 'calendar' && (
+        {showCalendar && (
           <div style={{ margin: '0 -16px' }}>
             <GanttCalendar bookings={bookings} taxis={taxis} />
           </div>
         )}
 
         {/* ── FLEET TAB ── */}
-        {activeTab === 'fleet' && (
+        {false && (
           <div>
             {taxis.map(t => (
-              <div key={t.id} style={{ background: '#fff', border: '1px solid #E0DED8', borderRadius: '14px', padding: '14px', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+              <div key={t.id} style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, padding: '14px', marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ width: 10, height: 10, borderRadius: '50%', background: t.color, flexShrink: 0 }} />
                     <div>
                       <p style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 2px' }}>{t.name}</p>
-                      <p style={{ fontSize: '12px', color: '#6B6963', margin: 0 }}>{t.driver_name || 'No driver'} {t.plate ? `· ${t.plate}` : ''}</p>
+                      <p style={{ fontSize: '12px', color: '#6f7979', margin: 0 }}>{t.driver_name || 'No driver'} {t.plate ? `· ${t.plate}` : ''}</p>
                     </div>
                   </div>
 
@@ -298,7 +403,7 @@ export default function CoordinatorHomePage() {
                     onClick={() => toggleAvailability(t.id, t.is_available)}
                     style={{
                       padding: '5px 12px', fontSize: '11px', fontWeight: 700,
-                      border: 'none', borderRadius: '999px', cursor: 'pointer',
+                      border: 'none', borderRadius: 9999, cursor: 'pointer',
                       background: t.is_available ? '#D1FAE5' : '#FEE2E2',
                       color:      t.is_available ? '#065F46' : '#991B1B',
                     }}
@@ -309,18 +414,18 @@ export default function CoordinatorHomePage() {
 
                 {/* Stats row */}
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <div style={{ background: '#F4F3EF', borderRadius: '8px', padding: '6px 10px', flex: 1, textAlign: 'center' }}>
-                    <p style={{ fontSize: '10px', color: '#A8A6A0', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Trips today</p>
+                  <div style={{ background: '#F5F5F2', borderRadius: '8px', padding: '6px 10px', flex: 1, textAlign: 'center' }}>
+                    <p style={{ fontSize: '10px', color: '#9ca3af', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Trips today</p>
                     <p style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>{t.trips_today}</p>
                   </div>
-                  <div style={{ background: t.declines_today >= 2 ? '#FEE2E2' : '#F4F3EF', borderRadius: '8px', padding: '6px 10px', flex: 1, textAlign: 'center' }}>
-                    <p style={{ fontSize: '10px', color: t.declines_today >= 2 ? '#991B1B' : '#A8A6A0', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Declines</p>
-                    <p style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: t.declines_today >= 2 ? '#991B1B' : '#0F0F0F' }}>{t.declines_today}</p>
+                  <div style={{ background: t.declines_today >= 2 ? '#FEE2E2' : 'rgba(0,0,0,0.04)', borderRadius: '8px', padding: '6px 10px', flex: 1, textAlign: 'center' }}>
+                    <p style={{ fontSize: '10px', color: t.declines_today >= 2 ? '#991B1B' : '#9ca3af', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Declines</p>
+                    <p style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: t.declines_today >= 2 ? '#991B1B' : '#006064' }}>{t.declines_today}</p>
                   </div>
                 </div>
 
                 {t.declines_today >= 2 && (
-                  <p style={{ fontSize: '11px', color: '#991B1B', margin: '8px 0 0', background: '#FEE2E2', padding: '6px 10px', borderRadius: '6px' }}>
+                  <p style={{ fontSize: '11px', color: '#991B1B', margin: '8px 0 0', background: '#ffdad6', padding: '6px 10px', borderRadius: '6px' }}>
                     ⚠ {t.driver_name} has declined {t.declines_today} trips today. Consider marking unavailable.
                   </p>
                 )}
@@ -333,10 +438,10 @@ export default function CoordinatorHomePage() {
       {/* Reject modal */}
       {rejectId && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 100 }}>
-          <div style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px' }}>
+          <div style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 14px' }}>Reject booking</h2>
             <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#A8A6A0', display: 'block', marginBottom: '6px' }}>
+              <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', display: 'block', marginBottom: '6px' }}>
                 Reason (optional)
               </label>
               <input
@@ -344,14 +449,14 @@ export default function CoordinatorHomePage() {
                 value={rejectNote}
                 onChange={e => setRejectNote(e.target.value)}
                 placeholder="e.g. No drivers available for this time"
-                style={{ width: '100%', padding: '11px 14px', fontSize: '14px', border: '1.5px solid #E0DED8', borderRadius: '10px', boxSizing: 'border-box', outline: 'none' }}
+                style={{ width: '100%', padding: '11px 14px', fontSize: '14px', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: '10px', boxSizing: 'border-box', outline: 'none' }}
               />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button onClick={() => { setRejectId(null); setRejectNote('') }} style={{ padding: '12px', background: 'transparent', border: '1.5px solid #E0DED8', borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => { setRejectId(null); setRejectNote('') }} style={{ padding: '12px', background: 'transparent', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
                 Cancel
               </button>
-              <button onClick={() => handleReject(rejectId)} style={{ padding: '12px', background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => handleReject(rejectId)} style={{ padding: '12px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
                 Reject
               </button>
             </div>
@@ -363,75 +468,81 @@ export default function CoordinatorHomePage() {
 }
 
 // ── Booking card ──────────────────────────────────────────────────────────────
-function BookingCard({ booking: b, isProcessing, onApprove, onReject }: {
+function BookingCard({ booking: b, isProcessing, onApprove, onReject, onReassign }: {
   booking: BookingDetail
   isProcessing: boolean
   onApprove: () => void
   onReject: () => void
+  onReassign?: () => void
 }) {
   const sc = STATUS_COLORS[b.status]
   const needsApproval = b.status === 'pending_coordinator_approval'
 
   return (
-    <div style={{ background: '#fff', border: `1px solid ${needsApproval ? '#FCD34D' : '#E0DED8'}`, borderLeft: needsApproval ? '3px solid #D97706' : '1px solid #E0DED8', borderRadius: '14px', padding: '14px', marginBottom: '8px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+    <div style={{ background: '#ffffff', borderRadius: 16, padding: '14px 16px', marginBottom: 10, boxShadow: '0 2px 8px rgba(0,96,100,0.06)', border: `1px solid ${needsApproval ? 'rgba(217,119,6,0.2)' : 'rgba(0,0,0,0.06)'}`, borderLeft: `3px solid ${needsApproval ? '#d97706' : '#006064'}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
         <div style={{ flex: 1, minWidth: 0, marginRight: '8px' }}>
           <p style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {b.passenger_name}
           </p>
-          <p style={{ fontSize: '12px', color: '#6B6963', margin: 0 }}>
+          <p style={{ fontSize: '12px', color: '#6f7979', margin: 0 }}>
             {format(new Date(b.scheduled_at), 'EEE d MMM · HH:mm', { locale: idLocale })}
           </p>
-          <p style={{ fontSize: '12px', color: '#6B6963', margin: '2px 0 0' }}>
+          <p style={{ fontSize: '12px', color: '#6f7979', margin: '2px 0 0' }}>
             {b.pickup} → {b.destination}
           </p>
         </div>
-        <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '999px', flexShrink: 0, background: sc.bg, color: sc.text }}>
+        <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: 9999, flexShrink: 0, background: sc.bg, color: sc.text }}>
           {STATUS_LABELS[b.status]}
         </span>
       </div>
 
       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginBottom: needsApproval ? '10px' : '0' }}>
-        <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px', background: b.trip_type === 'DROP' ? '#DBEAFE' : '#EDE9FE', color: b.trip_type === 'DROP' ? '#1E3A5F' : '#4C1D95' }}>
+        <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: b.trip_type === 'DROP' ? '#DBEAFE' : '#EDE9FE', color: b.trip_type === 'DROP' ? '#1E3A5F' : '#4C1D95' }}>
           {b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}min`}
         </span>
         {b.taxi_name
-          ? <span style={{ fontSize: '11px', color: '#6B6963', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          ? <span style={{ fontSize: '11px', color: '#6f7979', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: b.taxi_color || '#888', display: 'inline-block' }} />
               {b.taxi_name} · {b.driver_name}
             </span>
-          : <span style={{ fontSize: '11px', color: '#A8A6A0' }}>Unassigned</span>
+          : <span style={{ fontSize: '11px', color: '#9ca3af' }}>Unassigned</span>
         }
       </div>
 
       {needsApproval && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-          <button onClick={onReject} disabled={isProcessing} style={{ padding: '9px', background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: 6 }}>
+          <button onClick={onReject} disabled={isProcessing} style={{ padding: '9px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
             Reject
           </button>
-          <button onClick={onApprove} disabled={isProcessing} style={{ padding: '9px', background: '#D1FAE5', color: '#065F46', border: '1px solid #6EE7B7', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+          <button onClick={onApprove} disabled={isProcessing} style={{ padding: '9px', background: '#d8f3dc', color: '#2D6A4F', border: '1px solid #6EE7B7', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
             {isProcessing ? '...' : 'Approve'}
           </button>
         </div>
+      )}
+      {!needsApproval && !['completed','cancelled','rejected'].includes(b.status) && onReassign && (
+        <button onClick={onReassign} style={{ width: '100%', padding: '7px', background: '#F5F5F2', color: '#6f7979', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>
+          🔄 Reassign taxi
+        </button>
       )}
     </div>
   )
 }
 
-function StatCard({ label, value, color = '#0F0F0F', bg = '#F4F3EF' }: {
+function StatCard({ label, value, color = '#006064', bg = 'rgba(0,0,0,0.04)' }: {
   label: string; value: number; color?: string; bg?: string
 }) {
   return (
-    <div style={{ background: bg, borderRadius: '10px', padding: '12px' }}>
-      <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: color === '#0F0F0F' ? '#A8A6A0' : color, margin: '0 0 4px' }}>{label}</p>
-      <p style={{ fontSize: '22px', fontWeight: 700, margin: 0, letterSpacing: '-0.5px', color }}>{value}</p>
+    <div style={{ background: bg, borderRadius: 12, padding: '12px 14px', textAlign: 'center' }}>
+      <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color, margin: '0 0 4px', opacity: 0.75 }}>{label}</p>
+      <p style={{ fontSize: 26, fontWeight: 800, margin: 0, letterSpacing: '-1px', lineHeight: 1, color }}>{value}</p>
     </div>
   )
 }
 
 function EmptyState({ label }: { label: string }) {
   return (
-    <div style={{ textAlign: 'center', padding: '40px 20px', color: '#A8A6A0' }}>
+    <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9ca3af' }}>
       <p style={{ fontSize: '14px', margin: 0 }}>{label}</p>
     </div>
   )

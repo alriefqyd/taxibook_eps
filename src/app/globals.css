@@ -1,3 +1,4 @@
+html, body { background-color: #F5F5F2 !important; margin: 0; padding: 0; }
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
 @tailwind base;
@@ -147,3 +148,5 @@
 @layer utilities {
   .font-mono { font-family: var(--font-dm-mono); }
 }
+
+body { background-color: #F5F5F2; }

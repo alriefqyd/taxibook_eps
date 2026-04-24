@@ -124,7 +124,7 @@ export default function NotificationsPage({ role }: Props) {
 
   if (loading) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'system-ui' }}>
-      <p style={{ color:'#A8A6A0' }}>Loading...</p>
+      <p style={{ color:'#6B7C8F' }}>Loading...</p>
     </div>
   )
 
@@ -137,15 +137,15 @@ export default function NotificationsPage({ role }: Props) {
   }
 
   return (
-    <div style={{ fontFamily:'system-ui,sans-serif', minHeight:'100vh', background:'#F4F3EF' }}>
+    <div style={{ fontFamily: "var(--font-inter), 'Inter', sans-serif", minHeight:'100vh', background:'#F5F5F2' }}>
 
       {/* Header */}
-      <div style={{ background:'#fff', padding:'16px 20px 14px', borderBottom:'1px solid #E0DED8' }}>
+      <div style={{ background:'#ffffff', padding:'16px 20px 14px', borderBottom:'1px solid rgba(0,0,0,0.08)' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
             <button
               onClick={() => router.push(homeMap[role])}
-              style={{ width:32, height:32, borderRadius:'50%', background:'#F4F3EF', border:'1px solid #E0DED8', cursor:'pointer', fontSize:'15px', display:'flex', alignItems:'center', justifyContent:'center' }}
+              style={{ width:32, height:32, borderRadius:'50%', background:'#F5F5F2', border:'1px solid rgba(0,0,0,0.08)', cursor:'pointer', fontSize:'15px', display:'flex', alignItems:'center', justifyContent:'center' }}
             >
               ←
             </button>
@@ -153,7 +153,7 @@ export default function NotificationsPage({ role }: Props) {
               <h1 style={{ fontSize:'18px', fontWeight:700, margin:'0 0 2px', letterSpacing:'-0.3px' }}>
                 Notifications
               </h1>
-              <p style={{ fontSize:'12px', color:'#6B6963', margin:0 }}>
+              <p style={{ fontSize:'12px', color:'#8A9BB0', margin:0 }}>
                 {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
               </p>
             </div>
@@ -174,14 +174,14 @@ export default function NotificationsPage({ role }: Props) {
         {notifications.length === 0 ? (
           <div style={{ textAlign:'center', padding:'60px 20px' }}>
             <p style={{ fontSize:'32px', margin:'0 0 12px' }}>🔔</p>
-            <p style={{ fontSize:'14px', fontWeight:600, color:'#0F0F0F', margin:'0 0 6px' }}>No notifications yet</p>
-            <p style={{ fontSize:'13px', color:'#A8A6A0', margin:0 }}>
+            <p style={{ fontSize:'14px', fontWeight:600, color:'#006064', margin:'0 0 6px' }}>No notifications yet</p>
+            <p style={{ fontSize:'13px', color:'#6B7C8F', margin:0 }}>
               You'll be notified about your bookings here
             </p>
           </div>
         ) : (
           notifications.map(n => {
-            const colors = TYPE_COLORS[n.type] || { bg:'#F4F3EF', border:'#E0DED8', dot:'#A8A6A0' }
+            const colors = TYPE_COLORS[n.type] || { bg:'rgba(0,0,0,0.04)', border:'rgba(0,0,0,0.08)', dot:'#9ca3af' }
             const icon   = TYPE_ICONS[n.type] || '🔔'
             const timeAgo = formatDistanceToNow(new Date(n.sent_at), { addSuffix:true, locale: idLocale })
 
@@ -190,8 +190,8 @@ export default function NotificationsPage({ role }: Props) {
                 key={n.id}
                 style={{
                   background: n.is_read ? '#fff' : colors.bg,
-                  border: `1px solid ${n.is_read ? '#E0DED8' : colors.border}`,
-                  borderLeft: `3px solid ${n.is_read ? '#E0DED8' : colors.dot}`,
+                  border: `1px solid ${n.is_read ? 'rgba(0,0,0,0.08)' : colors.border}`,
+                  borderLeft: `3px solid ${n.is_read ? 'rgba(0,0,0,0.08)' : colors.dot}`,
                   borderRadius:'12px', padding:'12px 14px', marginBottom:'8px',
                   display:'flex', gap:'12px', alignItems:'flex-start',
                 }}
@@ -204,17 +204,17 @@ export default function NotificationsPage({ role }: Props) {
                 {/* Content */}
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'3px' }}>
-                    <p style={{ fontSize:'13px', fontWeight: n.is_read ? 600 : 700, margin:0, color:'#0F0F0F' }}>
+                    <p style={{ fontSize:'13px', fontWeight: n.is_read ? 600 : 700, margin:0, color:'#006064' }}>
                       {n.title}
                     </p>
                     {!n.is_read && (
                       <span style={{ width:8, height:8, borderRadius:'50%', background:colors.dot, flexShrink:0, marginLeft:'8px', marginTop:'3px' }} />
                     )}
                   </div>
-                  <p style={{ fontSize:'12px', color:'#6B6963', margin:'0 0 4px', lineHeight:1.5 }}>
+                  <p style={{ fontSize:'12px', color:'#8A9BB0', margin:'0 0 4px', lineHeight:1.5 }}>
                     {n.body}
                   </p>
-                  <p style={{ fontSize:'11px', color:'#A8A6A0', margin:0 }}>
+                  <p style={{ fontSize:'11px', color:'#6B7C8F', margin:0 }}>
                     {timeAgo}
                   </p>
                 </div>

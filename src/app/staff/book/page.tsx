@@ -18,18 +18,18 @@ interface FormData {
   wait_minutes: number
 }
 
-const FONT = "'DM Sans', -apple-system, sans-serif"
+const FONT = "var(--font-inter), 'Inter', sans-serif"
 
 const C = {
-  black:       '#0F0F0F',
-  white:       '#FAFAF8',
-  surface:     '#F4F3EF',
+  black:       '#006064',
+  white:       '#f9f9f6',
+  surface:     'rgba(0,0,0,0.04)',
   surface2:    '#ECEAE4',
-  border:      '#E0DED8',
+  border:      'rgba(0,0,0,0.08)',
   border2:     '#C8C6C0',
-  textPrimary: '#0F0F0F',
-  textSecond:  '#6B6963',
-  textTert:    '#A8A6A0',
+  textPrimary: '#006064',
+  textSecond:  '#3f4949',
+  textTert:    '#9ca3af',
   green:       '#2D6A4F',
   greenBg:     '#D8F3DC',
   greenMid:    '#52B788',
@@ -201,7 +201,7 @@ export default function BookPage() {
   const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 60
 
   return (
-    <div style={{ fontFamily: FONT, minHeight: '100vh', background: C.surface, WebkitFontSmoothing: 'antialiased' }}>
+    <div style={{ fontFamily: "var(--font-inter), 'Inter', sans-serif", minHeight: '100vh', background: C.surface, WebkitFontSmoothing: 'antialiased' }}>
 
       {/* ── Header ── */}
       <div style={{ background: C.white, borderBottom: `1px solid ${C.border}`, padding: '12px 20px 0' }}>
@@ -230,14 +230,14 @@ export default function BookPage() {
         {step === 1 && (
           <div>
             {/* Mode toggle */}
-            <div style={{ background: C.surface2, borderRadius: 14, padding: 4, display: 'flex', gap: 4, marginBottom: 24 }}>
+            <div style={{ background: C.surface2, borderRadius: 16, padding: 4, display: 'flex', gap: 4, marginBottom: 24 }}>
               {(['now','schedule'] as BookingMode[]).map(m => (
                 <button
                   key={m}
                   onClick={() => update('mode', m)}
                   style={{
                     flex: 1, padding: '10px 8px', border: 'none', borderRadius: 11,
-                    cursor: 'pointer', fontFamily: FONT, fontWeight: 600, fontSize: 13,
+                    cursor: 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif", fontWeight: 600, fontSize: 13,
                     transition: 'all 0.15s',
                     background: form.mode === m ? C.white : 'transparent',
                     color: form.mode === m ? C.textPrimary : C.textTert,
@@ -251,7 +251,7 @@ export default function BookPage() {
 
             {/* Now status */}
             {form.mode === 'now' && !noTaxiMsg && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: C.greenBg, border: `1px solid #B7E4C7`, borderRadius: 10, marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: C.greenBg, border: `1px solid #B7E4C7`, borderRadius: 12, marginBottom: 20 }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.greenMid, flexShrink: 0, display: 'inline-block' }} />
                 <p style={{ fontSize: 12, color: C.green, margin: 0, fontWeight: 500 }}>
                   Taxi will be assigned immediately after submission
@@ -261,7 +261,7 @@ export default function BookPage() {
 
             {/* No taxi error */}
             {noTaxiMsg && (
-              <div style={{ padding: '10px 14px', background: C.redBg, border: `1px solid #FECACA`, borderRadius: 10, marginBottom: 20 }}>
+              <div style={{ padding: '10px 14px', background: C.redBg, border: `1px solid #FECACA`, borderRadius: 12, marginBottom: 20 }}>
                 <p style={{ fontSize: 12, fontWeight: 600, color: C.red, margin: '0 0 2px' }}>⚠ No taxi available right now</p>
                 <p style={{ fontSize: 12, color: C.red, margin: 0 }}>{noTaxiMsg}</p>
               </div>
@@ -348,7 +348,7 @@ export default function BookPage() {
               </FG>
             )}
 
-            <div style={{ padding: '12px 14px', borderRadius: 10, border: `1px solid ${needsApproval ? '#FDE68A' : '#B7E4C7'}`, background: needsApproval ? C.amberBg : C.greenBg }}>
+            <div style={{ padding: '12px 14px', borderRadius: 12, border: `1px solid ${needsApproval ? '#FDE68A' : '#B7E4C7'}`, background: needsApproval ? C.amberBg : C.greenBg }}>
               <p style={{ fontSize: 12, fontWeight: 600, color: needsApproval ? C.amber : C.green, margin: '0 0 2px' }}>
                 {needsApproval ? '⚠ Coordinator approval required' : '✓ Auto-assigned'}
               </p>
@@ -406,7 +406,7 @@ export default function BookPage() {
             </div>
 
             {/* Status notice */}
-            <div style={{ padding: '12px 14px', borderRadius: 10, border: `1px solid ${needsApproval ? '#FDE68A' : '#B7E4C7'}`, background: needsApproval ? C.amberBg : C.greenBg, marginBottom: 4 }}>
+            <div style={{ padding: '12px 14px', borderRadius: 12, border: `1px solid ${needsApproval ? '#FDE68A' : '#B7E4C7'}`, background: needsApproval ? C.amberBg : C.greenBg, marginBottom: 4 }}>
               <p style={{ fontSize: 12, color: needsApproval ? C.amber : C.green, margin: 0 }}>
                 {needsApproval
                   ? '⏳ Sent to coordinator for approval first.'
@@ -420,7 +420,7 @@ export default function BookPage() {
 
         {/* Error */}
         {error && (
-          <div style={{ padding: '10px 14px', background: C.redBg, border: `1px solid #FECACA`, borderRadius: 10, marginTop: 12 }}>
+          <div style={{ padding: '10px 14px', background: C.redBg, border: `1px solid #FECACA`, borderRadius: 12, marginTop: 12 }}>
             <p style={{ fontSize: 12, color: C.red, margin: 0, fontWeight: 500 }}>{error}</p>
           </div>
         )}
@@ -431,7 +431,7 @@ export default function BookPage() {
             <button
               onClick={handleNext}
               disabled={checkingNow}
-              style={{ width: '100%', padding: '14px 20px', background: checkingNow ? C.border2 : C.black, color: C.white, border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: checkingNow ? 'not-allowed' : 'pointer', fontFamily: FONT, letterSpacing: '-0.1px', transition: 'opacity 0.15s' }}
+              style={{ width: '100%', padding: '14px 20px', background: checkingNow ? C.border2 : C.black, color: C.white, border: 'none', borderRadius: 16, fontSize: 15, fontWeight: 600, cursor: checkingNow ? 'not-allowed' : 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif", letterSpacing: '-0.1px', transition: 'opacity 0.15s' }}
             >
               {checkingNow ? 'Checking availability...' : step === 1 ? 'Next — Trip type →' : 'Next — Review →'}
             </button>
@@ -439,7 +439,7 @@ export default function BookPage() {
             <button
               onClick={submit}
               disabled={loading}
-              style={{ width: '100%', padding: '14px 20px', background: loading ? C.border2 : C.black, color: C.white, border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: FONT, letterSpacing: '-0.1px' }}
+              style={{ width: '100%', padding: '14px 20px', background: loading ? C.border2 : C.black, color: C.white, border: 'none', borderRadius: 16, fontSize: 15, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif", letterSpacing: '-0.1px' }}
             >
               {loading ? 'Submitting...' : 'Confirm booking'}
             </button>
@@ -454,7 +454,7 @@ export default function BookPage() {
 function FG({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#A8A6A0', marginBottom: 6 }}>
+      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 6 }}>
         {label}
       </label>
       {children}
@@ -479,9 +479,9 @@ function formatDateTime(s: string) {
 
 const inputSt: React.CSSProperties = {
   width: '100%', padding: '12px 14px', fontSize: 14,
-  fontFamily: "'DM Sans', sans-serif",
-  border: '1.5px solid #E0DED8', borderRadius: 12,
-  background: '#FAFAF8', color: '#0F0F0F',
+  fontFamily: "var(--font-inter), 'Inter', sans-serif",
+  border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 16,
+  background: '#F5F5F2', color: '#006064',
   boxSizing: 'border-box', outline: 'none',
   transition: 'border-color 0.15s',
 }

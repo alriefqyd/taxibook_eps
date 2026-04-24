@@ -127,8 +127,8 @@ export async function POST(
           await notify({
             user_id:    booking.passenger_id,
             booking_id: bookingId,
-            title:      'Trip approved & assigned',
-            body:       `Your trip to ${booking.destination} has been approved — ${assignedTaxi.name}`,
+            title:      '✅ Trip approved!',
+            body:       `Your trip to ${booking.destination} is approved. ${assignedTaxi.name} will confirm shortly.`,
             type:       'booking_confirmed',
           })
         }

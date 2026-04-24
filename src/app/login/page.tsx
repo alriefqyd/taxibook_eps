@@ -72,12 +72,12 @@ export default function LoginPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#F4F3EF',
+      background: '#F5F5F2',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '24px',
-      fontFamily: 'system-ui, sans-serif',
+      fontFamily: "var(--font-inter), 'Inter', sans-serif",
     }}>
       <div style={{ width: '100%', maxWidth: '360px' }}>
 
@@ -85,7 +85,7 @@ export default function LoginPage() {
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{
             width: '56px', height: '56px',
-            background: '#0F0F0F',
+            background: '#006064',
             borderRadius: '16px',
             margin: '0 auto 12px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -100,7 +100,7 @@ export default function LoginPage() {
           <h1 style={{ fontSize: '24px', fontWeight: '700', margin: '0 0 4px' }}>
             TaxiBook
           </h1>
-          <p style={{ fontSize: '13px', color: '#6B6963', margin: 0 }}>
+          <p style={{ fontSize: '13px', color: '#3f4949', margin: 0 }}>
             Company fleet management
           </p>
         </div>
@@ -108,7 +108,7 @@ export default function LoginPage() {
         {/* Form */}
         <div style={{
           background: 'white',
-          border: '1px solid #E0DED8',
+          border: '1px solid rgba(0,0,0,0.08)',
           borderRadius: '16px',
           padding: '24px',
         }}>
@@ -117,7 +117,7 @@ export default function LoginPage() {
               <label style={{
                 display: 'block', fontSize: '11px', fontWeight: '700',
                 letterSpacing: '0.08em', textTransform: 'uppercase',
-                color: '#A8A6A0', marginBottom: '6px',
+                color: '#9ca3af', marginBottom: '6px',
               }}>
                 Work email
               </label>
@@ -129,7 +129,7 @@ export default function LoginPage() {
                 required
                 style={{
                   width: '100%', padding: '10px 14px', fontSize: '14px',
-                  border: '1.5px solid #E0DED8', borderRadius: '10px',
+                  border: '1.5px solid rgba(0,0,0,0.08)', borderRadius: '10px',
                   outline: 'none', boxSizing: 'border-box',
                 }}
               />
@@ -139,7 +139,7 @@ export default function LoginPage() {
               <label style={{
                 display: 'block', fontSize: '11px', fontWeight: '700',
                 letterSpacing: '0.08em', textTransform: 'uppercase',
-                color: '#A8A6A0', marginBottom: '6px',
+                color: '#9ca3af', marginBottom: '6px',
               }}>
                 Password
               </label>
@@ -151,7 +151,7 @@ export default function LoginPage() {
                 required
                 style={{
                   width: '100%', padding: '10px 14px', fontSize: '14px',
-                  border: '1.5px solid #E0DED8', borderRadius: '10px',
+                  border: '1.5px solid rgba(0,0,0,0.08)', borderRadius: '10px',
                   outline: 'none', boxSizing: 'border-box',
                 }}
               />
@@ -185,7 +185,7 @@ export default function LoginPage() {
               disabled={loading}
               style={{
                 width: '100%', padding: '12px',
-                background: loading ? '#888' : '#0F0F0F',
+                background: loading ? '#888' : '#006064',
                 color: 'white', border: 'none', borderRadius: '10px',
                 fontSize: '14px', fontWeight: '700', cursor: 'pointer',
               }}
@@ -197,7 +197,7 @@ export default function LoginPage() {
 
         <p style={{
           textAlign: 'center', fontSize: '12px',
-          color: '#A8A6A0', marginTop: '16px',
+          color: '#9ca3af', marginTop: '16px',
         }}>
           Role is assigned by your admin
         </p>

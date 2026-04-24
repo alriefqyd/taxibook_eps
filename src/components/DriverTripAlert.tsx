@@ -124,7 +124,7 @@ export default function DriverTripAlert({ userId }: Props) {
 
       {/* Card */}
       <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 201 }}>
-        <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 360, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ background: '#ffffff', borderRadius: 20, width: '100%', maxWidth: 360, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
 
           {showOverdue && <OverdueCard
             trips={overdueTrips}
@@ -187,7 +187,7 @@ function OverdueCard({ trips, idx, setIdx, processing, onStart }: {
         >
           {processing === trip.id ? 'Starting...' : '🚗 Start trip now'}
         </button>
-        <p style={{ fontSize: 11, color: '#A8A6A0', textAlign: 'center', margin: '10px 0 0' }}>
+        <p style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', margin: '10px 0 0' }}>
           Cannot dismiss — start the trip to close this
         </p>
       </div>
@@ -222,7 +222,7 @@ function PendingCard({ trips, idx, setIdx, upcomingTrips, processing, onRespond 
   return (
     <>
       {/* Header */}
-      <div style={{ background: isNow ? '#0F0F0F' : '#2563EB', padding: '20px 20px 16px' }}>
+      <div style={{ background: isNow ? '#006064' : '#2563EB', padding: '20px 20px 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <span style={{ fontSize: 24 }}>{isNow ? '⚡' : '🚗'}</span>
           <div>
@@ -244,8 +244,8 @@ function PendingCard({ trips, idx, setIdx, upcomingTrips, processing, onRespond 
       {/* Conflict warnings — show all upcoming trips that could conflict */}
       {conflicts.length > 0 && (
         <div style={{ margin: '0 20px 16px' }}>
-          <div style={{ padding: '10px 14px', background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 10 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: '#92400E', margin: '0 0 8px' }}>
+          <div style={{ padding: '10px 14px', background: '#ffdeac', border: '1px solid #FCD34D', borderRadius: 12 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#7e5700', margin: '0 0 8px' }}>
               ⚠ Upcoming schedule conflict{conflicts.length > 1 ? 's' : ''}
             </p>
             {conflicts.map((u, i) => {
@@ -254,14 +254,14 @@ function PendingCard({ trips, idx, setIdx, upcomingTrips, processing, onRespond 
               return (
                 <div key={u.id} style={{ paddingTop: i > 0 ? 6 : 0, marginTop: i > 0 ? 6 : 0, borderTop: i > 0 ? '1px solid #FDE68A' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: '#92400E', margin: 0 }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: '#7e5700', margin: 0 }}>
                       {format(new Date(u.scheduled_at), 'HH:mm')} — {u.destination}
                     </p>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#92400E', background: '#FDE68A', padding: '1px 7px', borderRadius: 999 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#7e5700', background: '#FDE68A', padding: '1px 7px', borderRadius: 9999 }}>
                       in {diffMin}min
                     </span>
                   </div>
-                  <p style={{ fontSize: 11, color: '#92400E', margin: '2px 0 0' }}>
+                  <p style={{ fontSize: 11, color: '#7e5700', margin: '2px 0 0' }}>
                     {uIsWait ? `⏱ Waiting ${u.wait_minutes}min` : '→ Drop'} · Decline if you can't make it back
                   </p>
                 </div>
@@ -276,14 +276,14 @@ function PendingCard({ trips, idx, setIdx, upcomingTrips, processing, onRespond 
         <button
           onClick={() => onRespond(trip.id, 'decline')}
           disabled={processing === trip.id}
-          style={{ padding: '13px', background: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'system-ui' }}
+          style={{ padding: '13px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FECACA', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'system-ui' }}
         >
           Decline
         </button>
         <button
           onClick={() => onRespond(trip.id, 'accept')}
           disabled={processing === trip.id}
-          style={{ padding: '13px', background: '#065F46', color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'system-ui' }}
+          style={{ padding: '13px', background: '#065F46', color: '#fff', border: 'none', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'system-ui' }}
         >
           {processing === trip.id ? '...' : 'Accept'}
         </button>
@@ -306,31 +306,31 @@ function TripBody({ trip }: { trip: UrgentBooking }) {
           <p style={{ fontSize: 18, fontWeight: 700, margin: '0 0 3px', letterSpacing: '-0.3px' }}>
             {trip.passenger_name}
           </p>
-          <span style={{ fontSize: 12, color: '#6B6963', fontWeight: 600, flexShrink: 0 }}>
+          <span style={{ fontSize: 12, color: '#6f7979', fontWeight: 600, flexShrink: 0 }}>
             {format(tripAt, 'HH:mm', { locale: idLocale })}
           </span>
         </div>
         {/* Trip type detail */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{
-            fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+            fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9999,
             background: isWaiting ? '#EDE9FE' : '#DBEAFE',
             color:      isWaiting ? '#4C1D95'  : '#1E3A5F',
           }}>
             {isWaiting ? `⏱ Waiting — ${trip.wait_minutes} min` : '→ Drop only'}
           </span>
-          <span style={{ fontSize: 11, color: '#A8A6A0', fontWeight: 500 }}>
+          <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 500 }}>
             ~{isWaiting ? `${trip.wait_minutes + 30}min total` : '~30min'}
           </span>
         </div>
       </div>
 
       {/* Route */}
-      <div style={{ background: '#F4F3EF', borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
+      <div style={{ background: '#F5F5F2', borderRadius: 16, padding: '12px 14px', marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#0F0F0F', flexShrink: 0 }} />
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#006064', flexShrink: 0 }} />
           <div>
-            <p style={{ fontSize: 10, color: '#A8A6A0', margin: '0 0 1px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Pickup</p>
+            <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 1px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Pickup</p>
             <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{trip.pickup}</p>
           </div>
         </div>
@@ -338,7 +338,7 @@ function TripBody({ trip }: { trip: UrgentBooking }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52B788', flexShrink: 0 }} />
           <div>
-            <p style={{ fontSize: 10, color: '#A8A6A0', margin: '0 0 1px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Destination</p>
+            <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 1px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Destination</p>
             <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{trip.destination}</p>
           </div>
         </div>
@@ -346,9 +346,9 @@ function TripBody({ trip }: { trip: UrgentBooking }) {
 
       {/* Waiting detail box */}
       {isWaiting && (
-        <div style={{ background: '#EDE9FE', border: '1px solid #C4B5FD', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: '#4C1D95', margin: '0 0 2px' }}>⏱ Waiting trip</p>
-          <p style={{ fontSize: 11, color: '#4C1D95', margin: 0 }}>
+        <div style={{ background: 'rgba(0,96,100,0.1)', border: '1px solid #C4B5FD', borderRadius: 10, padding: '8px 12px', marginBottom: 10 }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: '#006064', margin: '0 0 2px' }}>⏱ Waiting trip</p>
+          <p style={{ fontSize: 11, color: '#006064', margin: 0 }}>
             You will wait <strong>{trip.wait_minutes} minutes</strong> at destination for passenger to return.
             Estimated total: ~{trip.wait_minutes + 30} min.
           </p>
@@ -356,8 +356,8 @@ function TripBody({ trip }: { trip: UrgentBooking }) {
       )}
 
       {trip.notes && (
-        <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
-          <p style={{ fontSize: 12, color: '#92400E', margin: 0 }}>📝 {trip.notes}</p>
+        <div style={{ background: '#ffdeac', border: '1px solid #FCD34D', borderRadius: 10, padding: '8px 12px', marginBottom: 10 }}>
+          <p style={{ fontSize: 12, color: '#7e5700', margin: 0 }}>📝 {trip.notes}</p>
         </div>
       )}
     </div>
@@ -380,7 +380,7 @@ function Dots({ count, current, onSelect }: { count: number; current: number; on
 function btnStyle(bg: string): React.CSSProperties {
   return {
     width: '100%', padding: '14px', background: bg, color: '#fff',
-    border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 800,
+    border: 'none', borderRadius: 16, fontSize: 15, fontWeight: 800,
     cursor: 'pointer', fontFamily: 'system-ui', letterSpacing: '-0.2px',
   }
 }

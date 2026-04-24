@@ -4,7 +4,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications'
 export default function StaffLayout({ children }: { children: React.ReactNode }) {
   usePushNotifications()
   return (
-    <div style={{ minHeight: '100dvh', background: '#F4F3EF', paddingBottom: '72px' }}>
+    <div style={{ minHeight: '100dvh', background: '#F5F5F2', paddingBottom: '72px' }}>
       {children}
       <BottomNav role="staff" />
     </div>

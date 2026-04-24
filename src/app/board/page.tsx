@@ -9,7 +9,7 @@ import {
 } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 
-const FONT     = "'DM Sans', -apple-system, sans-serif"
+const FONT     = "var(--font-inter), 'Inter', sans-serif"
 const HOUR_S   = 7
 const HOUR_E   = 20
 const H_PX     = 64   // px per hour
@@ -85,33 +85,35 @@ export default function BoardPage() {
   const availTaxis    = taxis.filter((t: any) => t.is_available && t.driver_id).length
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, background: '#F4F3EF' }}>
-      <p style={{ color: '#A8A6A0', fontSize: 16 }}>Loading dispatch board...</p>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, background: '#F5F5F2' }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } } @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} } @keyframes fadeInUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }`}</style>
+      <div style={{ width: 48, height: 48, borderRadius: '50%', border: '4px solid rgba(0,96,100,0.15)', borderTop: '4px solid #006064', animation: 'spin 0.8s linear infinite' }} />
+      <p style={{ color: '#9ca3af', fontSize: 14, marginTop: 16 }}>Loading dispatch board...</p>
     </div>
   )
 
   return (
-    <div style={{ fontFamily: FONT, minHeight: '100vh', background: '#F4F3EF', display: 'flex', flexDirection: 'column', WebkitFontSmoothing: 'antialiased' }}>
+    <div style={{ fontFamily: FONT, minHeight: '100vh', height: '100vh', maxHeight: '100vh', overflow: 'hidden', background: '#F5F5F2', display: 'flex', flexDirection: 'column', WebkitFontSmoothing: 'antialiased' }}>
 
       {/* ── Top bar ── */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #E0DED8', padding: '0 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, flexShrink: 0 }}>
+      <div style={{ background: '#fff', borderBottom: '1px solid #D4E8EA', padding: '0 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 32, height: 32, background: '#0F0F0F', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 32, height: 32, background: '#007B8A', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ fontSize: 16 }}>🚗</span>
           </div>
           <div>
             <p style={{ fontSize: 15, fontWeight: 700, margin: 0, letterSpacing: '-0.2px' }}>TaxiBook</p>
-            <p style={{ fontSize: 11, color: '#A8A6A0', margin: 0 }}>Dispatch Board</p>
+            <p style={{ fontSize: 11, color: '#9CA3AF', margin: 0 }}>Dispatch Board</p>
           </div>
         </div>
 
         {/* Stats row */}
         <div style={{ display: 'flex', gap: 8 }}>
           {[
-            { label: 'Active trips', value: activeCount,  bg: '#D8F3DC', color: '#2D6A4F' },
-            { label: 'Confirmed',    value: bookedCount,  bg: '#DBEAFE', color: '#1E3A5F' },
-            { label: 'Pending',      value: pendingCount, bg: '#FEF3C7', color: '#92400E' },
-            { label: 'Available',    value: availTaxis,   bg: '#F4F3EF', color: '#6B6963' },
+            { label: 'Active trips', value: activeCount,  bg: '#D8F3DC', color: '#2D7A5C' },
+            { label: 'Confirmed',    value: bookedCount,  bg: '#DBEAFE', color: '#007B8A' },
+            { label: 'Pending',      value: pendingCount, bg: '#FEF3C7', color: '#A16207' },
+            { label: 'Available',    value: availTaxis,   bg: 'rgba(0,0,0,0.04)', color: '#6B7280' },
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, borderRadius: 8, padding: '5px 12px', textAlign: 'center' }}>
               <p style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', letterSpacing: '-0.5px', color: s.color }}>{s.value}</p>
@@ -125,27 +127,27 @@ export default function BoardPage() {
           <p style={{ fontSize: 22, fontWeight: 700, margin: '0 0 1px', letterSpacing: '-0.5px', fontFamily: 'monospace' }}>
             {format(clock, 'HH:mm:ss')}
           </p>
-          <p style={{ fontSize: 11, color: '#A8A6A0', margin: 0 }}>
+          <p style={{ fontSize: 11, color: '#9CA3AF', margin: 0 }}>
             {format(clock, 'EEEE, d MMMM yyyy', { locale: idLocale })}
           </p>
         </div>
       </div>
 
       {/* ── Fleet strip ── */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #E0DED8', padding: '10px 28px', display: 'flex', gap: 10, flexShrink: 0 }}>
+      <div style={{ background: '#fff', borderBottom: '1px solid #D4E8EA', padding: '10px 28px', display: 'flex', gap: 10, flexShrink: 0 }}>
         {taxis.map(t => {
           const activeBk = bookings.find(b => b.taxi_id === t.id && ['on_trip','waiting_trip'].includes(b.status))
           const nextBk   = bookings.find(b => b.taxi_id === t.id && b.status === 'booked')
           const statusText = activeBk ? `🚗 ${activeBk.destination}` : nextBk ? `⏱ ${format(new Date(nextBk.scheduled_at), 'HH:mm')}` : t.is_available ? 'Free' : 'Unavailable'
-          const statusBg   = activeBk ? '#D8F3DC' : nextBk ? '#DBEAFE' : t.is_available ? '#F4F3EF' : '#FEE2E2'
-          const statusClr  = activeBk ? '#2D6A4F' : nextBk ? '#1E3A5F' : t.is_available ? '#6B6963' : '#991B1B'
+          const statusBg   = activeBk ? '#D8F3DC' : nextBk ? '#DBEAFE' : t.is_available ? 'rgba(0,0,0,0.04)' : '#FEE2E2'
+          const statusClr  = activeBk ? '#2D6A4F' : nextBk ? '#1E3A5F' : t.is_available ? '#3f4949' : '#991B1B'
           return (
-            <div key={t.id} style={{ flex: 1, background: '#F4F3EF', borderRadius: 10, padding: '8px 12px', borderLeft: `3px solid ${t.color || '#888'}` }}>
+            <div key={t.id} style={{ flex: 1, background: '#F5F5F2', borderRadius: 10, padding: '8px 12px', borderLeft: `3px solid ${t.color || '#888'}` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.is_available ? t.color : '#D1D5DB', flexShrink: 0, display: 'inline-block' }} />
                 <p style={{ fontSize: 12, fontWeight: 700, margin: 0 }}>{t.name}</p>
               </div>
-              <p style={{ fontSize: 11, color: '#6B6963', margin: '0 0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.driver_name}</p>
+              <p style={{ fontSize: 11, color: '#6B7280', margin: '0 0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.driver_name}</p>
               <div style={{ background: statusBg, borderRadius: 5, padding: '2px 8px', display: 'inline-block' }}>
                 <p style={{ fontSize: 10, fontWeight: 700, color: statusClr, margin: 0 }}>{statusText}</p>
               </div>
@@ -155,15 +157,15 @@ export default function BoardPage() {
       </div>
 
       {/* ── Controls ── */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #E0DED8', padding: '10px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+      <div style={{ background: '#fff', borderBottom: '1px solid #D4E8EA', padding: '10px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         {/* View tabs */}
         <div style={{ background: '#ECEAE4', borderRadius: 999, padding: 3, display: 'flex', gap: 2 }}>
           {(['day','week','month'] as View[]).map(v => (
             <button key={v} onClick={() => { setView(v); setCursor(new Date()) }} style={{
               padding: '6px 18px', fontSize: 12, fontWeight: 600, border: 'none',
               borderRadius: 999, cursor: 'pointer', fontFamily: FONT,
-              background: view === v ? '#fff' : 'transparent',
-              color: view === v ? '#0F0F0F' : '#A8A6A0',
+              background: view === v ? '#ffffff' : 'transparent',
+              color: view === v ? '#006064' : '#9ca3af',
               boxShadow: view === v ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
               textTransform: 'capitalize',
             }}>{v}</button>
@@ -179,14 +181,14 @@ export default function BoardPage() {
           <button onClick={() => navigate(1)} style={navBtnSt}>→</button>
         </div>
 
-        <button onClick={() => setCursor(new Date())} style={{ padding: '6px 16px', fontSize: 12, fontWeight: 600, border: '1px solid #E0DED8', borderRadius: 999, cursor: 'pointer', background: '#fff', fontFamily: FONT, color: '#6B6963' }}>
+        <button onClick={() => setCursor(new Date())} style={{ padding: '6px 16px', fontSize: 12, fontWeight: 600, border: '1px solid #D4E8EA', borderRadius: 999, cursor: 'pointer', background: '#fff', fontFamily: FONT, color: '#6B7280' }}>
           Today
         </button>
       </div>
 
       {/* ── Views ── */}
       <div style={{ flex: 1, padding: '16px 28px 24px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ background: '#fff', border: '1px solid #E0DED8', borderRadius: 12, overflow: 'auto', flex: 1 }}>
+        <div style={{ background: '#fff', border: '1px solid #D4E8EA', borderRadius: 12, overflow: 'auto', flex: 1 }}>
 
           {view === 'day' && (
             <DayView bookings={bookings} taxis={taxis} cursor={cursor} today={today} tooltip={tooltip} setTooltip={setTooltip} />
@@ -216,10 +218,10 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Time header */}
-      <div style={{ display: 'flex', marginLeft: 140, borderBottom: '1px solid #E0DED8', position: 'sticky', top: 0, zIndex: 20, background: '#F4F3EF' }}>
+      <div style={{ display: 'flex', marginLeft: 140, borderBottom: '1px solid #D4E8EA', position: 'sticky', top: 0, zIndex: 20, background: '#F5F5F2' }}>
         {HOURS.map(h => (
-          <div key={h} style={{ width: HOUR_W, flexShrink: 0, padding: '6px 4px', borderLeft: '1px solid #E0DED8' }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#A8A6A0' }}>{String(h).padStart(2,'0')}:00</span>
+          <div key={h} style={{ width: HOUR_W, flexShrink: 0, padding: '6px 4px', borderLeft: '1px solid #D4E8EA' }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF' }}>{String(h).padStart(2,'0')}:00</span>
           </div>
         ))}
       </div>
@@ -228,14 +230,14 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip }: any) {
       {taxis.map((t: any, idx: number) => {
         const txBks = dayBks.filter((b: any) => b.taxi_id === t.id)
         return (
-          <div key={t.id} style={{ display: 'flex', borderBottom: '1px solid #E0DED8', background: idx % 2 === 0 ? '#fff' : '#FAFAF8' }}>
+          <div key={t.id} style={{ display: 'flex', borderBottom: '1px solid #D4E8EA', background: idx % 2 === 0 ? '#fff' : '#f9f9f6' }}>
             {/* Taxi label */}
-            <div style={{ width: 140, flexShrink: 0, padding: '10px 14px', borderRight: '1px solid #E0DED8', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
+            <div style={{ width: 140, flexShrink: 0, padding: '10px 14px', borderRight: '1px solid #D4E8EA', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.is_available ? t.color : '#D1D5DB', flexShrink: 0, display: 'inline-block' }} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: t.is_available ? '#0F0F0F' : '#A8A6A0' }}>{t.name}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: t.is_available ? '#006064' : '#9ca3af' }}>{t.name}</span>
               </div>
-              <span style={{ fontSize: 10, color: '#A8A6A0', paddingLeft: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 10, color: '#9CA3AF', paddingLeft: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {t.is_available ? t.driver_name : 'Unavailable'}
               </span>
             </div>
@@ -244,7 +246,7 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip }: any) {
             <div style={{ flex: 1, position: 'relative', height: ROW_H, minWidth: totalW }}>
               {/* Grid lines */}
               {HOURS.map(h => (
-                <div key={h} style={{ position: 'absolute', left: (h - HOUR_S) * HOUR_W, top: 0, bottom: 0, width: 1, background: '#F0EEE8' }} />
+                <div key={h} style={{ position: 'absolute', left: (h - HOUR_S) * HOUR_W, top: 0, bottom: 0, width: 1, background: '#EAF4F5' }} />
               ))}
               {/* Unavailable hatch */}
               {!t.is_available && (
@@ -302,18 +304,18 @@ function WeekView({ bookings, cursor, today, tooltip, setTooltip }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 800 }}>
       {/* Day headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(7, 1fr)`, borderBottom: '1px solid #E0DED8', position: 'sticky', top: 0, zIndex: 20, background: '#fff' }}>
-        <div style={{ background: '#F4F3EF', borderRight: '1px solid #E0DED8' }} />
+      <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(7, 1fr)`, borderBottom: '1px solid #D4E8EA', position: 'sticky', top: 0, zIndex: 20, background: '#fff' }}>
+        <div style={{ background: '#F5F5F2', borderRight: '1px solid #D4E8EA' }} />
         {days.map(d => {
           const isToday = isSameDay(d, today)
           const cnt     = bookings.filter((b: any) => isSameDay(new Date(b.scheduled_at), d)).length
           return (
-            <div key={d.toISOString()} style={{ textAlign: 'center', padding: '8px 4px', borderRight: '1px solid #E0DED8', background: isToday ? '#0F0F0F' : '#F4F3EF' }}>
-              <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: isToday ? 'rgba(255,255,255,0.6)' : '#A8A6A0', margin: '0 0 2px' }}>
+            <div key={d.toISOString()} style={{ textAlign: 'center', padding: '8px 4px', borderRight: '1px solid #D4E8EA', background: isToday ? '#006064' : 'rgba(0,0,0,0.04)' }}>
+              <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: isToday ? 'rgba(255,255,255,0.6)' : '#9ca3af', margin: '0 0 2px' }}>
                 {format(d, 'EEE', { locale: idLocale })}
               </p>
-              <p style={{ fontSize: 17, fontWeight: 700, color: isToday ? '#fff' : '#0F0F0F', margin: '0 0 1px', lineHeight: 1 }}>{format(d, 'd')}</p>
-              {cnt > 0 && <p style={{ fontSize: 9, color: isToday ? 'rgba(255,255,255,0.6)' : '#A8A6A0', margin: 0 }}>{cnt}</p>}
+              <p style={{ fontSize: 17, fontWeight: 700, color: isToday ? '#fff' : '#006064', margin: '0 0 1px', lineHeight: 1 }}>{format(d, 'd')}</p>
+              {cnt > 0 && <p style={{ fontSize: 9, color: isToday ? 'rgba(255,255,255,0.6)' : '#9ca3af', margin: 0 }}>{cnt}</p>}
             </div>
           )
         })}
@@ -323,8 +325,8 @@ function WeekView({ bookings, cursor, today, tooltip, setTooltip }: any) {
       <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(7, 1fr)` }}>
         <div>
           {HOURS.map(h => (
-            <div key={h} style={{ height: H_PX, borderBottom: '1px solid #E0DED8', borderRight: '1px solid #E0DED8', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', padding: '4px 8px 0 0', background: '#FAFAF8' }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: '#A8A6A0' }}>{String(h).padStart(2,'0')}:00</span>
+            <div key={h} style={{ height: H_PX, borderBottom: '1px solid #D4E8EA', borderRight: '1px solid #D4E8EA', display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', padding: '4px 8px 0 0', background: '#F0F7F8' }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: '#9CA3AF' }}>{String(h).padStart(2,'0')}:00</span>
             </div>
           ))}
         </div>
@@ -332,8 +334,8 @@ function WeekView({ bookings, cursor, today, tooltip, setTooltip }: any) {
           const isToday = isSameDay(d, today)
           const dayBks  = bookings.filter((b: any) => isSameDay(new Date(b.scheduled_at), d))
           return (
-            <div key={d.toISOString()} style={{ position: 'relative', borderRight: '1px solid #E0DED8' }}>
-              {HOURS.map(h => <div key={h} style={{ height: H_PX, borderBottom: '1px solid #F0EEE8' }} />)}
+            <div key={d.toISOString()} style={{ position: 'relative', borderRight: '1px solid #D4E8EA' }}>
+              {HOURS.map(h => <div key={h} style={{ height: H_PX, borderBottom: '1px solid #EAF4F5' }} />)}
               {isToday && <div style={{ position: 'absolute', left: 0, right: 0, top: nowPct, height: 2, background: '#EF4444', zIndex: 10, pointerEvents: 'none' }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444', position: 'absolute', top: -3, left: -4 }} /></div>}
               {dayBks.map((b: any) => {
                 const dt     = new Date(b.scheduled_at)
@@ -371,9 +373,9 @@ function MonthView({ bookings, cursor, today, onDayClick }: any) {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid #E0DED8' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid #D4E8EA' }}>
         {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(n => (
-          <div key={n} style={{ textAlign: 'center', padding: '10px 0', fontSize: 10, fontWeight: 700, color: '#A8A6A0', textTransform: 'uppercase', letterSpacing: '0.06em', borderRight: '1px solid #E0DED8' }}>{n}</div>
+          <div key={n} style={{ textAlign: 'center', padding: '10px 0', fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', borderRight: '1px solid #D4E8EA' }}>{n}</div>
         ))}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
@@ -383,8 +385,8 @@ function MonthView({ bookings, cursor, today, onDayClick }: any) {
           const bks     = bookings.filter((b: any) => isSameDay(new Date(b.scheduled_at), d))
           const shown   = bks.slice(0, 4)
           return (
-            <div key={d.toISOString()} onClick={() => onDayClick(d)} style={{ minHeight: 100, borderRight: '1px solid #E0DED8', borderBottom: '1px solid #E0DED8', padding: 8, opacity: inMonth ? 1 : 0.35, cursor: 'pointer', background: isToday ? '#F8F7FF' : 'transparent' }}>
-              <div style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4, background: isToday ? '#0F0F0F' : 'transparent', fontSize: 12, fontWeight: 700, color: isToday ? '#fff' : '#0F0F0F' }}>
+            <div key={d.toISOString()} onClick={() => onDayClick(d)} style={{ minHeight: 100, borderRight: '1px solid #D4E8EA', borderBottom: '1px solid #D4E8EA', padding: 8, opacity: inMonth ? 1 : 0.35, cursor: 'pointer', background: isToday ? 'rgba(0,96,100,0.06)' : 'transparent' }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4, background: isToday ? '#006064' : 'transparent', fontSize: 12, fontWeight: 700, color: isToday ? '#fff' : '#006064' }}>
                 {format(d, 'd')}
               </div>
               {shown.map((b: any) => {
@@ -396,7 +398,7 @@ function MonthView({ bookings, cursor, today, onDayClick }: any) {
                   </div>
                 )
               })}
-              {bks.length > 4 && <p style={{ fontSize: 9, color: '#A8A6A0', fontWeight: 600, margin: '2px 0 0' }}>+{bks.length - 4} more</p>}
+              {bks.length > 4 && <p style={{ fontSize: 9, color: '#9CA3AF', fontWeight: 600, margin: '2px 0 0' }}>+{bks.length - 4} more</p>}
             </div>
           )
         })}
@@ -408,21 +410,21 @@ function MonthView({ bookings, cursor, today, onDayClick }: any) {
 // ── Legend ──────────────────────────────────────────────────
 function Legend({ taxis }: { taxis: any[] }) {
   return (
-    <div style={{ padding: '10px 16px', borderTop: '1px solid #E0DED8', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', background: '#FAFAF8' }}>
+    <div style={{ padding: '10px 16px', borderTop: '1px solid #D4E8EA', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', background: '#F0F7F8' }}>
       {taxis.map(t => (
         <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.color, display: 'inline-block' }} />
-          <span style={{ fontSize: 11, color: '#6B6963' }}>{t.name} · {t.driver_name}</span>
+          <span style={{ fontSize: 11, color: '#6B7280' }}>{t.name} · {t.driver_name}</span>
         </div>
       ))}
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ display: 'inline-block', width: 16, height: 2, background: '#EF4444' }} />
-          <span style={{ fontSize: 11, color: '#A8A6A0' }}>Now</span>
+          <span style={{ fontSize: 11, color: '#9CA3AF' }}>Now</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px dashed #A8A6A0', borderRadius: 2 }} />
-          <span style={{ fontSize: 11, color: '#A8A6A0' }}>Pending</span>
+          <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px dashed #9ca3af', borderRadius: 2 }} />
+          <span style={{ fontSize: 11, color: '#9CA3AF' }}>Pending</span>
         </div>
       </div>
     </div>
@@ -433,7 +435,7 @@ function Legend({ taxis }: { taxis: any[] }) {
 function Tooltip({ data }: { data: any }) {
   const { b } = data
   return (
-    <div style={{ position: 'fixed', left: data.x + 8, top: data.y, background: '#0F0F0F', color: '#fff', borderRadius: 10, padding: '10px 14px', fontSize: 12, zIndex: 999, pointerEvents: 'none', lineHeight: 1.7, maxWidth: 220, boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}>
+    <div style={{ position: 'fixed', left: data.x + 8, top: data.y, background: '#007B8A', color: '#fff', borderRadius: 10, padding: '10px 14px', fontSize: 12, zIndex: 999, pointerEvents: 'none', lineHeight: 1.7, maxWidth: 220, boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}>
       <p style={{ fontWeight: 700, margin: '0 0 4px', fontSize: 13 }}>{b.passenger_name}</p>
       <p style={{ margin: 0, opacity: 0.8 }}>{format(new Date(b.scheduled_at), 'HH:mm')} · {b.destination}</p>
       <p style={{ margin: 0, opacity: 0.7 }}>{b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}min`}</p>
@@ -444,7 +446,7 @@ function Tooltip({ data }: { data: any }) {
 
 const navBtnSt: React.CSSProperties = {
   width: 30, height: 30, borderRadius: '50%',
-  background: '#fff', border: '1px solid #E0DED8',
-  cursor: 'pointer', fontSize: 14, color: '#6B6963',
+  background: '#fff', border: '1px solid #D4E8EA',
+  cursor: 'pointer', fontSize: 14, color: '#6B7280',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
 }

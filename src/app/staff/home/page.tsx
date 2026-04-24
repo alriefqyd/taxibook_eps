@@ -28,6 +28,12 @@ export default function StaffHomePage() {
   const [bookings, setBookings] = useState<BookingDetail[]>([])
   const [taxis,    setTaxis]    = useState<any[]>([])
   const [loading,  setLoading]  = useState(true)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo,   setDateTo]   = useState('')
+  const [bkPage,      setBkPage]      = useState(0)
+  const [hasMoreBk,   setHasMoreBk]   = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [view,         setView]         = useState<ViewMode>('day')
   const [cursor,       setCursor]       = useState(new Date())
   const [selectedBk,   setSelectedBk]   = useState<any | null>(null)
@@ -41,14 +47,18 @@ export default function StaffHomePage() {
         .select('*')
         .eq('passenger_id', userId)
         .not('status', 'in', '("cancelled")')
-        .order('scheduled_at', { ascending: true }),
+        .order('scheduled_at', { ascending: false })
+        .range(0, 9),
       supabase
         .from('taxis')
         .select('*, users!driver_id(name)')
         .eq('is_active', true)
         .order('name'),
     ])
-    setBookings(bks || [])
+    const bkList = bks || []
+    setBookings(bkList)
+    setHasMoreBk(bkList.length === 10)
+    setBkPage(0)
     setTaxis((txs || []).map((t: any) => ({
       ...t,
       driver_name: t.users?.name || 'No driver',
@@ -83,6 +93,8 @@ export default function StaffHomePage() {
     const ch = supabase.channel('staff-home')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' },
         () => { if (userId) loadData(userId) })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' },
+        () => { if (userId) loadData(userId) })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
@@ -101,15 +113,22 @@ export default function StaffHomePage() {
   }, [loading, view])
 
   if (loading) return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'system-ui' }}>
-      <p style={{ color:'#A8A6A0' }}>Loading...</p>
+    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#F5F5F2', gap: 16, fontFamily:"'Inter',sans-serif" }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <div style={{ width: 44, height: 44, borderRadius: '50%', border: '4px solid rgba(0,96,100,0.15)', borderTop: '4px solid #006064', animation: 'spin 0.8s linear infinite' }} />
     </div>
   )
 
   const today        = new Date()
   const ACTIVE_STATUSES = ['booked','on_trip','waiting_trip']
   const activeBookings  = bookings.filter(b => ACTIVE_STATUSES.includes(b.status))
-  const myBookings      = bookings // all non-cancelled for list below
+  const myBookings      = bookings.filter(b => {
+    if (!dateFrom && !dateTo) return true
+    const d = new Date(b.scheduled_at)
+    if (dateFrom && d < new Date(dateFrom + 'T00:00:00')) return false
+    if (dateTo   && d > new Date(dateTo   + 'T23:59:59')) return false
+    return true
+  })
   // Stats show today's fleet activity
   const todayBookings  = activeBookings.filter(b => isSameDay(new Date(b.scheduled_at), today))
   const pendingCount   = activeBookings.filter(b => b.status === 'pending_driver_approval').length
@@ -134,44 +153,103 @@ export default function StaffHomePage() {
   }
 
   return (
-    <div style={{ fontFamily:'system-ui,sans-serif', minHeight:'100vh', background:'#F4F3EF' }}>
+    <div style={{ fontFamily: "'Inter', sans-serif", minHeight:'100vh', background:'#F5F5F2' }}>
 
-      {/* ── Header ── */}
-      <div style={{ background:'#fff', padding:'16px 20px 14px', borderBottom:'1px solid #E0DED8' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'12px' }}>
+      {/* ── TopAppBar ── */}
+      <header style={{
+        background: '#F5F5F2', borderBottom: '1px solid rgba(0,0,0,0.08)',
+        boxShadow: '0 1px 4px rgba(0,96,100,0.06)',
+        position: 'sticky', top: 0, zIndex: 40,
+      }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0 20px', height: 64 }}>
+          <div style={{ display:'flex', alignItems:'center', gap: 10 }}>
+            <div style={{ width:38, height:38, borderRadius:'50%', background:'#006064', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🚗</div>
+            <div>
+              <p style={{ fontSize:16, fontWeight:800, color:'#006064', margin:0, fontFamily:"'Plus Jakarta Sans',sans-serif", letterSpacing:'-0.3px', lineHeight:1 }}>TaxiBook</p>
+              <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:2 }}>
+                <span style={{ width:6, height:6, borderRadius:'50%', background:'#344500', display:'inline-block' }} />
+                <span style={{ fontSize:10, color:'#6f7979', fontWeight:500 }}>Staff</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+            <Link href="/staff/notifications" style={{ textDecoration:'none', width:40, height:40, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></Link>
+            <div style={{ position: 'relative' }}>
+              <div onClick={() => setMenuOpen(o => !o)} style={{ width: 36, height: 36, borderRadius: '50%', background: '#006064', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: '2px solid rgba(0,96,100,0.3)' }}>
+                {user?.name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') || 'S'}
+              </div>
+              {menuOpen && (
+                <>
+                  <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 98 }} />
+                  <div style={{ position: 'absolute', top: 44, right: 0, background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 99, minWidth: 220, overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: '#F5F5F2' }}>
+                      <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 2px', color: '#1a1c1b' }}>{user?.name}</p>
+                      <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>Staff</p>
+                    </div>
+                    <button onClick={() => { setMenuOpen(false); router.push('/staff/profile') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>View profile</p>
+                    </button>
+                    <button onClick={async () => { setMenuOpen(false); await supabase.auth.signOut(); router.push('/login') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ba1a1a" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#ba1a1a' }}>Sign out</p>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Greeting + Stats ── */}
+      <div style={{ background:'#ffffff', borderBottom:'1px solid rgba(0,0,0,0.06)', padding:'20px 20px 0' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
           <div>
-            <h1 style={{ fontSize:'18px', fontWeight:700, margin:'0 0 2px', letterSpacing:'-0.3px' }}>
-              Good {getGreeting()}, {user?.name?.split(' ')[0]}
+            <p style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#9ca3af', margin:'0 0 3px', fontFamily:"'Plus Jakarta Sans',sans-serif" }}>Good {getGreeting()}</p>
+            <h1 style={{ fontSize:24, fontWeight:800, color:'#006064', margin:'0 0 3px', letterSpacing:'-0.5px', fontFamily:"'Plus Jakarta Sans',sans-serif" }}>
+              {user?.name?.split(' ')[0]} 👋
             </h1>
-            <p style={{ fontSize:'12px', color:'#6B6963', margin:0 }}>
+            <p style={{ fontSize:13, color:'#6f7979', margin:0 }}>
               {format(today, 'EEEE, d MMMM yyyy', { locale: idLocale })}
             </p>
           </div>
-          <Avatar name={user?.name || ''} />
         </div>
 
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'12px' }}>
-          <StatCard label="Active today" value={todayBookings.length} />
-          <StatCard label="Awaiting driver" value={pendingCount} color="#92400E" bg="#FEF3C7" />
+        {/* Stat cards — matching reference design */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:16 }}>
+          <div style={{ background:'rgba(0,96,100,0.06)', borderRadius:12, padding:'12px 10px', textAlign:'center' }}>
+            <p style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#006064', margin:'0 0 4px', opacity:0.75 }}>Active</p>
+            <p style={{ fontSize:26, fontWeight:800, margin:0, color:'#006064', letterSpacing:'-1px', lineHeight:1 }}>{todayBookings.length}</p>
+          </div>
+          <div style={{ background:'#fff8e6', borderRadius:12, padding:'12px 10px', textAlign:'center' }}>
+            <p style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#7e5700', margin:'0 0 4px', opacity:0.75 }}>Pending</p>
+            <p style={{ fontSize:26, fontWeight:800, margin:0, color:'#7e5700', letterSpacing:'-1px', lineHeight:1 }}>{pendingCount}</p>
+          </div>
+          <div style={{ background:'#f0fce8', borderRadius:12, padding:'12px 10px', textAlign:'center' }}>
+            <p style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#344500', margin:'0 0 4px', opacity:0.75 }}>My trips</p>
+            <p style={{ fontSize:26, fontWeight:800, margin:0, color:'#344500', letterSpacing:'-1px', lineHeight:1 }}>{myBookings.length}</p>
+          </div>
         </div>
 
-        <Link href="/staff/book" style={{ textDecoration:'none', display:'block' }}>
-          <button style={{ width:'100%', padding:'12px', background:'#0F0F0F', color:'#fff', border:'none', borderRadius:'12px', fontSize:'14px', fontWeight:700, cursor:'pointer' }}>
-            + New booking
+        {/* New booking CTA — amber pill like reference */}
+        <Link href="/staff/book" style={{ textDecoration:'none', display:'block', marginBottom:16 }}>
+          <button style={{ width:'100%', padding:'14px', background:'#feb300', color:'#3d2c00', border:'none', borderRadius:9999, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:"'Plus Jakarta Sans',sans-serif", display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+            <span style={{ fontSize:18 }}>+</span> New booking
           </button>
         </Link>
       </div>
 
       {/* ── View tabs + nav ── */}
-      <div style={{ background:'#fff', borderBottom:'1px solid #E0DED8', padding:'12px 16px' }}>
+      <div style={{ background:'#ffffff', borderBottom:'1px solid rgba(0,0,0,0.08)', padding:'12px 16px' }}>
         {/* Tabs */}
-        <div style={{ display:'flex', background:'#ECEAE4', borderRadius:'999px', padding:'3px', gap:'2px', marginBottom:'10px' }}>
+        <div style={{ display:'flex', background:'#F5F5F2', borderRadius:10, padding:'3px', gap:'2px', marginBottom:'10px' }}>
           {(['day','week','month'] as ViewMode[]).map(v => (
             <button key={v} onClick={() => { setView(v); setCursor(new Date()) }} style={{
               flex:1, padding:'6px 4px', fontSize:'12px', fontWeight:600,
               border:'none', borderRadius:'999px', cursor:'pointer',
-              background: view === v ? '#fff' : 'transparent',
-              color: view === v ? '#0F0F0F' : '#A8A6A0',
+              background: view === v ? '#ffffff' : 'transparent',
+              color: view === v ? '#006064' : '#9ca3af',
               textTransform:'capitalize',
             }}>
               {v}
@@ -182,7 +260,7 @@ export default function StaffHomePage() {
         {/* Nav row */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <button onClick={() => navigate(-1)} style={navBtn}>←</button>
-          <span style={{ fontSize:'13px', fontWeight:700, color:'#0F0F0F', textAlign:'center', flex:1, padding:'0 8px' }}>
+          <span style={{ fontSize:'13px', fontWeight:700, color:'#006064', textAlign:'center', flex:1, padding:'0 8px' }}>
             {getNavLabel()}
           </span>
           <button onClick={() => navigate(1)} style={navBtn}>→</button>
@@ -195,51 +273,97 @@ export default function StaffHomePage() {
       {view === 'month' && <MonthView  bookings={bookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} />}
 
       {/* ── My bookings list ── */}
-      <div style={{ padding: '16px 16px 20px' }}>
-        <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#A8A6A0', margin: '0 0 10px' }}>
-          My bookings
-        </p>
+      <div style={{ padding: '16px 16px 100px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: 0 }}>
+            My bookings {myBookings.length > 0 && `· ${myBookings.length}`}
+          </p>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, padding: '5px 10px' }}>
+            <span style={{ fontSize: 11, flexShrink: 0 }}>📅</span>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              style={{ width: 120, border: 'none', outline: 'none', fontSize: 12, fontFamily: 'inherit', background: 'transparent', color: '#006064' }} />
+            <span style={{ fontSize: 10, color: '#9ca3af' }}>→</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              style={{ width: 120, border: 'none', outline: 'none', fontSize: 12, fontFamily: 'inherit', background: 'transparent', color: '#006064' }} />
+            {(dateFrom || dateTo) && (
+              <button onClick={() => { setDateFrom(''); setDateTo('') }}
+                style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 9999, border: '1px solid rgba(0,0,0,0.08)', background: '#F5F5F2', color: '#6f7979', cursor: 'pointer', fontFamily: 'inherit' }}>
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
         {myBookings.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '24px', color: '#A8A6A0', background: '#fff', borderRadius: '12px', border: '1px solid #E0DED8' }}>
+          <div style={{ textAlign: 'center', padding: '24px', color: '#9ca3af', background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)' }}>
             <p style={{ fontSize: '13px', margin: 0 }}>No bookings yet</p>
           </div>
         ) : (
-          myBookings.map(b => {
+          <>
+          {myBookings.map(b => {
             const sc = (STATUS_COLORS as any)[b.status]
             return (
               <div
                 key={b.id}
                 onClick={() => setSelectedBk(b)}
-                style={{ background: '#fff', border: '1px solid #E0DED8', borderRadius: '14px', padding: '14px', marginBottom: '8px', cursor: 'pointer' }}
+                style={{ background: '#ffffff', borderRadius: 16, padding: '16px', marginBottom: 10, boxShadow: '0 2px 8px rgba(0,96,100,0.06)', border: '1px solid rgba(0,0,0,0.05)', borderLeft: '3px solid #006064', cursor: 'pointer' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
                   <div style={{ flex: 1, minWidth: 0, marginRight: '8px' }}>
                     <p style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {b.destination}
                     </p>
-                    <p style={{ fontSize: '12px', color: '#6B6963', margin: 0 }}>
+                    <p style={{ fontSize: '12px', color: '#6f7979', margin: 0 }}>
                       {new Date(b.scheduled_at).toLocaleString('id-ID', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}
                     </p>
                   </div>
-                  {sc && <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '999px', flexShrink: 0, background: sc.bg, color: sc.text }}>{(STATUS_LABELS as any)[b.status]}</span>}
+                  {sc && <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: 9999, flexShrink: 0, background: sc.bg, color: sc.text }}>{(STATUS_LABELS as any)[b.status]}</span>}
                 </div>
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', borderTop: '1px solid #F0EEE8', paddingTop: '8px' }}>
-                  <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px', background: b.trip_type === 'DROP' ? '#DBEAFE' : '#EDE9FE', color: b.trip_type === 'DROP' ? '#1E3A5F' : '#4C1D95' }}>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: '8px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: b.trip_type === 'DROP' ? '#DBEAFE' : '#EDE9FE', color: b.trip_type === 'DROP' ? '#1E3A5F' : '#4C1D95' }}>
                     {b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}min`}
                   </span>
                   {b.taxi_name
-                    ? <span style={{ fontSize: '11px', color: '#6B6963', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    ? <span style={{ fontSize: '11px', color: '#6f7979', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span style={{ width: 7, height: 7, borderRadius: '50%', background: b.taxi_color || '#888', display: 'inline-block' }} />
                         {b.taxi_name} · {b.driver_name}
                       </span>
-                    : <span style={{ fontSize: '11px', color: '#A8A6A0', fontStyle: 'italic' }}>
+                    : <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>
                         {b.status === 'pending_coordinator_approval' ? 'Awaiting approval' : 'Awaiting driver'}
                       </span>
                   }
                 </div>
               </div>
             )
-          })
+          })}
+          {hasMoreBk && (
+            <button
+              disabled={loadingMore}
+              onClick={async () => {
+                setLoadingMore(true)
+                const nextPage = bkPage + 1
+                const { data: { user: au } } = await supabase.auth.getUser()
+                if (au) {
+                  const { data } = await supabase
+                    .from('bookings')
+                    .select('*, taxis(name,color), users!passenger_id(name)')
+                    .eq('passenger_id', au.id)
+                    .not('status', 'in', '("cancelled")')
+                    .order('scheduled_at', { ascending: false })
+                    .range(nextPage * 10, nextPage * 10 + 9)
+                  if (data) {
+                    setBookings(prev => [...prev, ...data])
+                    setHasMoreBk(data.length === 10)
+                    setBkPage(nextPage)
+                  }
+                }
+                setLoadingMore(false)
+              }}
+              style={{ width: '100%', padding: '13px', marginTop: 10, background: '#ffffff', boxShadow: '0 2px 8px rgba(0,96,100,0.06)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, fontSize: 13, fontWeight: 700, color: loadingMore ? '#9ca3af' : '#006064', cursor: loadingMore ? 'not-allowed' : 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+            >
+              {loadingMore ? 'Loading...' : 'Load more'}
+            </button>
+          )}
+          </>
         )}
       </div>
 
@@ -270,17 +394,17 @@ function DayGantt({ bookings, taxis, cursor, scrollRef }: {
   return (
     <div style={{ paddingBottom: 20 }}>
       <div style={{ padding:'10px 16px 6px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <span style={{ fontSize:'11px', color:'#A8A6A0' }}>← scroll to see full day →</span>
-        <span style={{ fontSize:'11px', color:'#A8A6A0' }}>{dayBks.length} booking{dayBks.length !== 1 ? 's' : ''}</span>
+        <span style={{ fontSize:'11px', color:'#6B7C8F' }}>← scroll to see full day →</span>
+        <span style={{ fontSize:'11px', color:'#6B7C8F' }}>{dayBks.length} booking{dayBks.length !== 1 ? 's' : ''}</span>
       </div>
       <div style={{ overflowX:'auto' }} ref={scrollRef}>
         <div style={{ minWidth: totalW + 90 }}>
 
           {/* Time header */}
-          <div style={{ display:'flex', marginLeft:90, borderBottom:'1px solid #E0DED8', background:'#fff', position:'sticky', top:0, zIndex:20 }}>
+          <div style={{ display:'flex', marginLeft:90, borderBottom:'1px solid rgba(0,0,0,0.08)', background:'#ffffff', position:'sticky', top:0, zIndex:20 }}>
             {hours.map(h => (
-              <div key={h} style={{ width:HOUR_W, flexShrink:0, padding:'5px 4px', borderLeft:'1px solid #F0EEE8' }}>
-                <span style={{ fontSize:'10px', fontWeight:700, color:'#A8A6A0' }}>
+              <div key={h} style={{ width:HOUR_W, flexShrink:0, padding:'5px 4px', borderLeft:'1px solid rgba(0,0,0,0.08)' }}>
+                <span style={{ fontSize:'10px', fontWeight:700, color:'#6B7C8F' }}>
                   {String(h).padStart(2,'0')}:00
                 </span>
               </div>
@@ -332,7 +456,7 @@ function DayGantt({ bookings, taxis, cursor, scrollRef }: {
                 ) : null
               }
               gridLines={hours.map(h => (
-                <div key={h} style={{ position:'absolute', left:(h-HOUR_START)*HOUR_W, top:0, bottom:0, width:1, background:'#F0EEE8' }} />
+                <div key={h} style={{ position:'absolute', left:(h-HOUR_START)*HOUR_W, top:0, bottom:0, width:1, background:'rgba(0,0,0,0.08)' }} />
               ))}
               totalW={totalW}
             />
@@ -359,8 +483,8 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef }: {
   return (
     <div style={{ paddingBottom:20 }}>
       <div style={{ padding:'10px 16px 6px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <span style={{ fontSize:'11px', color:'#A8A6A0' }}>← scroll to see full week →</span>
-        <span style={{ fontSize:'11px', color:'#A8A6A0' }}>
+        <span style={{ fontSize:'11px', color:'#6B7C8F' }}>← scroll to see full week →</span>
+        <span style={{ fontSize:'11px', color:'#6B7C8F' }}>
           {bookings.filter(b => days.some(d => isSameDay(new Date(b.scheduled_at), d))).length} bookings this week
         </span>
       </div>
@@ -368,24 +492,24 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef }: {
         <div style={{ minWidth: totalW + 90 }}>
 
           {/* Day header */}
-          <div style={{ display:'flex', marginLeft:90, borderBottom:'1px solid #E0DED8', background:'#fff', position:'sticky', top:0, zIndex:20 }}>
+          <div style={{ display:'flex', marginLeft:90, borderBottom:'1px solid rgba(0,0,0,0.08)', background:'#ffffff', position:'sticky', top:0, zIndex:20 }}>
             {days.map(d => {
               const isToday   = isSameDay(d, today)
               const dayBkCount = bookings.filter(b => isSameDay(new Date(b.scheduled_at), d)).length
               return (
                 <div key={d.toISOString()} style={{
                   width:DAY_W, flexShrink:0, padding:'6px 4px',
-                  borderLeft:'1px solid #F0EEE8', textAlign:'center',
-                  background: isToday ? '#0F0F0F' : 'transparent',
+                  borderLeft:'1px solid rgba(0,0,0,0.08)', textAlign:'center',
+                  background: isToday ? '#006064' : 'transparent',
                 }}>
-                  <p style={{ fontSize:'9px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.04em', color: isToday ? 'rgba(255,255,255,0.6)' : '#A8A6A0', margin:'0 0 2px' }}>
+                  <p style={{ fontSize:'9px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.04em', color: isToday ? 'rgba(255,255,255,0.6)' : '#9ca3af', margin:'0 0 2px' }}>
                     {format(d,'EEE',{locale:idLocale})}
                   </p>
-                  <p style={{ fontSize:'15px', fontWeight:700, color: isToday ? '#fff' : '#0F0F0F', margin:'0 0 2px', lineHeight:1 }}>
+                  <p style={{ fontSize:'15px', fontWeight:700, color: isToday ? '#fff' : '#006064', margin:'0 0 2px', lineHeight:1 }}>
                     {format(d,'d')}
                   </p>
                   {dayBkCount > 0 && (
-                    <p style={{ fontSize:'9px', color: isToday ? 'rgba(255,255,255,0.6)' : '#A8A6A0', margin:0 }}>
+                    <p style={{ fontSize:'9px', color: isToday ? 'rgba(255,255,255,0.6)' : '#9ca3af', margin:0 }}>
                       {dayBkCount} trip{dayBkCount > 1 ? 's' : ''}
                     </p>
                   )}
@@ -441,7 +565,7 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef }: {
                   ) : null
                 }
                 gridLines={days.map((d, i) => (
-                  <div key={d.toISOString()} style={{ position:'absolute', left:i*DAY_W, top:0, bottom:0, width:1, background: isSameDay(d, today) ? '#E0DED8' : '#F0EEE8' }} />
+                  <div key={d.toISOString()} style={{ position:'absolute', left:i*DAY_W, top:0, bottom:0, width:1, background: isSameDay(d, today) ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.08)' }} />
                 ))}
                 totalW={totalW}
               />
@@ -465,23 +589,23 @@ function GanttRow({ taxi, idx, bookings, renderBlock, nowLine, gridLines, totalW
   totalW: number
 }) {
   return (
-    <div style={{ display:'flex', borderBottom:'1px solid #E0DED8', background: idx % 2 === 0 ? '#fff' : '#FAFAF8' }}>
+    <div style={{ display:'flex', borderBottom:'1px solid rgba(0,0,0,0.08)', background: idx % 2 === 0 ? '#fff' : '#f9f9f6' }}>
       {/* Label */}
       <div style={{
         width:90, flexShrink:0, padding:'8px 10px',
-        borderRight:'1px solid #E0DED8',
+        borderRight:'1px solid rgba(0,0,0,0.08)',
         display:'flex', flexDirection:'column', justifyContent:'center', gap:2,
         position:'sticky', left:0,
-        background: idx % 2 === 0 ? '#fff' : '#FAFAF8',
+        background: idx % 2 === 0 ? '#fff' : '#f9f9f6',
         zIndex:10,
       }}>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
           <span style={{ width:7, height:7, borderRadius:'50%', background: taxi.is_available ? taxi.color : '#D1D5DB', flexShrink:0 }} />
-          <span style={{ fontSize:'11px', fontWeight:800, color: taxi.is_available ? '#0F0F0F' : '#A8A6A0' }}>
+          <span style={{ fontSize:'11px', fontWeight:800, color: taxi.is_available ? '#006064' : '#9ca3af' }}>
             {taxi.name}
           </span>
         </div>
-        <span style={{ fontSize:'9px', color:'#A8A6A0', paddingLeft:12, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+        <span style={{ fontSize:'9px', color:'#6B7C8F', paddingLeft:12, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
           {taxi.is_available ? taxi.driver_name : 'Unavailable'}
         </span>
       </div>
@@ -516,11 +640,11 @@ function MonthView({ bookings, cursor, onDayClick }: {
 
   return (
     <div style={{ padding:'14px 16px 20px' }}>
-      <div style={{ background:'#fff', borderRadius:'14px', border:'1px solid #E0DED8', overflow:'hidden' }}>
+      <div style={{ background:'#ffffff', borderRadius:'14px', border:'1px solid rgba(0,0,0,0.08)', overflow:'hidden' }}>
         {/* Day name headers */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', borderBottom:'1px solid #E0DED8' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', borderBottom:'1px solid rgba(0,0,0,0.08)' }}>
           {['M','T','W','T','F','S','S'].map((n,i) => (
-            <div key={i} style={{ textAlign:'center', padding:'7px 0', fontSize:'10px', fontWeight:700, color:'#A8A6A0', textTransform:'uppercase' }}>
+            <div key={i} style={{ textAlign:'center', padding:'7px 0', fontSize:'10px', fontWeight:700, color:'#6B7C8F', textTransform:'uppercase' }}>
               {n}
             </div>
           ))}
@@ -535,16 +659,16 @@ function MonthView({ bookings, cursor, onDayClick }: {
               <div
                 key={d.toISOString()}
                 onClick={() => onDayClick(d)}
-                style={{ minHeight:52, borderRight:'1px solid #E0DED8', borderBottom:'1px solid #E0DED8', padding:'4px', opacity: inMonth ? 1 : 0.3, cursor:'pointer', background: isToday ? '#F8F7FF' : 'transparent' }}
+                style={{ minHeight:52, borderRight:'1px solid rgba(0,0,0,0.08)', borderBottom:'1px solid rgba(0,0,0,0.08)', padding:'4px', opacity: inMonth ? 1 : 0.3, cursor:'pointer', background: isToday ? 'rgba(0,96,100,0.06)' : 'transparent' }}
               >
-                <div style={{ width:20, height:20, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:3, background: isToday ? '#0F0F0F' : 'transparent', fontSize:'11px', fontWeight:700, color: isToday ? '#fff' : '#0F0F0F' }}>
+                <div style={{ width:20, height:20, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:3, background: isToday ? '#006064' : 'transparent', fontSize:'11px', fontWeight:700, color: isToday ? '#fff' : '#006064' }}>
                   {format(d,'d')}
                 </div>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
                   {bks.slice(0,3).map(b => (
-                    <span key={b.id} style={{ width:6, height:6, borderRadius:'50%', background: b.taxi_color || '#A8A6A0', opacity: b.status.includes('pending') ? 0.4 : 1, display:'inline-block' }} />
+                    <span key={b.id} style={{ width:6, height:6, borderRadius:'50%', background: b.taxi_color || '#9ca3af', opacity: b.status.includes('pending') ? 0.4 : 1, display:'inline-block' }} />
                   ))}
-                  {bks.length > 3 && <span style={{ fontSize:'8px', color:'#A8A6A0', fontWeight:700 }}>+{bks.length-3}</span>}
+                  {bks.length > 3 && <span style={{ fontSize:'8px', color:'#6B7C8F', fontWeight:700 }}>+{bks.length-3}</span>}
                 </div>
               </div>
             )
@@ -554,15 +678,15 @@ function MonthView({ bookings, cursor, onDayClick }: {
       <div style={{ display:'flex', gap:'14px', marginTop:'10px', flexWrap:'wrap' }}>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
           <span style={{ display:'inline-block', width:16, height:2, background:'#EF4444' }} />
-          <span style={{ fontSize:'10px', color:'#A8A6A0' }}>Tap day → Day view</span>
+          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Tap day → Day view</span>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-          <span style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:'#A8A6A0', opacity:0.4 }} />
-          <span style={{ fontSize:'10px', color:'#A8A6A0' }}>Pending</span>
+          <span style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:'#9ca3af', opacity:0.4 }} />
+          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Pending</span>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
           <span style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:'#2563EB' }} />
-          <span style={{ fontSize:'10px', color:'#A8A6A0' }}>Confirmed (taxi color)</span>
+          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Confirmed (taxi color)</span>
         </div>
       </div>
     </div>
@@ -572,30 +696,30 @@ function MonthView({ bookings, cursor, onDayClick }: {
 // ── Gantt legend ────────────────────────────────────────────
 function GanttLegend() {
   return (
-    <div style={{ padding:'8px 16px', background:'#fff', borderTop:'1px solid #E0DED8', display:'flex', gap:'14px', flexWrap:'wrap' }}>
+    <div style={{ padding:'8px 16px', background:'#ffffff', borderTop:'1px solid rgba(0,0,0,0.08)', display:'flex', gap:'14px', flexWrap:'wrap' }}>
       <div style={{ display:'flex', alignItems:'center', gap:5 }}>
         <span style={{ display:'inline-block', width:16, height:2, background:'#EF4444' }} />
-        <span style={{ fontSize:'10px', color:'#A8A6A0' }}>Now</span>
+        <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Now</span>
       </div>
       <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-        <span style={{ display:'inline-block', width:20, height:10, border:'1.5px dashed #A8A6A0', borderRadius:2 }} />
-        <span style={{ fontSize:'10px', color:'#A8A6A0' }}>Pending</span>
+        <span style={{ display:'inline-block', width:20, height:10, border:'1.5px dashed #9ca3af', borderRadius:2 }} />
+        <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Pending</span>
       </div>
       <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-        <span style={{ display:'inline-block', width:20, height:10, border:'1.5px solid #A8A6A0', borderRadius:2 }} />
-        <span style={{ fontSize:'10px', color:'#A8A6A0' }}>Confirmed</span>
+        <span style={{ display:'inline-block', width:20, height:10, border:'1.5px solid #9ca3af', borderRadius:2 }} />
+        <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Confirmed</span>
       </div>
     </div>
   )
 }
 
 // ── Helpers ─────────────────────────────────────────────────
-function StatCard({ label, value, color = '#0F0F0F', bg = '#F4F3EF' }: {
+function StatCard({ label, value, color = '#006064', bg = 'rgba(0,0,0,0.04)' }: {
   label: string; value: number; color?: string; bg?: string
 }) {
   return (
     <div style={{ background:bg, borderRadius:'10px', padding:'12px' }}>
-      <p style={{ fontSize:'10px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color: color === '#0F0F0F' ? '#A8A6A0' : color, margin:'0 0 4px' }}>{label}</p>
+      <p style={{ fontSize:'10px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color: color === '#006064' ? '#9ca3af' : color, margin:'0 0 4px' }}>{label}</p>
       <p style={{ fontSize:'24px', fontWeight:700, margin:0, letterSpacing:'-0.5px', color }}>{value}</p>
     </div>
   )
@@ -617,8 +741,8 @@ function getGreeting() {
 
 const navBtn: React.CSSProperties = {
   width:30, height:30, borderRadius:'50%',
-  background:'#fff', border:'1px solid #E0DED8',
-  cursor:'pointer', fontSize:'14px', color:'#6B6963',
+  background:'#ffffff', border:'1px solid rgba(0,0,0,0.08)',
+  cursor:'pointer', fontSize:'14px', color:'#8A9BB0',
   display:'flex', alignItems:'center', justifyContent:'center',
   flexShrink:0,
 }
@@ -631,18 +755,18 @@ function WeekView({ bookings, cursor }: { bookings: BookingDetail[]; cursor: Dat
 
   return (
     <div style={{ padding:'14px 16px 20px' }}>
-      <div style={{ background:'#fff', borderRadius:'14px', border:'1px solid #E0DED8', overflow:'hidden' }}>
+      <div style={{ background:'#ffffff', borderRadius:'14px', border:'1px solid rgba(0,0,0,0.08)', overflow:'hidden' }}>
 
         {/* Day headers */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', borderBottom:'1px solid #E0DED8' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', borderBottom:'1px solid rgba(0,0,0,0.08)' }}>
           {days.map(d => {
             const isToday = isSameDay(d, today)
             return (
-              <div key={d.toISOString()} style={{ textAlign:'center', padding:'8px 2px', background: isToday ? '#0F0F0F' : 'transparent', borderRight:'1px solid #E0DED8' }}>
-                <p style={{ fontSize:'8px', fontWeight:700, color: isToday ? 'rgba(255,255,255,0.6)' : '#A8A6A0', margin:'0 0 2px', textTransform:'uppercase' }}>
+              <div key={d.toISOString()} style={{ textAlign:'center', padding:'8px 2px', background: isToday ? '#006064' : 'transparent', borderRight:'1px solid rgba(0,0,0,0.08)' }}>
+                <p style={{ fontSize:'8px', fontWeight:700, color: isToday ? 'rgba(255,255,255,0.6)' : '#9ca3af', margin:'0 0 2px', textTransform:'uppercase' }}>
                   {format(d,'EEE',{locale:idLocale})}
                 </p>
-                <p style={{ fontSize:'15px', fontWeight:700, color: isToday ? '#fff' : '#0F0F0F', margin:0 }}>
+                <p style={{ fontSize:'15px', fontWeight:700, color: isToday ? '#fff' : '#006064', margin:0 }}>
                   {format(d,'d')}
                 </p>
               </div>
@@ -655,9 +779,9 @@ function WeekView({ bookings, cursor }: { bookings: BookingDetail[]; cursor: Dat
           {days.map(d => {
             const dayBks = bookings.filter(b => isSameDay(new Date(b.scheduled_at), d))
             return (
-              <div key={d.toISOString()} style={{ borderRight:'1px solid #E0DED8', padding:'4px 2px', minHeight:120 }}>
+              <div key={d.toISOString()} style={{ borderRight:'1px solid rgba(0,0,0,0.08)', padding:'4px 2px', minHeight:120 }}>
                 {dayBks.map(b => {
-                  const color     = b.taxi_color || '#6B6963'
+                  const color     = b.taxi_color || '#3f4949'
                   const isPending = b.status.includes('pending')
                   return (
                     <div key={b.id} style={{
@@ -680,12 +804,12 @@ function WeekView({ bookings, cursor }: { bookings: BookingDetail[]; cursor: Dat
       {/* Legend */}
       <div style={{ display:'flex', gap:'14px', marginTop:'10px', flexWrap:'wrap' }}>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-          <span style={{ display:'inline-block', width:20, height:10, border:'1.5px dashed #A8A6A0', borderRadius:2 }} />
-          <span style={{ fontSize:'10px', color:'#A8A6A0' }}>Pending</span>
+          <span style={{ display:'inline-block', width:20, height:10, border:'1.5px dashed #9ca3af', borderRadius:2 }} />
+          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Pending</span>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
           <span style={{ display:'inline-block', width:20, height:10, border:'1.5px solid #2563EB', borderRadius:2, background:'#2563EB20' }} />
-          <span style={{ fontSize:'10px', color:'#A8A6A0' }}>Confirmed (taxi color)</span>
+          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Confirmed (taxi color)</span>
         </div>
       </div>
     </div>
@@ -740,10 +864,10 @@ function StaffBookingSheet({ booking, onClose, onCancelled }: {
       onClick={onClose}
     >
       <div
-        style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px', maxHeight: '85vh', overflowY: 'auto' }}
+        style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px', maxHeight: '85vh', overflowY: 'auto' }}
         onClick={e => e.stopPropagation()}
       >
-        <div style={{ width: 36, height: 4, borderRadius: 2, background: '#E0DED8', margin: '0 auto 20px' }} />
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.08)', margin: '0 auto 20px' }} />
 
         {/* Booking header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
@@ -751,14 +875,14 @@ function StaffBookingSheet({ booking, onClose, onCancelled }: {
             <p style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.3px' }}>
               {booking.destination}
             </p>
-            <p style={{ fontSize: '13px', color: '#6B6963', margin: 0 }}>
+            <p style={{ fontSize: '13px', color: '#6f7979', margin: 0 }}>
               {booking.scheduled_at && new Date(booking.scheduled_at).toLocaleString('id-ID', {
                 weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'
               })}
             </p>
           </div>
           <span style={{
-            fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '999px',
+            fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: 9999,
             background: booking.trip_type === 'DROP' ? '#DBEAFE' : '#EDE9FE',
             color: booking.trip_type === 'DROP' ? '#1E3A5F' : '#4C1D95',
           }}>
@@ -767,7 +891,7 @@ function StaffBookingSheet({ booking, onClose, onCancelled }: {
         </div>
 
         {/* Details */}
-        <div style={{ background: '#F4F3EF', borderRadius: '12px', padding: '12px 14px', marginBottom: '16px' }}>
+        <div style={{ background: '#F5F5F2', borderRadius: 16, padding: '12px 14px', marginBottom: '16px' }}>
           {[
             { label: 'Booking ID',  value: booking.booking_code },
             { label: 'Pickup',      value: booking.pickup },
@@ -775,8 +899,8 @@ function StaffBookingSheet({ booking, onClose, onCancelled }: {
             { label: 'Taxi',        value: booking.taxi_name ? `${booking.taxi_name} · ${booking.driver_name}` : 'Not assigned yet' },
             ...(booking.notes ? [{ label: 'Notes', value: booking.notes }] : []),
           ].map((row, i, arr) => (
-            <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: i < arr.length - 1 ? '8px' : '0', marginBottom: i < arr.length - 1 ? '8px' : '0', borderBottom: i < arr.length - 1 ? '1px solid #E0DED8' : 'none' }}>
-              <span style={{ fontSize: '12px', color: '#6B6963' }}>{row.label}</span>
+            <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: i < arr.length - 1 ? '8px' : '0', marginBottom: i < arr.length - 1 ? '8px' : '0', borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.08)' : 'none' }}>
+              <span style={{ fontSize: '12px', color: '#6f7979' }}>{row.label}</span>
               <span style={{ fontSize: '12px', fontWeight: 600, textAlign: 'right', maxWidth: '60%', textTransform: 'capitalize' }}>{row.value}</span>
             </div>
           ))}
@@ -786,7 +910,7 @@ function StaffBookingSheet({ booking, onClose, onCancelled }: {
         {canCancel && !showCancel && (
           <button
             onClick={() => setShowCancel(true)}
-            style={{ width: '100%', padding: '12px', background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '12px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+            style={{ width: '100%', padding: '12px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: 16, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
           >
             Cancel this booking
           </button>
@@ -794,8 +918,8 @@ function StaffBookingSheet({ booking, onClose, onCancelled }: {
 
         {canCancel && showCancel && (
           <div>
-            <div style={{ marginBottom: '10px' }}>
-              <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#A8A6A0', marginBottom: '6px' }}>
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: '6px' }}>
                 Reason for cancellation
               </label>
               <input
@@ -803,14 +927,14 @@ function StaffBookingSheet({ booking, onClose, onCancelled }: {
                 value={cancelReason}
                 onChange={e => setCancelReason(e.target.value)}
                 placeholder="e.g. I no longer need the taxi"
-                style={{ width: '100%', padding: '11px 14px', fontSize: '14px', border: '1.5px solid #E0DED8', borderRadius: '10px', boxSizing: 'border-box', outline: 'none' }}
+                style={{ width: '100%', padding: '11px 14px', fontSize: '14px', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: '10px', boxSizing: 'border-box', outline: 'none' }}
               />
             </div>
             {error && (
-              <p style={{ fontSize: '12px', color: '#991B1B', margin: '0 0 10px', background: '#FEE2E2', padding: '8px 12px', borderRadius: '8px' }}>{error}</p>
+              <p style={{ fontSize: '12px', color: '#991B1B', margin: '0 0 10px', background: '#ffdad6', padding: '8px 12px', borderRadius: '8px' }}>{error}</p>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button onClick={() => setShowCancel(false)} style={{ padding: '12px', background: 'transparent', border: '1.5px solid #E0DED8', borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => setShowCancel(false)} style={{ padding: '12px', background: 'transparent', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
                 Go back
               </button>
               <button
@@ -825,8 +949,8 @@ function StaffBookingSheet({ booking, onClose, onCancelled }: {
         )}
 
         {!canCancel && (
-          <div style={{ background: '#F4F3EF', borderRadius: '10px', padding: '10px 14px', textAlign: 'center' }}>
-            <p style={{ fontSize: '12px', color: '#6B6963', margin: 0 }}>
+          <div style={{ background: '#F5F5F2', borderRadius: '10px', padding: '10px 14px', textAlign: 'center' }}>
+            <p style={{ fontSize: '12px', color: '#6f7979', margin: 0 }}>
               {booking.status === 'completed' ? 'This trip has been completed.' : 'This booking cannot be cancelled.'}
             </p>
           </div>
