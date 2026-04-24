@@ -417,7 +417,7 @@ export default function DriversPage() {
                 style={{ border: 'none', outline: 'none', fontSize: 13, fontFamily: "var(--font-inter), 'Inter', sans-serif", background: 'transparent', color: '#006064', fontWeight: 600 }} />
             </div>
             <button onClick={() => { const t = new Date().toISOString().slice(0,10); setDateFilter(t); loadData(t) }}
-              style={{ padding: '9px 16px', fontSize: 12, fontWeight: 700, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, background: '#ffffff', color: '#8C6E54', cursor: 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif", border: '1px solid rgba(0,0,0,0.08)' }}>
+              style={{ padding: '9px 16px', fontSize: 12, fontWeight: 700, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 12, background: '#ffffff', color: '#6f7979', cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
               Today
             </button>
           </div>
