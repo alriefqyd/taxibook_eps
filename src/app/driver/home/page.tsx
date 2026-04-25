@@ -86,15 +86,26 @@ export default function DriverHomePage() {
         .eq('taxi_id', taxi.id).in('status', ['on_trip','waiting_trip']).limit(1),
     ])
     const newActiveTrip = (activeData || [])[0] || null
-    setUpcoming(upData || [])
+    const upcomingList = upData || []
+    setUpcoming(upcomingList)
     setPast(pastData || [])
     setActiveTrip(newActiveTrip)
     setUpPage(0)
     setPastPage(0)
-    setHasMoreUp((upData || []).length === 10)
+    setHasMoreUp(upcomingList.length === 10)
     setHasMorePast((pastData || []).length === 5)
     // Auto switch tab when trip becomes active
     if (newActiveTrip) setTab('active')
+    // Auto-show popup for overdue trips (booked but past scheduled time)
+    const now = new Date()
+    const overdueTrip = upcomingList.find((t: any) => {
+      const scheduled = new Date(t.scheduled_at)
+      return scheduled < now && t.status === 'booked'
+    })
+    if (overdueTrip) {
+      setSelected(overdueTrip)
+      setTab('trips')
+    }
   }, [supabase])
 
   useEffect(() => {
