@@ -126,10 +126,13 @@ export async function GET(request: NextRequest) {
       .lt('scheduled_at', now.toISOString())
       .gte('scheduled_at', overdueStart.toISOString())
 
+    console.log(`Overdue bookings found: ${(overdueNotStarted || []).length}`)
+
     for (const b of (overdueNotStarted || []) as any[]) {
       const minutesLate = Math.round(
         (now.getTime() - new Date(b.scheduled_at).getTime()) / 60000
       )
+      console.log(`Overdue booking ${b.id}: ${minutesLate} min late, driver: ${b.taxis?.driver_id}`)
 
       // Only notify if at least 5 min has passed since last overdue notif
       const { data: lastNotif } = await admin
@@ -144,7 +147,8 @@ export async function GET(request: NextRequest) {
       if (lastNotif) {
         const lastSent   = new Date(lastNotif.created_at)
         const minsSince  = (now.getTime() - lastSent.getTime()) / 60000
-        if (minsSince < 4.5) continue // too soon, skip
+        console.log(`Last notif was ${minsSince.toFixed(1)} min ago`)
+        if (minsSince < 4.5) { console.log('Skipping — too soon'); continue }
       }
 
       const notifs: any[] = []
@@ -197,13 +201,18 @@ export async function GET(request: NextRequest) {
       }
 
       if (notifs.length) {
-        // Send push directly with correct URLs
+        // Check push subscriptions exist
         for (const notif of notifs) {
           const url = notif.user_id === b.taxis?.driver_id ? '/driver/home' : '/coordinator/home'
+          const { data: subs } = await admin.from('push_subscriptions').select('id').eq('user_id', notif.user_id)
+          console.log(`User ${notif.user_id} has ${subs?.length || 0} push subscriptions`)
           await sendPushToUser(notif.user_id, notif.title, notif.body, url)
+          console.log(`Push sent to ${notif.user_id}: ${notif.title}`)
         }
         await admin.from('notifications').insert(notifs)
         results.reminded_overdue++
+      } else {
+        console.log(`No notifs built for booking ${b.id} (driver_id: ${b.taxis?.driver_id})`)
       }
     }
 

@@ -19,51 +19,23 @@ export function usePushNotifications() {
         const permission = await Notification.requestPermission()
         if (permission !== 'granted') return
 
-        // Unregister ALL existing service workers first
-        const regs = await navigator.serviceWorker.getRegistrations()
-        for (const reg of regs) {
-          await reg.unregister()
-          console.log('[Push] Unregistered SW:', reg.scope)
-        }
+        // Wait for next-pwa's sw.js to be ready (it has the push handler)
+        const reg = await navigator.serviceWorker.ready
+        console.log('[Push] SW ready:', reg.scope)
 
-        // Register fresh push-sw.js at root scope
-        const reg = await navigator.serviceWorker.register('/push-sw.js')
-        console.log('[Push] Registered:', reg.scope)
-
-        // Wait for active
-        await new Promise<void>(resolve => {
-          if (reg.active) { resolve(); return }
-          reg.addEventListener('updatefound', () => {
-            const sw = reg.installing
-            if (!sw) { resolve(); return }
-            sw.addEventListener('statechange', () => {
-              if (sw.state === 'activated') resolve()
-            })
-          })
-          setTimeout(resolve, 4000)
-        })
-
-        // Also wait for controller
-        if (!navigator.serviceWorker.controller) {
-          await new Promise<void>(resolve => {
-            navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true })
-            setTimeout(resolve, 2000)
-          })
-        }
-
-        console.log('[Push] Active:', !!reg.active, 'Controller:', !!navigator.serviceWorker.controller)
-
+        // Get or create push subscription using the active sw.js
         let sub = await reg.pushManager.getSubscription()
         if (!sub) {
           sub = await reg.pushManager.subscribe({
             userVisibleOnly:      true,
-            applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
+            applicationServerKey: urlBase64ToUint8Array(vapidKey),
           })
-          console.log('[Push] Subscribed:', sub.endpoint.slice(0, 60))
+          console.log('[Push] New subscription:', sub.endpoint.slice(0, 60))
         } else {
-          console.log('[Push] Already subscribed')
+          console.log('[Push] Existing subscription:', sub.endpoint.slice(0, 60))
         }
 
+        // Save to DB
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) return
 
@@ -75,7 +47,7 @@ export function usePushNotifications() {
           },
           body: JSON.stringify({ subscription: sub }),
         })
-        console.log('[Push] Saved:', res.status)
+        console.log('[Push] Saved to DB:', res.status)
 
       } catch (err) {
         console.error('[Push] Error:', err)
@@ -83,9 +55,9 @@ export function usePushNotifications() {
     }
 
     if (document.readyState === 'complete') {
-      setTimeout(subscribe, 1500)
+      setTimeout(subscribe, 2000)
     } else {
-      window.addEventListener('load', () => setTimeout(subscribe, 1500), { once: true })
+      window.addEventListener('load', () => setTimeout(subscribe, 2000), { once: true })
     }
   }, [])
 }
