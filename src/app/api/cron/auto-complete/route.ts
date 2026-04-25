@@ -134,15 +134,15 @@ export async function GET(request: NextRequest) {
       // Only notify if at least 5 min has passed since last overdue notif
       const { data: lastNotif } = await admin
         .from('notifications')
-        .select('sent_at')
+        .select('created_at')
         .eq('booking_id', b.id)
         .eq('type', 'reminder_overdue')
-        .order('sent_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
       if (lastNotif) {
-        const lastSent   = new Date(lastNotif.sent_at)
+        const lastSent   = new Date(lastNotif.created_at)
         const minsSince  = (now.getTime() - lastSent.getTime()) / 60000
         if (minsSince < 4.5) continue // too soon, skip
       }
@@ -169,16 +169,16 @@ export async function GET(request: NextRequest) {
           // Only notify coordinator once every 10 min
           const { data: lastCoordNotif } = await admin
             .from('notifications')
-            .select('sent_at')
+            .select('created_at')
             .eq('booking_id', b.id)
             .eq('type', 'reminder_overdue')
             .in('user_id', coordinators.map((c: any) => c.id))
-            .order('sent_at', { ascending: false })
+            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle()
 
           const shouldNotifyCoord = !lastCoordNotif ||
-            (now.getTime() - new Date(lastCoordNotif.sent_at).getTime()) / 60000 >= 9.5
+            (now.getTime() - new Date(lastCoordNotif.created_at).getTime()) / 60000 >= 9.5
 
           if (shouldNotifyCoord) {
             const { data: passenger } = await admin
@@ -197,11 +197,12 @@ export async function GET(request: NextRequest) {
       }
 
       if (notifs.length) {
-        await notify(notifs)
+        // Send push directly with correct URLs
         for (const notif of notifs) {
-          const url = notif.type?.includes('driver') ? '/driver/home' : '/staff/home'
+          const url = notif.user_id === b.taxis?.driver_id ? '/driver/home' : '/coordinator/home'
           await sendPushToUser(notif.user_id, notif.title, notif.body, url)
         }
+        await admin.from('notifications').insert(notifs)
         results.reminded_overdue++
       }
     }

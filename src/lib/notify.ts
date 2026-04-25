@@ -19,7 +19,12 @@ export async function notify(payload: NotifPayload | NotifPayload[]) {
 
   // Send push to each user
   for (const p of payloads) {
-    const url = p.type.includes('driver') ? '/driver/home'
+    // Look up user role to determine correct URL
+    const { data: u } = await admin.from('users').select('role').eq('id', p.user_id).single().catch(() => ({ data: null }))
+    const role = u?.role || ''
+    const url = role === 'driver' ? '/driver/home'
+              : role === 'coordinator' ? '/coordinator/home'
+              : p.type.includes('driver') ? '/driver/home'
               : p.type.includes('coordinator') || p.type.includes('needs_approval') ? '/coordinator/home'
               : '/staff/home'
     await sendPushToUser(p.user_id, p.title, p.body, url)
