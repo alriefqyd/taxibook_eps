@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -50,6 +51,7 @@ export default function DriverHomePage() {
   const [hasMorePast, setHasMorePast] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [menuOpen,   setMenuOpen]   = useState(false)
+  const uidRef = React.useRef('')
   const [toggling,   setToggling]   = useState(false)
 
 
@@ -83,23 +85,25 @@ export default function DriverHomePage() {
       supabase.from('booking_details').select('*')
         .eq('taxi_id', taxi.id).in('status', ['on_trip','waiting_trip']).limit(1),
     ])
+    const newActiveTrip = (activeData || [])[0] || null
     setUpcoming(upData || [])
     setPast(pastData || [])
-    setActiveTrip((activeData || [])[0] || null)
+    setActiveTrip(newActiveTrip)
     setUpPage(0)
     setPastPage(0)
     setHasMoreUp((upData || []).length === 10)
     setHasMorePast((pastData || []).length === 5)
+    // Auto switch tab when trip becomes active
+    if (newActiveTrip) setTab('active')
   }, [supabase])
 
   useEffect(() => {
-    let uid = ''
     async function init() {
       const { data: { user: au } } = await supabase.auth.getUser()
       if (!au) { router.push('/login'); return }
       const { data: p } = await supabase.from('users').select('*').eq('id', au.id).single()
       if (p?.role !== 'driver') { router.push('/login'); return }
-      uid = au.id; setUser(p)
+      uidRef.current = au.id; setUser(p)
       await loadTrips(au.id)
       const { data: taxi } = await supabase
         .from('taxis').select('*, users!driver_id(name)').eq('driver_id', au.id).single()
@@ -109,14 +113,12 @@ export default function DriverHomePage() {
     init()
     const ch = supabase.channel('driver-home')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' },
-        () => { if (uid) loadTrips(uid) })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'booking_details' },
-        () => { if (uid) loadTrips(uid) })
+        () => { if (uidRef.current) loadTrips(uidRef.current) })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'taxis' },
         async () => {
-          if (!uid) return
+          if (!uidRef.current) return
           const { data: taxi } = await supabase
-            .from('taxis').select('*, users!driver_id(name)').eq('driver_id', uid).single()
+            .from('taxis').select('*, users!driver_id(name)').eq('driver_id', uidRef.current).single()
           if (taxi) setMyTaxi({ ...taxi, driver_name: taxi.users?.name || '' })
         })
       .subscribe()
