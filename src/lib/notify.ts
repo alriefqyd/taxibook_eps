@@ -29,6 +29,6 @@ export async function notify(payload: NotifPayload | NotifPayload[]): Promise<vo
       else if (p.type.includes('driver')) url = '/driver/home'
       else if (p.type.includes('coordinator') || p.type.includes('needs_approval')) url = '/coordinator/home'
     } catch (_) {}
-    await sendPushToUser(p.user_id, p.title, p.body, url)
+    await sendPushToUser(p.user_id, p.title, p.body, url, p.type)
   }
 }

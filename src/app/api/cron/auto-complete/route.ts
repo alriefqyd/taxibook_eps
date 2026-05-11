@@ -206,7 +206,7 @@ export async function GET(request: NextRequest) {
           const url = notif.user_id === b.taxis?.driver_id ? '/driver/home' : '/coordinator/home'
           const { data: subs } = await admin.from('push_subscriptions').select('id').eq('user_id', notif.user_id)
           console.log(`User ${notif.user_id} has ${subs?.length || 0} push subscriptions`)
-          await sendPushToUser(notif.user_id, notif.title, notif.body, url)
+          await sendPushToUser(notif.user_id, notif.title, notif.body, url, notif.type)
           console.log(`Push sent to ${notif.user_id}: ${notif.title}`)
         }
         await admin.from('notifications').insert(notifs)
