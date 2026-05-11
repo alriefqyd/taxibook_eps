@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import {
   format, startOfWeek, addDays, addMonths,
@@ -11,6 +12,8 @@ import {
 import { id as idLocale } from 'date-fns/locale'
 import type { BookingDetail, User } from '@/types'
 import { STATUS_COLORS, STATUS_LABELS } from '@/types'
+
+const TrackingMap = dynamic(() => import('@/components/map/TrackingMap'), { ssr: false })
 
 type ViewMode = 'day' | 'week' | 'month'
 
@@ -889,6 +892,17 @@ function StaffBookingSheet({ booking, onClose, onCancelled }: {
             {booking.trip_type === 'DROP' ? 'Drop' : `Wait ${booking.wait_minutes}min`}
           </span>
         </div>
+
+        {/* Driver tracking map — shown when driver is confirmed/active */}
+        {['booked', 'on_trip', 'waiting_trip'].includes(booking.status) && booking.taxi_id && (
+          <TrackingMap
+            taxiId={booking.taxi_id}
+            taxiColor={booking.taxi_color || '#006064'}
+            pickup={booking.pickup}
+            destination={booking.destination}
+            status={booking.status}
+          />
+        )}
 
         {/* Details */}
         <div style={{ background: '#F5F5F2', borderRadius: 16, padding: '12px 14px', marginBottom: '16px' }}>

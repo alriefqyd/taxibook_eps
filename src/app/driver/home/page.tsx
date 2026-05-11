@@ -3,11 +3,15 @@ import React from 'react'
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import type { User } from '@/types'
 import GanttCalendar from '@/components/GanttCalendar'
+import { useGpsReporting } from '@/hooks/useGpsReporting'
+
+const ActiveTripMap = dynamic(() => import('@/components/map/ActiveTripMap'), { ssr: false })
 
 const FONT = 'Inter, sans-serif'
 
@@ -54,6 +58,8 @@ export default function DriverHomePage() {
   const uidRef = React.useRef('')
   const [toggling,   setToggling]   = useState(false)
 
+  // Broadcast GPS to Supabase whenever driver has a taxi assigned
+  useGpsReporting(myTaxi?.id ?? null)
 
   async function toggleAvailability() {
     if (!myTaxi || toggling) return
@@ -312,11 +318,19 @@ export default function DriverHomePage() {
       {tab === 'active' && (
         <div style={{ padding: '16px 16px 100px' }}>
           {activeTrip ? (
-            <ActiveTripCard
-              trip={activeTrip}
-              processing={processing}
-              onComplete={complete}
-            />
+            <>
+              <ActiveTripCard
+                trip={activeTrip}
+                processing={processing}
+                onComplete={complete}
+              />
+              <ActiveTripMap
+                pickup={activeTrip.pickup}
+                destination={activeTrip.destination}
+                status={activeTrip.status}
+                taxiColor={activeTrip.taxi_color || '#006064'}
+              />
+            </>
           ) : nextTrip ? (
             <div>
               <div style={{ background: 'rgba(0,96,100,0.1)', border: '1px solid #93C5FD', borderRadius: 16, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>

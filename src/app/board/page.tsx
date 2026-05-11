@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import {
   format, startOfWeek, addDays, addMonths,
@@ -9,13 +10,15 @@ import {
 } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 
+const DriverFleetMap = dynamic(() => import('@/components/map/DriverFleetMap'), { ssr: false })
+
 const FONT     = "var(--font-inter), 'Inter', sans-serif"
 const HOUR_S   = 7
 const HOUR_E   = 20
 const H_PX     = 64   // px per hour
 const HOURS    = Array.from({ length: HOUR_E - HOUR_S }, (_, i) => i + HOUR_S)
 
-type View = 'day' | 'week' | 'month'
+type View = 'day' | 'week' | 'month' | 'map'
 
 export default function BoardPage() {
   const router   = useRouter()
@@ -160,7 +163,7 @@ export default function BoardPage() {
       <div style={{ background: '#fff', borderBottom: '1px solid #D4E8EA', padding: '10px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         {/* View tabs */}
         <div style={{ background: '#ECEAE4', borderRadius: 999, padding: 3, display: 'flex', gap: 2 }}>
-          {(['day','week','month'] as View[]).map(v => (
+          {(['day','week','month','map'] as View[]).map(v => (
             <button key={v} onClick={() => { setView(v); setCursor(new Date()) }} style={{
               padding: '6px 18px', fontSize: 12, fontWeight: 600, border: 'none',
               borderRadius: 999, cursor: 'pointer', fontFamily: FONT,
@@ -198,6 +201,11 @@ export default function BoardPage() {
           )}
           {view === 'month' && (
             <MonthView bookings={bookings} cursor={cursor} today={today} onDayClick={(d: Date) => { setCursor(d); setView('day') }} />
+          )}
+          {view === 'map' && (
+            <div style={{ padding: 16, height: '100%', boxSizing: 'border-box' }}>
+              <DriverFleetMap />
+            </div>
           )}
         </div>
       </div>

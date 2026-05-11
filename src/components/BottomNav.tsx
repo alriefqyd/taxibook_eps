@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const PRIMARY = '#006064'
@@ -14,6 +14,7 @@ const ICONS: Record<string, { outline: string; filled: string }> = {
   person:       { outline: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', filled: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
   dashboard:    { outline: 'M3 3h7v7H3z M3 14h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z', filled: 'M3 3h7v7H3z M3 14h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z' },
   group:        { outline: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M23 21v-2a4 4 0 0 0-3-3.87 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M16 3.13a4 4 0 0 1 0 7.75', filled: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
+  map:          { outline: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z M8 2v16 M16 6v16', filled: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z' },
 }
 
 const SvgIcon = ({ d, size = 22, color = 'currentColor', fill = 'none', strokeWidth = 2 }: {
@@ -38,6 +39,7 @@ const NAV: Record<string, NavItem[]> = {
   coordinator: [
     { href: '/coordinator/home',          label: 'Home',    iconKey: 'dashboard' },
     { href: '/coordinator/drivers',       label: 'Drivers', iconKey: 'group'     },
+    { href: '/coordinator/map',           label: 'Map',     iconKey: 'map'       },
     { href: '/coordinator/notifications', label: 'Alerts',  iconKey: 'bell'      },
     { href: '/coordinator/profile',       label: 'Profile', iconKey: 'person'    },
   ],
@@ -49,8 +51,9 @@ const NAV: Record<string, NavItem[]> = {
 }
 
 export function BottomNav({ role }: { role: 'staff' | 'coordinator' | 'driver' }) {
-  const pathname = usePathname()
-  const supabase = createClient()
+  const pathname  = usePathname()
+  const supabase  = createClient()
+  const channelId = useRef(`nav-badge-${Math.random().toString(36).slice(2)}`)
   const [unread, setUnread] = useState(0)
   const items = NAV[role] || []
 
@@ -65,7 +68,7 @@ export function BottomNav({ role }: { role: 'staff' | 'coordinator' | 'driver' }
       if (mounted) setUnread(count || 0)
     }
     load()
-    const ch = supabase.channel('nav-badge')
+    const ch = supabase.channel(channelId.current)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, load)
       .subscribe()
     return () => { mounted = false; supabase.removeChannel(ch) }

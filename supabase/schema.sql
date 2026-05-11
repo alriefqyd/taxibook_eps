@@ -282,3 +282,34 @@ left join public.bookings b on b.taxi_id = t.id
   and b.status in ('booked', 'on_trip', 'waiting_trip')
   and b.auto_complete_at > now()
 where t.is_active = true;
+
+-- ============================================================
+-- MIGRATION: map / location columns
+-- Run this in Supabase SQL Editor after the initial schema
+-- ============================================================
+
+-- Driver real-time GPS on taxis table
+alter table public.taxis add column if not exists latitude          float8;
+alter table public.taxis add column if not exists longitude         float8;
+alter table public.taxis add column if not exists location_updated_at timestamptz;
+
+-- Allow drivers to update their own taxi's location
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where tablename = 'taxis' and policyname = 'Driver can update own taxi location'
+  ) then
+    execute $p$
+      create policy "Driver can update own taxi location" on public.taxis
+        for update using (driver_id = auth.uid())
+    $p$;
+  end if;
+end;
+$$;
+
+-- Pre-geocoded coordinates stored on bookings (populated async after creation)
+alter table public.bookings add column if not exists pickup_lat      float8;
+alter table public.bookings add column if not exists pickup_lng      float8;
+alter table public.bookings add column if not exists destination_lat float8;
+alter table public.bookings add column if not exists destination_lng float8;
