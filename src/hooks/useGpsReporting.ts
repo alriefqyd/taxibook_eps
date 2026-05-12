@@ -4,6 +4,26 @@ import { createClient } from '@/lib/supabase/client'
 export function useGpsReporting(taxiId: string | null) {
   const lastRef = useRef<{ lat: number; lng: number; time: number } | null>(null)
 
+  // Wake Lock: keep screen on so Chrome never suspends GPS
+  useEffect(() => {
+    if (!taxiId || !('wakeLock' in navigator)) return
+    let wakeLock: WakeLockSentinel | null = null
+
+    const acquire = () =>
+      (navigator.wakeLock as WakeLock).request('screen')
+        .then(lock => { wakeLock = lock })
+        .catch(() => {})
+
+    acquire()
+    // Re-acquire after visibility change (e.g. user returns to tab)
+    document.addEventListener('visibilitychange', acquire)
+
+    return () => {
+      document.removeEventListener('visibilitychange', acquire)
+      wakeLock?.release()
+    }
+  }, [taxiId])
+
   useEffect(() => {
     if (!taxiId || !navigator.geolocation) return
 
