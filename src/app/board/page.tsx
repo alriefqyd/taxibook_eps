@@ -189,25 +189,25 @@ export default function BoardPage() {
       </div>
 
       {/* ── Views ── */}
-      <div style={{ flex: 1, padding: '16px 28px 24px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ background: '#fff', border: '1px solid #D4E8EA', borderRadius: 12, overflow: 'auto', flex: 1 }}>
-
-          {view === 'day' && (
-            <DayView bookings={bookings} taxis={taxis} cursor={cursor} today={today} tooltip={tooltip} setTooltip={setTooltip} />
-          )}
-          {view === 'week' && (
-            <WeekView bookings={bookings} cursor={cursor} today={today} tooltip={tooltip} setTooltip={setTooltip} />
-          )}
-          {view === 'month' && (
-            <MonthView bookings={bookings} cursor={cursor} today={today} onDayClick={(d: Date) => { setCursor(d); setView('day') }} />
-          )}
-          {view === 'map' && (
-            <div style={{ padding: 16, height: '100%', boxSizing: 'border-box' }}>
-              <DriverFleetMap />
-            </div>
-          )}
+      {view === 'map' ? (
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <DriverFleetMap style={{ borderRadius: 0 }} />
         </div>
-      </div>
+      ) : (
+        <div style={{ flex: 1, padding: '16px 28px 24px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ background: '#fff', border: '1px solid #D4E8EA', borderRadius: 12, overflow: 'auto', flex: 1 }}>
+            {view === 'day' && (
+              <DayView bookings={bookings} taxis={taxis} cursor={cursor} today={today} tooltip={tooltip} setTooltip={setTooltip} />
+            )}
+            {view === 'week' && (
+              <WeekView bookings={bookings} cursor={cursor} today={today} tooltip={tooltip} setTooltip={setTooltip} />
+            )}
+            {view === 'month' && (
+              <MonthView bookings={bookings} cursor={cursor} today={today} onDayClick={(d: Date) => { setCursor(d); setView('day') }} />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

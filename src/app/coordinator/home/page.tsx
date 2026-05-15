@@ -5,7 +5,6 @@ const PRIMARY = '#006064'
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
@@ -13,7 +12,6 @@ import type { BookingDetail, User } from '@/types'
 import { STATUS_LABELS, STATUS_COLORS } from '@/types'
 import GanttCalendar from '@/components/GanttCalendar'
 
-const DriverFleetMap = dynamic(() => import('@/components/map/DriverFleetMap'), { ssr: false })
 
 interface TaxiRow {
   id: string
@@ -35,7 +33,7 @@ export default function CoordinatorHomePage() {
   const [bookings,   setBookings]   = useState<BookingDetail[]>([])
   const [taxis,      setTaxis]      = useState<TaxiRow[]>([])
   const [loading,    setLoading]    = useState(true)
-  const [view,        setView]        = useState<'list' | 'calendar' | 'map'>('list')
+  const [view,        setView]        = useState<'list' | 'calendar'>('list')
   const [filter,     setFilter]     = useState<'all' | 'pending' | 'booked' | 'completed'>('all')
   const [rejectId,   setRejectId]   = useState<string | null>(null)
   const [rejectNote, setRejectNote] = useState('')
@@ -251,6 +249,10 @@ export default function CoordinatorHomePage() {
                       <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 2px', color: '#1a1c1b' }}>{user?.name}</p>
                       <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>Coordinator</p>
                     </div>
+                    <button onClick={() => { setMenuOpen(false); window.open('/board', '_blank') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>Dispatch Board</p>
+                    </button>
                     <button onClick={() => { setMenuOpen(false); router.push('/coordinator/locations') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
                       <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#D97706' }}>Saved Locations</p>
@@ -280,7 +282,6 @@ export default function CoordinatorHomePage() {
           {([
             { key: 'list',     label: 'Bookings' },
             { key: 'calendar', label: 'Calendar' },
-            { key: 'map',      label: 'Map' },
           ] as const).map(v => (
             <button key={v.key} onClick={() => setView(v.key)} style={{
               flex: 1, padding: '7px 4px', fontSize: 12, fontWeight: 600, border: 'none',
@@ -401,12 +402,7 @@ export default function CoordinatorHomePage() {
           </div>
         )}
 
-        {/* ── MAP TAB ── */}
-        {view === 'map' && (
-          <div style={{ margin: '0 -16px', height: 'calc(100dvh - 200px)' }}>
-            <DriverFleetMap style={{ borderRadius: 0 }} />
-          </div>
-        )}
+
 
         {/* ── FLEET TAB ── */}
         {false && (

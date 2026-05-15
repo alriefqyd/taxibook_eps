@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>TaxiBook EPS — Visual Guide & Tutorial</title>
+<style>
+/* ── Base ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --teal:#006064;--teal-d:#004047;--teal-l:#E0F2F1;
+  --gold:#ECB833;--gold-d:#B8860B;
+  --gray:#6B7280;--gray-l:#F5F5F2;--border:rgba(0,0,0,0.08);
+  --green:#059669;--amber:#D97706;--red:#DC2626;--purple:#7C3AED;
+  --font:'Segoe UI',Arial,sans-serif;
+}
+html{font-size:13px;}
+body{font-family:var(--font);color:#1a1c1b;background:#fff;line-height:1.6;}
+
+/* ── A4 pages ── */
+.page{
+  width:210mm;min-height:297mm;
+  margin:0 auto 8mm;padding:16mm 16mm 14mm;
+  background:#fff;position:relative;overflow:hidden;
+}
+@media print{
+  html,body{background:#fff;}
+  .page{margin:0;padding:14mm 14mm 12mm;page-break-after:always;box-shadow:none!important;}
+  .page:last-child{page-break-after:avoid;}
+  @page{size:A4;margin:0;}
+}
+@media screen{
+  body{background:#d0d0d0;padding:12px 0;}
+  .page{box-shadow:0 6px 28px rgba(0,0,0,0.18);border-radius:4px;}
+}
+
+/* ── Cover ── */
+.cover{background:var(--teal-d);color:#fff;padding:0;display:flex;flex-direction:column;}
+.cover-body{padding:20mm 16mm 0;flex:1;}
+.cover-logo{display:flex;align-items:center;gap:12px;margin-bottom:56px;}
+.cover-logo svg{flex-shrink:0;}
+.cover-logo-text .name{font-size:15px;font-weight:800;color:#fff;}
+.cover-logo-text .sub{font-size:10px;color:rgba(255,255,255,0.5);letter-spacing:1px;text-transform:uppercase;}
+.cover-bar{height:3px;width:100px;background:linear-gradient(90deg,var(--gold),transparent);border-radius:2px;margin-bottom:28px;}
+.cover h1{font-size:36px;font-weight:800;line-height:1.15;letter-spacing:-1px;margin-bottom:14px;}
+.cover-desc{font-size:13px;color:rgba(255,255,255,0.6);max-width:320px;line-height:1.6;margin-bottom:32px;}
+.cover-tags{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:0;}
+.cover-tag{padding:4px 13px;border-radius:999px;font-size:10px;font-weight:700;border:1.5px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);}
+.cover-phones{display:flex;justify-content:flex-end;align-items:flex-end;gap:-20px;padding:0 10mm;margin-top:auto;}
+.cover-foot{background:rgba(0,0,0,0.22);padding:12px 16mm;display:flex;justify-content:space-between;}
+.cover-foot p{font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:0.3px;}
+
+/* ── Section banner ── */
+.banner{
+  margin:0 -16mm 20px;padding:16px 16mm;
+  display:flex;align-items:center;gap:12px;color:#fff;
+}
+.banner-icon{width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.banner h1{font-size:18px;font-weight:800;letter-spacing:-0.2px;line-height:1.2;}
+.banner p{font-size:10px;color:rgba(255,255,255,0.6);margin-top:1px;}
+.banner-role{margin-left:auto;padding:3px 10px;border-radius:999px;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:1.5px solid rgba(255,255,255,0.3);color:rgba(255,255,255,0.85);flex-shrink:0;}
+
+/* ── Typography ── */
+h2{font-size:14px;font-weight:800;color:var(--teal-d);margin:20px 0 8px;display:flex;align-items:center;gap:8px;}
+h2::after{content:'';flex:1;height:1.5px;background:var(--teal-l);border-radius:1px;}
+h3{font-size:11px;font-weight:700;color:var(--teal);margin:12px 0 5px;text-transform:uppercase;letter-spacing:.06em;}
+p{font-size:11px;margin-bottom:7px;color:#374151;}
+ul,ol{padding-left:16px;margin:6px 0;}
+li{font-size:11px;color:#374151;margin-bottom:3px;}
+
+/* ── Tutorial layout ── */
+.tut{display:grid;grid-template-columns:1fr 200px;gap:20px;align-items:start;margin:12px 0 20px;}
+.tut.full{grid-template-columns:1fr;}
+.tut-steps{flex:1;}
+.step{display:flex;gap:10px;margin-bottom:9px;align-items:flex-start;}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--teal);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.step-body{}
+.step-title{font-size:11px;font-weight:700;color:#1a1c1b;margin-bottom:2px;}
+.step-desc{font-size:10px;color:var(--gray);margin:0;}
+
+/* ── Phone mockup ── */
+.phone{
+  width:200px;
+  background:#1a1c1b;
+  border-radius:28px;
+  padding:8px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.28),inset 0 0 0 1px rgba(255,255,255,0.06);
+  flex-shrink:0;
+  position:relative;
+}
+.phone-screen{
+  background:var(--gray-l);
+  border-radius:22px;
+  overflow:hidden;
+  min-height:360px;
+  display:flex;
+  flex-direction:column;
+  position:relative;
+}
+.phone-bar{background:#1a1c1b;height:22px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-radius:22px 22px 0 0;}
+.phone-bar .time{font-size:8px;font-weight:700;color:#fff;}
+.phone-bar .icons{display:flex;gap:4px;align-items:center;}
+.phone-bar .icons span{font-size:7px;color:rgba(255,255,255,0.8);}
+
+/* ── App UI components (inside phone) ── */
+.app-header{background:#F5F5F2;border-bottom:1px solid rgba(0,0,0,0.07);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.app-header-logo{display:flex;align-items:center;gap:6px;}
+.app-header-logo .vmark{width:38px;height:16px;}
+.app-header-sep{width:1px;height:14px;background:rgba(0,0,0,0.12);}
+.app-header-title{font-size:9px;font-weight:700;color:var(--teal);}
+.app-header-right{display:flex;align-items:center;gap:4px;}
+.app-avatar{width:20px;height:20px;border-radius:50%;background:var(--teal);color:#fff;font-size:7px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+.app-bell{font-size:12px;color:#9ca3af;}
+
+.app-scroll{flex:1;overflow:hidden;padding:8px 10px;display:flex;flex-direction:column;gap:6px;}
+
+.app-card{background:#fff;border-radius:10px;padding:8px 10px;border:1px solid rgba(0,0,0,0.06);box-shadow:0 1px 4px rgba(0,96,100,0.05);}
+.app-card-title{font-size:8.5px;font-weight:700;color:#1a1c1b;margin-bottom:1px;}
+.app-card-sub{font-size:7.5px;color:#6B7280;}
+.app-card-row{display:flex;justify-content:space-between;align-items:center;margin-top:4px;}
+.app-badge{padding:1px 6px;border-radius:999px;font-size:7px;font-weight:700;}
+.badge-booked{background:#D1FAE5;color:#065F46;}
+.badge-ontrip{background:#D1FAE5;color:#065F46;}
+.badge-waiting{background:#EDE9FE;color:#4C1D95;}
+.badge-pending{background:#FEF3C7;color:#92400E;}
+.badge-submitted{background:#DBEAFE;color:#1E3A5F;}
+.badge-completed{background:#F1F5F9;color:#475569;}
+.badge-approval{background:#FEF3C7;color:#92400E;}
+
+.app-route{font-size:7px;color:#6B7280;display:flex;align-items:center;gap:3px;margin-top:2px;}
+.app-route-dot{width:5px;height:5px;border-radius:50%;background:var(--teal);flex-shrink:0;}
+.app-route-line{width:1px;height:8px;background:rgba(0,0,0,0.15);margin:1px 2px;}
+.app-route-pin{font-size:7px;}
+
+.app-map{background:linear-gradient(135deg,#d4e8d4 0%,#c8e0c8 40%,#dce8d8 100%);border-radius:8px;height:70px;position:relative;overflow:hidden;margin-top:4px;}
+.app-map-road-h{position:absolute;top:50%;left:0;right:0;height:5px;background:rgba(255,255,255,0.7);transform:translateY(-50%);}
+.app-map-road-v{position:absolute;left:40%;top:0;bottom:0;width:4px;background:rgba(255,255,255,0.6);}
+.app-map-driver{position:absolute;top:42%;left:35%;font-size:10px;}
+.app-map-dest{position:absolute;top:25%;right:18%;font-size:10px;}
+.app-map-route{position:absolute;top:44%;left:38%;right:20%;height:2px;background:var(--teal);border-radius:1px;transform:rotate(-15deg);}
+
+.app-bottom-nav{background:#fff;border-top:1px solid rgba(0,0,0,0.07);display:flex;justify-content:space-around;padding:6px 4px 8px;flex-shrink:0;}
+.app-nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;}
+.app-nav-icon{font-size:14px;line-height:1;}
+.app-nav-label{font-size:6.5px;font-weight:600;color:#9ca3af;}
+.app-nav-item.active .app-nav-icon{color:var(--teal);}
+.app-nav-item.active .app-nav-label{color:var(--teal);font-weight:700;}
+.app-nav-dot{width:4px;height:4px;border-radius:50%;background:var(--teal);margin:0 auto;display:block;}
+
+.app-form-field{background:#F5F5F2;border-radius:6px;padding:6px 8px;margin-bottom:5px;}
+.app-form-label{font-size:7px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;}
+.app-form-value{font-size:8.5px;color:#1a1c1b;font-weight:500;}
+.app-form-placeholder{font-size:8px;color:#9ca3af;}
+
+.app-btn{border-radius:7px;padding:8px;text-align:center;font-size:8.5px;font-weight:700;cursor:pointer;}
+.app-btn-primary{background:var(--teal);color:#fff;}
+.app-btn-accept{background:#D1FAE5;color:#065F46;}
+.app-btn-decline{background:#FEE2E2;color:#991B1B;}
+.app-btn-row{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px;}
+
+.app-login-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px 14px;background:#F5F5F2;}
+.app-login-logo{margin-bottom:16px;text-align:center;}
+.app-login-card{background:#fff;border-radius:12px;padding:14px;width:100%;border:1px solid rgba(0,0,0,0.07);}
+
+.app-section-hd{padding:8px 10px 4px;display:flex;align-items:center;gap:6px;}
+.app-section-hd span{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;}
+
+.app-filter-row{display:flex;gap:4px;padding:0 10px 6px;overflow:hidden;}
+.app-filter-pill{padding:2px 8px;border-radius:999px;font-size:7px;font-weight:700;border:1px solid rgba(0,0,0,0.1);color:#6B7280;background:#fff;flex-shrink:0;}
+.app-filter-pill.active{background:var(--teal);color:#fff;border-color:var(--teal);}
+
+.app-stat-row{display:flex;gap:4px;padding:4px 10px;}
+.app-stat{background:var(--gray-l);border-radius:6px;padding:4px 6px;flex:1;text-align:center;}
+.app-stat-val{font-size:11px;font-weight:800;color:var(--teal);}
+.app-stat-lbl{font-size:6px;color:#9ca3af;font-weight:700;text-transform:uppercase;}
+
+.app-gantt-row{display:flex;align-items:center;border-bottom:1px solid rgba(0,0,0,0.06);min-height:28px;}
+.app-gantt-label{width:38px;flex-shrink:0;font-size:7px;font-weight:700;color:#374151;padding:0 4px;border-right:1px solid rgba(0,0,0,0.06);}
+.app-gantt-track{flex:1;position:relative;height:28px;background:repeating-linear-gradient(90deg,transparent,transparent 19px,rgba(0,0,0,0.04) 19px,rgba(0,0,0,0.04) 20px);}
+.app-gantt-block{position:absolute;top:4px;height:20px;border-radius:4px;display:flex;align-items:center;padding:0 4px;font-size:6.5px;font-weight:700;overflow:hidden;white-space:nowrap;}
+.app-now-line{position:absolute;top:0;bottom:0;width:1.5px;background:#EF4444;z-index:10;}
+
+/* ── Callout bubbles ── */
+.callout{
+  position:absolute;
+  background:var(--teal);color:#fff;
+  font-size:8px;font-weight:800;
+  width:16px;height:16px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid #fff;
+  box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  z-index:20;pointer-events:none;
+}
+
+/* ── Legend callout reference ── */
+.callout-ref{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;}
+.callout-item{display:flex;align-items:center;gap:5px;}
+.callout-num{width:16px;height:16px;border-radius:50%;background:var(--teal);color:#fff;font-size:8px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.callout-text{font-size:10px;color:#374151;}
+
+/* ── Info boxes ── */
+.info{border-radius:8px;padding:9px 11px;margin:8px 0;display:flex;gap:8px;align-items:flex-start;}
+.info.tip{background:#E0F2F1;border-left:3px solid var(--teal);}
+.info.warn{background:#FEF3C7;border-left:3px solid var(--amber);}
+.info.note{background:#EFF6FF;border-left:3px solid #3B82F6;}
+.info-icon{font-size:12px;flex-shrink:0;margin-top:1px;}
+.info-body{font-size:10px;color:#374151;}
+.info-body strong{display:block;font-weight:700;margin-bottom:1px;}
+
+/* ── Flow ── */
+.flow{display:flex;align-items:center;gap:5px;margin:10px 0;flex-wrap:wrap;}
+.flow-box{background:var(--teal-l);border:1.5px solid var(--teal);border-radius:6px;padding:4px 10px;font-size:9px;font-weight:700;color:var(--teal-d);white-space:nowrap;}
+.flow-box.gold{background:#FEF3C7;border-color:var(--gold-d);color:#78350F;}
+.flow-box.green{background:#D1FAE5;border-color:var(--green);color:#065F46;}
+.flow-box.gray{background:#F1F5F9;border-color:#CBD5E1;color:#475569;}
+.flow-arr{color:var(--teal);font-size:12px;font-weight:700;}
+
+/* ── Status table ── */
+table{width:100%;border-collapse:collapse;font-size:10px;margin:8px 0;}
+th{background:var(--teal-d);color:#fff;padding:6px 8px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}
+td{padding:6px 8px;border-bottom:1px solid var(--border);color:#374151;vertical-align:top;}
+tr:nth-child(even) td{background:var(--gray-l);}
+
+.pill{padding:2px 8px;border-radius:999px;font-size:9px;font-weight:700;}
+.p-sub{background:#DBEAFE;color:#1E3A5F;}
+.p-app{background:#FEF3C7;color:#92400E;}
+.p-bkd{background:#D1FAE5;color:#065F46;}
+.p-tri{background:#D1FAE5;color:#065F46;}
+.p-wai{background:#EDE9FE;color:#4C1D95;}
+.p-cmp{background:#F1F5F9;color:#475569;}
+.p-rej{background:#FEE2E2;color:#991B1B;}
+
+/* ── Two column ── */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:8px 0;}
+
+/* ── Page footer ── */
+.foot{position:absolute;bottom:10mm;left:16mm;right:16mm;display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:5px;}
+.foot p{font-size:8px;color:#9ca3af;margin:0;}
+
+/* ── Card grid ── */
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;}
+.card{background:var(--gray-l);border-radius:8px;padding:10px 11px;border-left:3px solid var(--teal);}
+.card-icon{font-size:16px;margin-bottom:4px;}
+.card-title{font-size:11px;font-weight:700;color:var(--teal-d);margin-bottom:2px;}
+.card-desc{font-size:9.5px;color:var(--gray);line-height:1.5;}
+
+.divider{height:1px;background:var(--border);margin:16px 0;}
+
+/* Tut layout variants */
+.tut-wide{display:grid;grid-template-columns:1fr 230px;gap:18px;align-items:start;margin:10px 0 18px;}
+.phones-row{display:flex;gap:12px;justify-content:center;margin:10px 0;}
+.phone-sm{width:140px;}
+.phone-sm .phone-screen{min-height:240px;}
+
+code{background:#F1F5F9;border-radius:3px;padding:1px 5px;font-family:'Courier New',monospace;font-size:9px;color:var(--teal);}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════ COVER ═══════════════════════════════════ -->
+<div class="page cover">
+  <div class="cover-body">
+    <div class="cover-logo">
+      <svg width="48" height="48" viewBox="0 0 54 54" xmlns="http://www.w3.org/2000/svg">
+        <rect width="54" height="54" rx="10" fill="rgba(255,255,255,0.1)"/>
+        <polygon points="6,10 12,10 27,44 42,10 48,10 27,47" fill="white" opacity="0.95"/>
+        <polygon points="42,10 48,10 41,22 37,22" fill="#ECB833"/>
+      </svg>
+      <div class="cover-logo-text">
+        <div class="name">TaxiBook EPS</div>
+        <div class="sub">PT Vale Indonesia · EPS Department</div>
+      </div>
+    </div>
+
+    <div class="cover-bar"></div>
+    <h1 style="font-size:34px;font-weight:800;line-height:1.15;letter-spacing:-1px;color:#fff;margin-bottom:12px;">
+      Visual Guide<br/>&amp; Tutorial
+    </h1>
+    <p class="cover-desc" style="font-size:13px;color:rgba(255,255,255,0.6);max-width:300px;line-height:1.6;margin-bottom:28px;">
+      Step-by-step tutorials with screen previews for Staff, Drivers, and Coordinators.
+    </p>
+    <div class="cover-tags">
+      <div class="cover-tag">📱 Screen Previews</div>
+      <div class="cover-tag">👤 Staff Tutorial</div>
+      <div class="cover-tag">🚗 Driver Tutorial</div>
+      <div class="cover-tag">📋 Coordinator Tutorial</div>
+      <div class="cover-tag">🖥️ Dispatch Board</div>
+    </div>
+  </div>
+
+  <!-- decorative phone silhouettes -->
+  <div style="position:absolute;right:14mm;top:30mm;opacity:0.07;">
+    <div style="width:90px;height:170px;border:3px solid #fff;border-radius:18px;"></div>
+  </div>
+  <div style="position:absolute;right:24mm;top:50mm;opacity:0.05;">
+    <div style="width:80px;height:155px;border:3px solid #fff;border-radius:16px;"></div>
+  </div>
+
+  <div class="cover-foot">
+    <p>Version 1.0 · May 2026</p>
+    <p>EPS Department — Internal Use Only</p>
+    <p>PT Vale Indonesia Tbk</p>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════ PAGE: LOGIN ══════════════════════════════ -->
+<div class="page">
+  <div class="banner" style="background:var(--teal-d);">
+    <div class="banner-icon">🔐</div>
+    <div><h1>Getting Started</h1><p>Install the app and sign in</p></div>
+  </div>
+
+  <h2>Step 1 — Install TaxiBook EPS</h2>
+  <p>TaxiBook EPS is a <strong>Progressive Web App (PWA)</strong> — install it from your browser, no app store needed.</p>
+
+  <div class="two" style="margin-bottom:12px;">
+    <div>
+      <h3>Android (Chrome)</h3>
+      <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Open Chrome, go to the app URL</div><div class="step-desc">Enter the URL given by your admin.</div></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Tap ⋮ → "Add to Home screen"</div><div class="step-desc">Tap the three-dot menu at the top-right.</div></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Tap Add — done!</div><div class="step-desc">The TaxiBook icon appears on your home screen.</div></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">Allow notifications when prompted</div><div class="step-desc">Required for trip alerts and reminders.</div></div></div>
+    </div>
+    <div>
+      <h3>iOS (Safari)</h3>
+      <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Open Safari (not Chrome)</div><div class="step-desc">Must use Safari on iOS for PWA install.</div></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Tap the Share button ↑</div><div class="step-desc">At the bottom of the Safari browser.</div></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Tap "Add to Home Screen"</div><div class="step-desc">Scroll down in the share sheet to find it.</div></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">Tap Add</div><div class="step-desc">The app icon appears on your home screen.</div></div></div>
+    </div>
+  </div>
+
+  <h2>Step 2 — Sign In</h2>
+  <div class="tut-wide">
+    <div>
+      <p>Open TaxiBook EPS from your home screen. You will see the login page.</p>
+      <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Enter your work email</div><div class="step-desc">The email address registered by your PT Vale admin.</div></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Enter your password</div><div class="step-desc">Provided by your admin. Contact them if you forgot.</div></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Tap Sign in</div><div class="step-desc">You are redirected automatically to the correct home screen for your role (Staff, Driver, or Coordinator).</div></div></div>
+      <div class="callout-ref" style="margin-top:12px;">
+        <div class="callout-item"><div class="callout-num">1</div><span class="callout-text">PT Vale (Vale) logo</span></div>
+        <div class="callout-item"><div class="callout-num">2</div><span class="callout-text">Work email field</span></div>
+        <div class="callout-item"><div class="callout-num">3</div><span class="callout-text">Password field</span></div>
+        <div class="callout-item"><div class="callout-num">4</div><span class="callout-text">Sign in button</span></div>
+      </div>
+      <div class="info tip" style="margin-top:10px;">
+        <div class="info-icon">💡</div>
+        <div class="info-body"><strong>Role is automatic</strong>Your role (Staff / Driver / Coordinator) is set by your admin. You don't choose it at login — the app takes you to the right screen automatically.</div>
+      </div>
+    </div>
+
+    <!-- Login screen mockup -->
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-bar">
+          <span class="time">9:41</span>
+          <div class="icons"><span>▲ ☁ 🔋</span></div>
+        </div>
+        <div class="app-login-body">
+          <div class="app-login-logo" style="position:relative;">
+            <!-- Vale logo mini -->
+            <svg width="70" height="28" viewBox="0 0 110 45" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto 6px;">
+              <g transform="translate(-268.45764,-342.61778)"><g transform="matrix(0.9623665,0,0,0.9623665,270.84808,345.00818)">
+                <path d="M 50.479,12.708 C 43.042,18.291 36.159,17.69 29.826,10.905 C 42.663,5.985 49.426,-1.617 56.015,4.901 L 51.128,11.893 L 51.12,11.893 L 51.119,11.903 L 51.111,11.903 L 51.111,11.904 L 51.11,11.904 L 51.11,11.915 L 51.101,11.915 L 51.101,11.917 L 51.095,11.917 L 51.095,11.918 L 51.092,11.918 L 51.092,11.919 C 51.087,11.919 51.089,11.924 51.085,11.924 L 51.085,11.927 L 51.084,11.927 L 51.084,11.93 L 51.082,11.93 L 51.081,11.936 L 51.079,11.936 L 51.077,11.94 L 51.076,11.94 C 51.076,11.943 51.073,11.943 51.073,11.946 L 51.071,11.946 L 51.071,11.949 L 51.07,11.949 L 51.07,11.951 C 51.062,11.951 51.055,11.964 51.051,11.964 L 51.051,11.965 L 51.049,11.965 L 51.048,11.969 L 51.05,11.969 L 51.05,11.971 L 51.048,11.971 L 51.044,11.978 L 51.035,11.984 L 51.035,11.987 L 51.033,11.987 C 51.033,11.993 51.02,12.009 51.015,12.012 L 51.015,12.014 L 51.013,12.015 L 51.013,12.03 L 51.01,12.03 L 51.01,12.034 L 51.008,12.034 L 51.008,12.036 L 51.007,12.037 L 51.007,12.041 L 51.002,12.043 L 51.002,12.044 L 51,12.044 L 50.995,12.047 L 50.995,12.049 C 50.992,12.051 50.99,12.053 50.99,12.058 L 50.989,12.058 L 50.987,12.062 L 50.974,12.067 L 50.974,12.069 L 50.971,12.071 L 50.971,12.072 C 50.962,12.077 50.915,12.142 50.906,12.155 L 50.906,12.155 L 50.904,12.159 L 50.902,12.159 C 50.902,12.165 50.895,12.172 50.895,12.181 L 50.894,12.181 L 50.894,12.185 C 50.885,12.189 50.867,12.209 50.857,12.209 L 50.857,12.213 C 50.838,12.222 50.823,12.239 50.802,12.247 L 50.802,12.25 L 50.795,12.25 L 50.795,12.253 L 50.792,12.253 L 50.789,12.259 C 50.785,12.259 50.784,12.262 50.78,12.262 L 50.78,12.265 L 50.764,12.274 L 50.764,12.28 L 50.761,12.28 L 50.761,12.282 C 50.756,12.286 50.734,12.303 50.73,12.303 L 50.718,12.319 L 50.715,12.319 L 50.715,12.322 L 50.71,12.33 L 50.71,12.333 L 50.704,12.333 C 50.704,12.46 50.525,12.507 50.525,12.589 L 50.522,12.589 C 50.522,12.598 50.501,12.617 50.501,12.629 L 50.498,12.629 C 50.495,12.633 50.485,12.644 50.485,12.648 L 50.482,12.648 C 50.473,12.657 50.479,12.697 50.479,12.708" fill="#ecb833"/>
+                <path d="M 51.138,11.879 C 31.745,29.432 24.14,-12.087 0,3.626 L 27.202,42.346" fill="#00939a"/>
+                <polyline points="55.607,22.818 62.247,37.215 63.772,37.203 69.605,22.729 67.004,22.64 63.055,33.337 58.298,22.729" fill="#77787b"/>
+                <polyline points="70.413,37.113 73.284,37.203 74.451,33.607 80.554,33.607 81.719,37.113 84.5,37.203 78.668,22.729 76.604,22.729" fill="#77787b"/>
+                <polyline points="75.662,31.36 79.342,31.36 77.726,26.281" fill="#ffffff"/>
+                <polyline points="88.541,37.023 88.541,23.292 91.082,23.292 91.082,34.69 97.4,34.69 97.4,37.023" fill="#77787b"/>
+                <path d="M 100.576,36.934 L 100.576,22.999 L 108.799,22.999 L 108.799,24.076 C 108.2,24.451 107.632,24.924 107.076,25.357 L 102.756,25.357 L 102.756,28.446 L 108.176,28.446 L 108.176,30.793 L 102.756,30.793 L 102.756,34.585 L 108.786,34.585 L 108.786,36.934" fill="#77787b"/>
+              </g></g>
+            </svg>
+            <div style="font-size:10px;font-weight:800;color:var(--teal);text-align:center;">TaxiBook EPS</div>
+            <!-- callout 1 -->
+            <div class="callout" style="top:-4px;right:16px;">1</div>
+          </div>
+          <div class="app-login-card" style="position:relative;">
+            <div class="app-form-field" style="border:1.5px solid rgba(0,0,0,0.08);">
+              <div class="app-form-label">Work Email</div>
+              <div class="app-form-placeholder">you@vale.com</div>
+            </div>
+            <!-- callout 2 -->
+            <div class="callout" style="top:28px;right:-8px;">2</div>
+            <div class="app-form-field" style="border:1.5px solid rgba(0,0,0,0.08);margin-top:6px;">
+              <div class="app-form-label">Password</div>
+              <div class="app-form-placeholder">••••••••</div>
+            </div>
+            <!-- callout 3 -->
+            <div class="callout" style="top:70px;right:-8px;">3</div>
+            <div class="app-btn app-btn-primary" style="margin-top:10px;position:relative;">
+              Sign in
+              <!-- callout 4 -->
+              <div class="callout" style="top:-6px;right:-8px;">4</div>
+            </div>
+          </div>
+          <div style="font-size:7px;color:#9ca3af;margin-top:8px;text-align:center;">Role assigned by your admin</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p>TaxiBook EPS — Visual Guide & Tutorial</p><p>EPS Department · PT Vale Indonesia</p><p>Page 2</p>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════ PAGE: STAFF HOME ═════════════════════════ -->
+<div class="page">
+  <div class="banner" style="background:#1E3A5F;">
+    <div class="banner-icon">👤</div>
+    <div><h1>Staff — Home Screen</h1><p>Your personal booking dashboard</p></div>
+    <div class="banner-role">STAFF</div>
+  </div>
+
+  <div class="tut-wide">
+    <div>
+      <p>After login, Staff lands on the <strong>Home</strong> screen. Everything about your trips is here.</p>
+      <div class="callout-ref">
+        <div class="callout-item"><div class="callout-num">1</div><span class="callout-text">Vale logo + app name header</span></div>
+        <div class="callout-item"><div class="callout-num">2</div><span class="callout-text">Active trip card — live status</span></div>
+        <div class="callout-item"><div class="callout-num">3</div><span class="callout-text">Upcoming / recent bookings</span></div>
+        <div class="callout-item"><div class="callout-num">4</div><span class="callout-text">Status badge (color-coded)</span></div>
+        <div class="callout-item"><div class="callout-num">5</div><span class="callout-text">Bottom navigation bar</span></div>
+      </div>
+      <div class="divider"></div>
+      <h3>Booking status colors</h3>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px;">
+        <div style="display:flex;align-items:center;gap:8px;"><span class="pill p-sub">Submitted</span><span style="font-size:10px;color:#374151;">Waiting to be processed</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span class="pill p-app">Needs Approval</span><span style="font-size:10px;color:#374151;">Coordinator reviewing</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span class="pill p-bkd">Booked</span><span style="font-size:10px;color:#374151;">Driver accepted — confirmed</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span class="pill p-tri">On Trip</span><span style="font-size:10px;color:#374151;">Trip in progress</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span class="pill p-cmp">✓ Completed</span><span style="font-size:10px;color:#374151;">Trip finished</span></div>
+      </div>
+      <div class="info tip" style="margin-top:10px;">
+        <div class="info-icon">💡</div>
+        <div class="info-body"><strong>Live updates</strong>The screen refreshes automatically. You don't need to reload — status changes appear instantly.</div>
+      </div>
+    </div>
+
+    <!-- Staff home mockup -->
+    <div class="phone" style="position:relative;">
+      <div class="phone-screen">
+        <div class="phone-bar"><span class="time">9:41</span><div class="icons"><span>▲ ☁ 🔋</span></div></div>
+        <!-- Header -->
+        <div class="app-header" style="position:relative;">
+          <div class="app-header-logo">
+            <svg class="app-header-logo vmark" viewBox="0 0 110 45" width="40" height="16" xmlns="http://www.w3.org/2000/svg"><g transform="translate(-268.45764,-342.61778)"><g transform="matrix(0.9623665,0,0,0.9623665,270.84808,345.00818)"><path d="M 51.138,11.879 C 31.745,29.432 24.14,-12.087 0,3.626 L 27.202,42.346" fill="#00939a"/><polyline points="55.607,22.818 62.247,37.215 63.772,37.203 69.605,22.729 67.004,22.64 63.055,33.337 58.298,22.729" fill="#77787b"/><polyline points="70.413,37.113 73.284,37.203 74.451,33.607 80.554,33.607 81.719,37.113 84.5,37.203 78.668,22.729 76.604,22.729" fill="#77787b"/><polyline points="75.662,31.36 79.342,31.36 77.726,26.281" fill="#fff"/><polyline points="88.541,37.023 88.541,23.292 91.082,23.292 91.082,34.69 97.4,34.69 97.4,37.023" fill="#77787b"/><path d="M 100.576,36.934 L 100.576,22.999 L 108.799,22.999 L 108.799,24.076 C 108.2,24.451 107.632,24.924 107.076,25.357 L 102.756,25.357 L 102.756,28.446 L 108.176,28.446 L 108.176,30.793 L 102.756,30.793 L 102.756,34.585 L 108.786,34.585 L 108.786,36.934" fill="#77787b"/></g></g></svg>
+            <div class="app-header-sep"></div>
+            <div class="app-header-title">TaxiBook EPS</div>
+          </div>
+          <div class="app-header-right">
+            <div class="app-bell">🔔</div>
+            <div class="app-avatar">AS</div>
+          </div>
+          <div class="callout" style="top:6px;left:6px;">1</div>
+        </div>
+        <div class="app-scroll">
+          <!-- Active trip card -->
+          <div class="app-card" style="border-left:3px solid var(--teal);position:relative;">
+            <div class="app-card-title">🟢 Trip in Progress</div>
+            <div style="display:flex;flex-direction:column;gap:1px;margin-top:3px;">
+              <div class="app-route"><div class="app-route-dot"></div><span style="font-size:7px;">Kantor Pusat</span></div>
+              <div style="font-size:7px;color:#9ca3af;padding-left:8px;">↓</div>
+              <div class="app-route"><span style="font-size:8px;">📍</span><span style="font-size:7px;">Warehouse Gate 3</span></div>
+            </div>
+            <div class="app-card-row">
+              <span style="font-size:7px;color:#6B7280;">Taxi 02 · Driver 2</span>
+              <span class="app-badge badge-ontrip">On Trip</span>
+            </div>
+            <div class="callout" style="top:4px;right:4px;">2</div>
+          </div>
+          <!-- upcoming booking -->
+          <div style="font-size:7.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;">Upcoming</div>
+          <div class="app-card" style="position:relative;">
+            <div class="app-card-title">Ahmad Santoso</div>
+            <div class="app-card-sub">Fri 15 May · 14:00</div>
+            <div class="app-card-sub">Kantor EPS → Medical Centre</div>
+            <div class="app-card-row">
+              <span style="font-size:7px;color:#6B7280;">Taxi 03 · Driver 3</span>
+              <span class="app-badge badge-booked">Booked</span>
+            </div>
+            <div class="callout" style="top:4px;right:4px;">4</div>
+          </div>
+          <div class="app-card">
+            <div class="app-card-title">Ahmad Santoso</div>
+            <div class="app-card-sub">Fri 15 May · 16:30</div>
+            <div class="app-card-sub">Gate 1 → Sorowako Town</div>
+            <div class="app-card-row">
+              <span style="font-size:7px;color:#9ca3af;">Unassigned</span>
+              <span class="app-badge badge-submitted">Submitted</span>
+            </div>
+          </div>
+          <div class="callout" style="top:170px;left:8px;">3</div>
+        </div>
+        <!-- Bottom nav -->
+        <div class="app-bottom-nav" style="position:relative;">
+          <div class="app-nav-item active"><div class="app-nav-icon">🏠</div><div class="app-nav-label">Home</div><span class="app-nav-dot"></span></div>
+          <div class="app-nav-item"><div class="app-nav-icon">🚗</div><div class="app-nav-label">Book</div></div>
+          <div class="app-nav-item"><div class="app-nav-icon">🔔</div><div class="app-nav-label">Alerts</div></div>
+          <div class="app-nav-item"><div class="app-nav-icon">👤</div><div class="app-nav-label">Profile</div></div>
+          <div class="callout" style="bottom:24px;right:4px;">5</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p>TaxiBook EPS — Visual Guide & Tutorial</p><p>EPS Department · PT Vale Indonesia</p><p>Page 3</p>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════ PAGE: STAFF BOOK ════════════════════════ -->
+<div class="page">
+  <div class="banner" style="background:#1E3A5F;">
+    <div class="banner-icon">➕</div>
+    <div><h1>Staff — Book a Trip</h1><p>How to request a company taxi</p></div>
+    <div class="banner-role">STAFF</div>
+  </div>
+
+  <div class="tut-wide">
+    <div>
+      <p>Tap <strong>Book</strong> in the bottom navigation (or the Book a Trip button on Home). Fill in the form:</p>
+      <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Pickup Location</div><div class="step-desc">Type your pickup point, or tap a <strong>saved location</strong> from the list (recommended for locations inside the PTVI site — avoids GPS errors).</div></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Destination</div><div class="step-desc">Type or select your destination. Use saved locations for on-site addresses.</div></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Date &amp; Time</div><div class="step-desc">Pick the date and time you need the taxi. Book at least 15 minutes in advance.</div></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">Trip Type</div><div class="step-desc"><strong>DROP</strong> — driver drops you off and leaves.<br/><strong>WAITING</strong> — driver waits at destination. Set the wait time in minutes.</div></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-body"><div class="step-title">Notes (optional)</div><div class="step-desc">Special instructions for the driver.</div></div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-body"><div class="step-title">Tap Submit</div><div class="step-desc">You'll get a push notification when a driver is assigned and confirms.</div></div></div>
+
+      <div class="info warn" style="margin-top:8px;">
+        <div class="info-icon">⚠️</div>
+        <div class="info-body"><strong>Book at least 15 minutes early</strong>This gives the system time to assign a driver and send the notification.</div>
+      </div>
+    </div>
+
+    <!-- Book form mockup -->
+    <div class="phone" style="position:relative;">
+      <div class="phone-screen">
+        <div class="phone-bar"><span class="time">9:41</span><div class="icons"><span>▲ ☁ 🔋</span></div></div>
+        <div class="app-header">
+          <div style="font-size:9px;font-weight:700;color:var(--teal-d);">← Book a Trip</div>
+        </div>
+        <div class="app-scroll" style="gap:0;">
+          <div style="font-size:7.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin:4px 0 3px;">Trip Details</div>
+          <div class="app-form-field" style="position:relative;">
+            <div class="app-form-label">Pickup Location</div>
+            <div class="app-form-value">Kantor EPS</div>
+            <div class="callout" style="top:2px;right:-8px;">1</div>
+          </div>
+          <div class="app-form-field" style="position:relative;">
+            <div class="app-form-label">Destination</div>
+            <div class="app-form-placeholder">Type or select saved…</div>
+            <div class="callout" style="top:2px;right:-8px;">2</div>
+          </div>
+          <div class="app-form-field" style="position:relative;">
+            <div class="app-form-label">Date &amp; Time</div>
+            <div class="app-form-value">Fri, 15 May 2026 · 14:00</div>
+            <div class="callout" style="top:2px;right:-8px;">3</div>
+          </div>
+          <!-- Trip type -->
+          <div style="font-size:7.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin:6px 0 4px;">Trip Type</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;position:relative;">
+            <div style="background:var(--teal);color:#fff;border-radius:7px;padding:6px;text-align:center;font-size:8px;font-weight:700;">DROP</div>
+            <div style="background:#F5F5F2;border:1.5px solid rgba(0,0,0,0.1);border-radius:7px;padding:6px;text-align:center;font-size:8px;font-weight:700;color:#9ca3af;">WAITING</div>
+            <div class="callout" style="top:-6px;right:-8px;">4</div>
+          </div>
+          <div class="app-form-field" style="position:relative;">
+            <div class="app-form-label">Notes (optional)</div>
+            <div class="app-form-placeholder">Special instructions…</div>
+            <div class="callout" style="top:2px;right:-8px;">5</div>
+          </div>
+          <div class="app-btn app-btn-primary" style="margin-top:8px;position:relative;">
+            Submit Booking
+            <div class="callout" style="top:-6px;right:-8px;">6</div>
+          </div>
+        </div>
+        <div class="app-bottom-nav">
+          <div class="app-nav-item"><div class="app-nav-icon">🏠</div><div class="app-nav-label">Home</div></div>
+          <div class="app-nav-item active"><div class="app-nav-icon">🚗</div><div class="app-nav-label">Book</div><span class="app-nav-dot"></span></div>
+          <div class="app-nav-item"><div class="app-nav-icon">🔔</div><div class="app-nav-label">Alerts</div></div>
+          <div class="app-nav-item"><div class="app-nav-icon">👤</div><div class="app-nav-label">Profile</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>What happens after you submit?</h2>
+  <div class="flow">
+    <div class="flow-box">You submit</div><div class="flow-arr">→</div>
+    <div class="flow-box gold">Coordinator reviews<br/><span style="font-weight:400;font-size:8px;">(if required)</span></div><div class="flow-arr">→</div>
+    <div class="flow-box">Driver notified</div><div class="flow-arr">→</div>
+    <div class="flow-box">Driver accepts</div><div class="flow-arr">→</div>
+    <div class="flow-box green">Trip confirmed ✓</div>
+  </div>
+  <p style="font-size:10px;color:var(--gray);">You receive a push notification at each step.</p>
+
+  <div class="foot">
+    <p>TaxiBook EPS — Visual Guide & Tutorial</p><p>EPS Department · PT Vale Indonesia</p><p>Page 4</p>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════ PAGE: DRIVER ════════════════════════════ -->
+<div class="page">
+  <div class="banner" style="background:#065F46;">
+    <div class="banner-icon">🚗</div>
+    <div><h1>Driver — Accept &amp; Run a Trip</h1><p>From notification to trip completion</p></div>
+    <div class="banner-role">DRIVER</div>
+  </div>
+
+  <div class="tut-wide">
+    <div>
+      <p>When a booking is assigned to your taxi, you receive a push notification. Open the app to act on it.</p>
+      <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Check the booking details</div><div class="step-desc">Passenger name, pickup, destination, date/time, and trip type (DROP or WAITING).</div></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Tap Accept or Decline</div><div class="step-desc">Accept to confirm. Decline if you cannot complete the trip — the system reassigns automatically.</div></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">At departure time — tap "Start Trip"</div><div class="step-desc">This begins GPS tracking. The passenger can now see your live location on their map.</div></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">For WAITING trips — tap "Arrived / Waiting"</div><div class="step-desc">When you reach the destination and the passenger exits, tap to mark as Waiting.</div></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-body"><div class="step-title">Tap "Complete Trip"</div><div class="step-desc">When the trip is fully done. The system records the actual finish time.</div></div></div>
+
+      <div class="callout-ref" style="margin-top:10px;">
+        <div class="callout-item"><div class="callout-num">1</div><span class="callout-text">Passenger &amp; trip info</span></div>
+        <div class="callout-item"><div class="callout-num">2</div><span class="callout-text">Accept button (green)</span></div>
+        <div class="callout-item"><div class="callout-num">3</div><span class="callout-text">Decline button (red)</span></div>
+        <div class="callout-item"><div class="callout-num">4</div><span class="callout-text">Trip type badge</span></div>
+      </div>
+      <div class="info warn" style="margin-top:8px;">
+        <div class="info-icon">⚠️</div>
+        <div class="info-body"><strong>Declines are tracked</strong>The coordinator sees how many trips you decline per day. Excessive declines may be flagged for review.</div>
+      </div>
+    </div>
+
+    <!-- Driver trip request mockup -->
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-bar"><span class="time">9:41</span><div class="icons"><span>▲ ☁ 🔋</span></div></div>
+        <div class="app-header">
+          <div class="app-header-logo">
+            <svg viewBox="0 0 110 45" width="38" height="15" xmlns="http://www.w3.org/2000/svg"><g transform="translate(-268.45764,-342.61778)"><g transform="matrix(0.9623665,0,0,0.9623665,270.84808,345.00818)"><path d="M 51.138,11.879 C 31.745,29.432 24.14,-12.087 0,3.626 L 27.202,42.346" fill="#00939a"/><polyline points="55.607,22.818 62.247,37.215 63.772,37.203 69.605,22.729 67.004,22.64 63.055,33.337 58.298,22.729" fill="#77787b"/><polyline points="70.413,37.113 73.284,37.203 74.451,33.607 80.554,33.607 81.719,37.113 84.5,37.203 78.668,22.729 76.604,22.729" fill="#77787b"/><polyline points="75.662,31.36 79.342,31.36 77.726,26.281" fill="#fff"/><polyline points="88.541,37.023 88.541,23.292 91.082,23.292 91.082,34.69 97.4,34.69 97.4,37.023" fill="#77787b"/><path d="M 100.576,36.934 L 100.576,22.999 L 108.799,22.999 L 108.799,24.076 C 108.2,24.451 107.632,24.924 107.076,25.357 L 102.756,25.357 L 102.756,28.446 L 108.176,28.446 L 108.176,30.793 L 102.756,30.793 L 102.756,34.585 L 108.786,34.585 L 108.786,36.934" fill="#77787b"/></g></g></svg>
+            <div class="app-header-sep"></div><div class="app-header-title">TaxiBook EPS</div>
+          </div>
+          <div class="app-header-right"><div class="app-bell">🔔</div><div class="app-avatar">D2</div></div>
+        </div>
+        <div class="app-scroll">
+          <div style="font-size:7.5px;font-weight:700;color:#D97706;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:4px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:#D97706;display:inline-block;"></div>New Trip Request
+          </div>
+          <!-- Trip request card -->
+          <div class="app-card" style="border-left:3px solid #D97706;position:relative;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div class="app-card-title">Ahmad Santoso</div>
+                <div class="app-card-sub">Fri 15 May · 14:00</div>
+              </div>
+              <span class="app-badge" style="background:#FEF3C7;color:#92400E;font-size:6px;">DROP</span>
+            </div>
+            <div style="margin:5px 0;border-top:1px solid rgba(0,0,0,0.06);padding-top:5px;">
+              <div class="app-route"><div class="app-route-dot"></div><span style="font-size:7px;font-weight:600;">Kantor EPS</span></div>
+              <div style="font-size:7px;color:#9ca3af;padding-left:8px;margin:1px 0;">↓</div>
+              <div class="app-route"><span style="font-size:8px;">📍</span><span style="font-size:7px;font-weight:600;">Medical Centre</span></div>
+            </div>
+            <div class="app-btn-row">
+              <div class="app-btn app-btn-decline" style="font-size:8px;position:relative;">Decline<div class="callout" style="top:-6px;right:-6px;">3</div></div>
+              <div class="app-btn app-btn-accept" style="font-size:8px;position:relative;">Accept<div class="callout" style="top:-6px;right:-6px;">2</div></div>
+            </div>
+            <div class="callout" style="top:4px;left:4px;">1</div>
+            <div class="callout" style="top:28px;right:4px;">4</div>
+          </div>
+
+          <!-- Upcoming -->
+          <div style="font-size:7.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">Confirmed Today</div>
+          <div class="app-card">
+            <div class="app-card-title">Budi Prakoso</div>
+            <div class="app-card-sub">Fri 15 May · 10:00 · Warehouse → Gate 1</div>
+            <div class="app-card-row"><span style="font-size:7px;color:#6B7280;">Taxi 02</span><span class="app-badge badge-booked">Booked</span></div>
+          </div>
+        </div>
+        <div class="app-bottom-nav">
+          <div class="app-nav-item active"><div class="app-nav-icon">🏠</div><div class="app-nav-label">Trips</div><span class="app-nav-dot"></span></div>
+          <div class="app-nav-item"><div class="app-nav-icon">🔔</div><div class="app-nav-label">Alerts</div></div>
+          <div class="app-nav-item"><div class="app-nav-icon">👤</div><div class="app-nav-label">Profile</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p>TaxiBook EPS — Visual Guide & Tutorial</p><p>EPS Department · PT Vale Indonesia</p><p>Page 5</p>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════ PAGE: DRIVER MAP ════════════════════════ -->
+<div class="page">
+  <div class="banner" style="background:#065F46;">
+    <div class="banner-icon">🗺️</div>
+    <div><h1>Driver — Active Trip Map</h1><p>GPS tracking during a trip</p></div>
+    <div class="banner-role">DRIVER</div>
+  </div>
+
+  <div class="tut-wide">
+    <div>
+      <p>After tapping <strong>Start Trip</strong>, the map screen opens showing your live position and the route to the destination.</p>
+      <div class="callout-ref">
+        <div class="callout-item"><div class="callout-num">1</div><span class="callout-text">Trip info header (passenger, destination)</span></div>
+        <div class="callout-item"><div class="callout-num">2</div><span class="callout-text">Live map — your GPS position updates automatically</span></div>
+        <div class="callout-item"><div class="callout-num">3</div><span class="callout-text">Your driver marker (current position)</span></div>
+        <div class="callout-item"><div class="callout-num">4</div><span class="callout-text">Route line — road-following path to destination</span></div>
+        <div class="callout-item"><div class="callout-num">5</div><span class="callout-text">Destination pin</span></div>
+        <div class="callout-item"><div class="callout-num">6</div><span class="callout-text">Complete Trip button</span></div>
+      </div>
+      <div class="info tip" style="margin-top:10px;">
+        <div class="info-icon">💡</div>
+        <div class="info-body"><strong>Keep the app open</strong>The screen stays on automatically (Wake Lock) so GPS keeps updating. Keep your device plugged in for long trips.</div>
+      </div>
+      <div class="info note" style="margin-top:6px;">
+        <div class="info-icon">ℹ️</div>
+        <div class="info-body"><strong>Passenger sees your location too</strong>While your trip is On Trip, the passenger can see your live position and the route on their own map screen.</div>
+      </div>
+
+      <h3 style="margin-top:12px;">Trip controls</h3>
+      <table style="margin-top:4px;">
+        <thead><tr><th>Button</th><th>When to tap</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Start Trip</strong></td><td>When you depart to pick up the passenger</td></tr>
+          <tr><td><strong>Arrived / Waiting</strong></td><td>WAITING trips only — when passenger has exited and you're waiting</td></tr>
+          <tr><td><strong>Complete Trip</strong></td><td>When the full trip is done — records actual finish time</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Driver map mockup -->
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-bar"><span class="time">10:22</span><div class="icons"><span>▲ ☁ 🔋</span></div></div>
+        <!-- trip info header -->
+        <div style="background:var(--teal);padding:8px 10px;position:relative;">
+          <div style="font-size:8px;font-weight:700;color:rgba(255,255,255,0.7);">ON TRIP</div>
+          <div style="font-size:9px;font-weight:800;color:#fff;margin:1px 0;">Ahmad Santoso</div>
+          <div style="font-size:7.5px;color:rgba(255,255,255,0.8);">→ Medical Centre</div>
+          <div class="callout" style="top:4px;right:4px;background:#fff;color:var(--teal);">1</div>
+        </div>
+        <!-- map -->
+        <div class="app-map" style="height:160px;border-radius:0;position:relative;flex:1;">
+          <div class="app-map-road-h"></div>
+          <div class="app-map-road-v"></div>
+          <!-- second road -->
+          <div style="position:absolute;top:30%;left:0;right:0;height:3px;background:rgba(255,255,255,0.5);transform:rotate(-8deg);"></div>
+          <!-- route line -->
+          <div style="position:absolute;top:46%;left:30%;width:45%;height:2.5px;background:var(--teal);border-radius:2px;transform:rotate(-12deg);z-index:5;"></div>
+          <!-- driver marker -->
+          <div style="position:absolute;top:41%;left:25%;font-size:16px;z-index:10;">🚗</div>
+          <!-- destination -->
+          <div style="position:absolute;top:22%;right:12%;font-size:14px;z-index:10;">📍</div>
+          <div style="position:absolute;top:12%;right:6%;font-size:6.5px;background:#fff;border-radius:4px;padding:2px 4px;font-weight:700;color:var(--teal-d);z-index:10;">Medical Centre</div>
+          <div class="callout" style="top:6px;left:6px;background:rgba(0,0,0,0.7);">2</div>
+          <div class="callout" style="top:39%;left:22%;z-index:15;">3</div>
+          <div class="callout" style="top:43%;left:50%;z-index:15;">4</div>
+          <div class="callout" style="top:20%;right:8%;z-index:15;">5</div>
+        </div>
+        <!-- complete button -->
+        <div style="padding:8px 10px;background:#fff;position:relative;">
+          <div class="app-btn app-btn-primary" style="background:var(--green);font-size:8.5px;">
+            ✓ Complete Trip
+          </div>
+          <div class="callout" style="top:2px;right:4px;">6</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p>TaxiBook EPS — Visual Guide & Tutorial</p><p>EPS Department · PT Vale Indonesia</p><p>Page 6</p>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════ PAGE: COORDINATOR ═══════════════════════ -->
+<div class="page">
+  <div class="banner" style="background:var(--teal-d);">
+    <div class="banner-icon">📋</div>
+    <div><h1>Coordinator — Dispatch Dashboard</h1><p>Manage bookings, fleet, and approvals</p></div>
+    <div class="banner-role">COORDINATOR</div>
+  </div>
+
+  <div class="tut-wide">
+    <div>
+      <p>The coordinator home is a full dispatch dashboard with three tabs: <strong>Bookings</strong>, <strong>Calendar</strong>, and <strong>Map</strong>.</p>
+      <div class="callout-ref">
+        <div class="callout-item"><div class="callout-num">1</div><span class="callout-text">Vale logo header + coordinator menu</span></div>
+        <div class="callout-item"><div class="callout-num">2</div><span class="callout-text">Needs Approval — pinned urgent section</span></div>
+        <div class="callout-item"><div class="callout-num">3</div><span class="callout-text">Approve / Reject buttons</span></div>
+        <div class="callout-item"><div class="callout-num">4</div><span class="callout-text">View tabs: Bookings / Calendar / Map</span></div>
+        <div class="callout-item"><div class="callout-num">5</div><span class="callout-text">Status filter pills</span></div>
+        <div class="callout-item"><div class="callout-num">6</div><span class="callout-text">Date range selector</span></div>
+      </div>
+
+      <h3 style="margin-top:10px;">Approval workflow</h3>
+      <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Check the "Needs Approval" section</div><div class="step-desc">Bookings requiring your review appear at the top with an orange badge count.</div></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Review the booking</div><div class="step-desc">Passenger, pickup, destination, date, and trip type.</div></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Tap Approve or Reject</div><div class="step-desc">Approve → moves to driver assignment. Reject → optionally add a reason.</div></div></div>
+
+      <div class="info tip" style="margin-top:8px;">
+        <div class="info-icon">💡</div>
+        <div class="info-body"><strong>Reassign a taxi</strong>Tap "🔄 Reassign taxi" on any confirmed booking to move it to a different driver.</div>
+      </div>
+    </div>
+
+    <!-- Coordinator home mockup -->
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="phone-bar"><span class="time">9:41</span><div class="icons"><span>▲ ☁ 🔋</span></div></div>
+        <div class="app-header" style="position:relative;">
+          <div class="app-header-logo">
+            <svg viewBox="0 0 110 45" width="38" height="15" xmlns="http://www.w3.org/2000/svg"><g transform="translate(-268.45764,-342.61778)"><g transform="matrix(0.9623665,0,0,0.9623665,270.84808,345.00818)"><path d="M 51.138,11.879 C 31.745,29.432 24.14,-12.087 0,3.626 L 27.202,42.346" fill="#00939a"/><polyline points="55.607,22.818 62.247,37.215 63.772,37.203 69.605,22.729 67.004,22.64 63.055,33.337 58.298,22.729" fill="#77787b"/><polyline points="70.413,37.113 73.284,37.203 74.451,33.607 80.554,33.607 81.719,37.113 84.5,37.203 78.668,22.729 76.604,22.729" fill="#77787b"/><polyline points="75.662,31.36 79.342,31.36 77.726,26.281" fill="#fff"/><polyline points="88.541,37.023 88.541,23.292 91.082,23.292 91.082,34.69 97.4,34.69 97.4,37.023" fill="#77787b"/><path d="M 100.576,36.934 L 100.576,22.999 L 108.799,22.999 L 108.799,24.076 C 108.2,24.451 107.632,24.924 107.076,25.357 L 102.756,25.357 L 102.756,28.446 L 108.176,28.446 L 108.176,30.793 L 102.756,30.793 L 102.756,34.585 L 108.786,34.585 L 108.786,36.934" fill="#77787b"/></g></g></svg>
+            <div class="app-header-sep"></div><div class="app-header-title">TaxiBook EPS</div>
+          </div>
+          <div class="app-header-right"><div class="app-bell">🔔</div><div class="app-avatar">CO</div></div>
+          <div class="callout" style="top:6px;left:6px;">1</div>
+        </div>
+        <!-- view tabs -->
+        <div style="display:flex;background:#ECEAE4;border-radius:999px;padding:2px;margin:6px 8px;gap:2px;position:relative;">
+          <div style="flex:1;background:#fff;border-radius:999px;padding:4px;text-align:center;font-size:7px;font-weight:700;color:var(--teal);box-shadow:0 1px 3px rgba(0,0,0,0.1);">Bookings</div>
+          <div style="flex:1;padding:4px;text-align:center;font-size:7px;color:#9ca3af;font-weight:600;">Calendar</div>
+          <div style="flex:1;padding:4px;text-align:center;font-size:7px;color:#9ca3af;font-weight:600;">Map</div>
+          <div class="callout" style="top:-6px;right:-6px;">4</div>
+        </div>
+        <div class="app-scroll" style="padding:4px 8px;">
+          <!-- needs approval -->
+          <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;">
+            <div style="width:14px;height:14px;border-radius:50%;background:#D97706;color:#fff;font-size:7px;font-weight:800;display:flex;align-items:center;justify-content:center;">1</div>
+            <span style="font-size:7.5px;font-weight:700;color:#7e5700;text-transform:uppercase;letter-spacing:.05em;">Needs Approval</span>
+          </div>
+          <div class="app-card" style="border-left:3px solid #D97706;position:relative;">
+            <div class="app-card-title">Siti Rahayu</div>
+            <div class="app-card-sub">Fri 15 May · 11:00 · Kantor → Airport</div>
+            <div class="app-btn-row" style="margin-top:5px;">
+              <div class="app-btn app-btn-decline" style="font-size:7.5px;">Reject</div>
+              <div class="app-btn app-btn-accept" style="font-size:7.5px;">Approve</div>
+            </div>
+            <div class="callout" style="top:4px;right:4px;">2</div>
+            <div class="callout" style="bottom:4px;right:4px;">3</div>
+          </div>
+          <!-- filter pills -->
+          <div class="app-filter-row" style="padding:0;position:relative;">
+            <div class="app-filter-pill active">All</div>
+            <div class="app-filter-pill">Pending</div>
+            <div class="app-filter-pill">Confirmed</div>
+            <div class="app-filter-pill">Done</div>
+            <div class="callout" style="top:-6px;right:-6px;">5</div>
+          </div>
+          <!-- date bar -->
+          <div style="background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:8px;padding:4px 8px;display:flex;align-items:center;gap:4px;margin:3px 0;position:relative;">
+            <span style="font-size:8px;">📅</span>
+            <span style="font-size:7.5px;color:var(--teal);font-weight:600;">15/05/2026</span>
+            <span style="font-size:7px;color:#9ca3af;">→</span>
+            <span style="font-size:7.5px;color:var(--teal);font-weight:600;">15/05/2026</span>
+            <div class="callout" style="top:-6px;right:-6px;">6</div>
+          </div>
+          <div class="app-card">
+            <div class="app-card-title">Ahmad Santoso</div>
+            <div class="app-card-sub">14:00 · Kantor EPS → Medical Centre</div>
+            <div class="app-card-row"><span style="font-size:7px;color:#6B7280;">Taxi 03 · Driver 3</span><span class="app-badge badge-booked">Booked</span></div>
+          </div>
+        </div>
+        <div class="app-bottom-nav">
+          <div class="app-nav-item active"><div class="app-nav-icon">⊞</div><div class="app-nav-label">Home</div><span class="app-nav-dot"></span></div>
+          <div class="app-nav-item"><div class="app-nav-icon">👥</div><div class="app-nav-label">Drivers</div></div>
+          <div class="app-nav-item"><div class="app-nav-icon">🗺️</div><div class="app-nav-label">Map</div></div>
+          <div class="app-nav-item"><div class="app-nav-icon">🔔</div><div class="app-nav-label">Alerts</div></div>
+          <div class="app-nav-item"><div class="app-nav-icon">👤</div><div class="app-nav-label">Profile</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p>TaxiBook EPS — Visual Guide & Tutorial</p><p>EPS Department · PT Vale Indonesia</p><p>Page 7</p>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════ PAGE: DISPATCH BOARD ════════════════════ -->
+<div class="page">
+  <div class="banner" style="background:#1a1c1b;">
+    <div class="banner-icon">🖥️</div>
+    <div><h1>Dispatch Board</h1><p>Full-screen real-time dashboard — open at /board</p></div>
+    <div class="banner-role">ALL ROLES</div>
+  </div>
+
+  <p>The Dispatch Board is designed for large screens (monitors/TVs) in control rooms. Open it at <code>/board</code> in your browser. It updates in real time — no refresh needed.</p>
+
+  <!-- Full-width board mockup -->
+  <div style="background:#1a1c1b;border-radius:10px;overflow:hidden;margin:12px 0;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+    <!-- Board header -->
+    <div style="background:#fff;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #D4E8EA;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <svg viewBox="0 0 110 45" width="44" height="18" xmlns="http://www.w3.org/2000/svg"><g transform="translate(-268.45764,-342.61778)"><g transform="matrix(0.9623665,0,0,0.9623665,270.84808,345.00818)"><path d="M 51.138,11.879 C 31.745,29.432 24.14,-12.087 0,3.626 L 27.202,42.346" fill="#00939a"/><polyline points="55.607,22.818 62.247,37.215 63.772,37.203 69.605,22.729 67.004,22.64 63.055,33.337 58.298,22.729" fill="#77787b"/><polyline points="70.413,37.113 73.284,37.203 74.451,33.607 80.554,33.607 81.719,37.113 84.5,37.203 78.668,22.729 76.604,22.729" fill="#77787b"/><polyline points="75.662,31.36 79.342,31.36 77.726,26.281" fill="#fff"/><polyline points="88.541,37.023 88.541,23.292 91.082,23.292 91.082,34.69 97.4,34.69 97.4,37.023" fill="#77787b"/><path d="M 100.576,36.934 L 100.576,22.999 L 108.799,22.999 L 108.799,24.076 C 108.2,24.451 107.632,24.924 107.076,25.357 L 102.756,25.357 L 102.756,28.446 L 108.176,28.446 L 108.176,30.793 L 102.756,30.793 L 102.756,34.585 L 108.786,34.585 L 108.786,36.934" fill="#77787b"/></g></g></svg>
+        <div style="width:1px;height:16px;background:rgba(0,0,0,0.12);"></div>
+        <div><div style="font-size:10px;font-weight:800;color:#1a1c1b;">TaxiBook EPS</div><div style="font-size:7.5px;color:#9CA3AF;">Dispatch Board</div></div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <div style="background:#D8F3DC;border-radius:6px;padding:3px 8px;text-align:center;"><div style="font-size:12px;font-weight:800;color:#2D7A5C;">1</div><div style="font-size:7px;color:#2D7A5C;font-weight:600;">Active</div></div>
+        <div style="background:#DBEAFE;border-radius:6px;padding:3px 8px;text-align:center;"><div style="font-size:12px;font-weight:800;color:#007B8A;">3</div><div style="font-size:7px;color:#007B8A;font-weight:600;">Confirmed</div></div>
+        <div style="background:#FEF3C7;border-radius:6px;padding:3px 8px;text-align:center;"><div style="font-size:12px;font-weight:800;color:#A16207;">0</div><div style="font-size:7px;color:#A16207;font-weight:600;">Pending</div></div>
+        <div style="background:rgba(0,0,0,0.04);border-radius:6px;padding:3px 8px;text-align:center;"><div style="font-size:12px;font-weight:800;color:#374151;">2</div><div style="font-size:7px;color:#6B7280;font-weight:600;">Available</div></div>
+      </div>
+      <div style="text-align:right;"><div style="font-size:14px;font-weight:800;font-family:monospace;letter-spacing:-0.5px;">10:27:08</div><div style="font-size:8px;color:#9CA3AF;">Jumat, 15 Mei 2026</div></div>
+    </div>
+    <!-- Fleet strip -->
+    <div style="background:#fff;padding:6px 14px;display:flex;gap:6px;border-bottom:1px solid #D4E8EA;">
+      <div style="flex:1;background:#F5F5F2;border-radius:7px;padding:5px 8px;border-left:3px solid #2563EB;">
+        <div style="font-size:7.5px;font-weight:700;">Taxi 01</div>
+        <div style="font-size:7px;color:#6B7280;margin:1px 0;">Driver 1</div>
+        <div style="background:#FEE2E2;border-radius:3px;padding:1px 5px;display:inline-block;font-size:6.5px;font-weight:700;color:#991B1B;">Unavailable</div>
+      </div>
+      <div style="flex:1;background:#F5F5F2;border-radius:7px;padding:5px 8px;border-left:3px solid #059669;">
+        <div style="font-size:7.5px;font-weight:700;">Taxi 02</div>
+        <div style="font-size:7px;color:#6B7280;margin:1px 0;">Driver 2</div>
+        <div style="background:#D8F3DC;border-radius:3px;padding:1px 5px;display:inline-block;font-size:6.5px;font-weight:700;color:#2D6A4F;">🚗 Medical Ctr</div>
+      </div>
+      <div style="flex:1;background:#F5F5F2;border-radius:7px;padding:5px 8px;border-left:3px solid #DB2777;">
+        <div style="font-size:7.5px;font-weight:700;">Taxi 03</div>
+        <div style="font-size:7px;color:#6B7280;margin:1px 0;">Driver 3</div>
+        <div style="background:rgba(0,0,0,0.04);border-radius:3px;padding:1px 5px;display:inline-block;font-size:6.5px;font-weight:700;color:#374151;">Free</div>
+      </div>
+      <div style="flex:1;background:#F5F5F2;border-radius:7px;padding:5px 8px;border-left:3px solid #D97706;">
+        <div style="font-size:7.5px;font-weight:700;">Taxi 04</div>
+        <div style="font-size:7px;color:#6B7280;margin:1px 0;">Driver 4</div>
+        <div style="background:#FEE2E2;border-radius:3px;padding:1px 5px;display:inline-block;font-size:6.5px;font-weight:700;color:#991B1B;">Unavailable</div>
+      </div>
+      <div style="flex:1;background:#F5F5F2;border-radius:7px;padding:5px 8px;border-left:3px solid #7C3AED;">
+        <div style="font-size:7.5px;font-weight:700;">Taxi 05</div>
+        <div style="font-size:7px;color:#6B7280;margin:1px 0;">Driver 5</div>
+        <div style="background:#DBEAFE;border-radius:3px;padding:1px 5px;display:inline-block;font-size:6.5px;font-weight:700;color:#1E3A5F;">⏱ 14:00</div>
+      </div>
+    </div>
+    <!-- Gantt -->
+    <div style="background:#fff;padding:0;">
+      <!-- time header -->
+      <div style="display:flex;margin-left:38px;background:#F5F5F2;border-bottom:1px solid #D4E8EA;">
+        <div style="width:76px;flex-shrink:0;padding:3px 4px;border-left:1px solid #D4E8EA;font-size:7px;font-weight:700;color:#9CA3AF;">07:00</div>
+        <div style="width:76px;flex-shrink:0;padding:3px 4px;border-left:1px solid #D4E8EA;font-size:7px;font-weight:700;color:#9CA3AF;">09:00</div>
+        <div style="width:76px;flex-shrink:0;padding:3px 4px;border-left:1px solid #D4E8EA;font-size:7px;font-weight:700;color:#9CA3AF;">11:00</div>
+        <div style="width:76px;flex-shrink:0;padding:3px 4px;border-left:1px solid #D4E8EA;font-size:7px;font-weight:700;color:#9CA3AF;">13:00</div>
+        <div style="width:76px;flex-shrink:0;padding:3px 4px;border-left:1px solid #D4E8EA;font-size:7px;font-weight:700;color:#9CA3AF;">15:00</div>
+      </div>
+      <!-- Taxi rows -->
+      <div class="app-gantt-row">
+        <div class="app-gantt-label" style="width:38px;font-size:7px;">Taxi 01</div>
+        <div class="app-gantt-track" style="position:relative;">
+          <div class="app-now-line" style="left:25%;"></div>
+          <!-- completed block -->
+          <div class="app-gantt-block" style="left:2%;width:15%;background:#F1F5F9;border:1px solid #CBD5E1;color:#64748B;">✓ Ahmad · Done 09:15</div>
+        </div>
+      </div>
+      <div class="app-gantt-row" style="background:#f9f9f6;">
+        <div class="app-gantt-label" style="width:38px;font-size:7px;">Taxi 02</div>
+        <div class="app-gantt-track" style="position:relative;">
+          <div class="app-now-line" style="left:25%;"></div>
+          <div class="app-gantt-block" style="left:22%;width:18%;background:#05996922;border:1.5px solid #059669;color:#065F46;">Budi → Medical</div>
+        </div>
+      </div>
+      <div class="app-gantt-row">
+        <div class="app-gantt-label" style="width:38px;font-size:7px;">Taxi 03</div>
+        <div class="app-gantt-track" style="position:relative;">
+          <div class="app-now-line" style="left:25%;"></div>
+          <div class="app-gantt-block" style="left:36%;width:18%;background:#DB277722;border:1.5px solid #DB2777;color:#DB2777;">Siti → Gate 1</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout-ref">
+    <div class="callout-item"><div style="width:16px;height:16px;border-radius:3px;background:#D8F3DC;display:inline-block;border:1px solid #059669;"></div><span class="callout-text" style="margin-left:4px;">Active / confirmed booking block</span></div>
+    <div class="callout-item"><div style="width:16px;height:16px;border-radius:3px;background:#F1F5F9;display:inline-block;border:1px solid #CBD5E1;"></div><span class="callout-text" style="margin-left:4px;">✓ Completed trip — actual finish time shown</span></div>
+    <div class="callout-item"><div style="width:2px;height:16px;background:#EF4444;display:inline-block;"></div><span class="callout-text" style="margin-left:4px;">Red line = current time (Now)</span></div>
+  </div>
+
+  <div class="foot">
+    <p>TaxiBook EPS — Visual Guide & Tutorial</p><p>EPS Department · PT Vale Indonesia</p><p>Page 8</p>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════ PAGE: QUICK REFERENCE ═══════════════════ -->
+<div class="page">
+  <div class="banner" style="background:var(--teal-d);">
+    <div class="banner-icon">📋</div>
+    <div><h1>Quick Reference</h1><p>Status guide, notifications, and glossary</p></div>
+  </div>
+
+  <h2>Booking Statuses</h2>
+  <table>
+    <thead><tr><th>Badge</th><th>Status</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill p-sub">Submitted</span></td><td>Submitted</td><td>Booking created, waiting for processing</td></tr>
+      <tr><td><span class="pill p-app">Needs Approval</span></td><td>Coordinator Approval</td><td>Coordinator must approve before a driver is assigned</td></tr>
+      <tr><td><span class="pill" style="background:#FEF3C7;color:#92400E;">Awaiting Driver</span></td><td>Pending Driver</td><td>Driver has been notified and must accept/decline</td></tr>
+      <tr><td><span class="pill p-bkd">Booked</span></td><td>Booked</td><td>Driver accepted — trip is confirmed</td></tr>
+      <tr><td><span class="pill p-tri">On Trip</span></td><td>On Trip</td><td>Trip is currently in progress</td></tr>
+      <tr><td><span class="pill p-wai">Waiting</span></td><td>Waiting</td><td>Driver arrived and is waiting (WAITING trip type)</td></tr>
+      <tr><td><span class="pill p-cmp">✓ Completed</span></td><td>Completed</td><td>Trip finished — actual completion time recorded</td></tr>
+      <tr><td><span class="pill p-rej">Rejected</span></td><td>Rejected</td><td>Booking was rejected by coordinator</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Push Notification Summary</h2>
+  <div class="two">
+    <div>
+      <h3>Staff receives</h3>
+      <ul>
+        <li>Booking approved / rejected</li>
+        <li>Driver assigned &amp; accepted</li>
+        <li>15-minute departure reminder</li>
+        <li>Trip started / completed</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Driver receives</h3>
+      <ul>
+        <li>New trip assigned</li>
+        <li>15-minute reminder</li>
+        <li>Start time reminder</li>
+        <li>Overdue alert</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Navigation Reference</h2>
+  <div class="two">
+    <table>
+      <thead><tr><th colspan="2">Staff Navigation</th></tr></thead>
+      <tbody>
+        <tr><td>🏠 Home</td><td>My bookings &amp; active trip</td></tr>
+        <tr><td>🚗 Book</td><td>Create a new booking</td></tr>
+        <tr><td>🔔 Alerts</td><td>Push notification history</td></tr>
+        <tr><td>👤 Profile</td><td>Account &amp; sign out</td></tr>
+      </tbody>
+    </table>
+    <table>
+      <thead><tr><th colspan="2">Coordinator Navigation</th></tr></thead>
+      <tbody>
+        <tr><td>⊞ Home</td><td>Dispatch dashboard</td></tr>
+        <tr><td>👥 Drivers</td><td>Fleet &amp; driver status</td></tr>
+        <tr><td>🗺️ Map</td><td>Live fleet map</td></tr>
+        <tr><td>🔔 Alerts</td><td>Notifications</td></tr>
+        <tr><td>👤 Profile</td><td>Account &amp; saved locations</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="background:var(--teal-d);color:#fff;border-radius:10px;padding:16px 18px;display:flex;gap:14px;align-items:center;margin-top:14px;">
+    <svg width="40" height="40" viewBox="0 0 54 54" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;">
+      <rect width="54" height="54" rx="10" fill="rgba(255,255,255,0.12)"/>
+      <polygon points="6,10 12,10 27,44 42,10 48,10 27,47" fill="white" opacity="0.95"/>
+      <polygon points="42,10 48,10 41,22 37,22" fill="#ECB833"/>
+    </svg>
+    <div>
+      <div style="font-size:12px;font-weight:800;color:#fff;margin-bottom:3px;">TaxiBook EPS — PT Vale Indonesia</div>
+      <div style="font-size:9.5px;color:rgba(255,255,255,0.6);">For support contact your EPS department administrator.<br/>This document is for internal use only — EPS Department.</div>
+      <div style="font-size:8px;color:rgba(255,255,255,0.35);margin-top:6px;">Version 1.0 · May 2026 · Confidential</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p>TaxiBook EPS — Visual Guide & Tutorial</p><p>EPS Department · PT Vale Indonesia</p><p>Page 9</p>
+  </div>
+</div>
+
+</body>
+</html>
