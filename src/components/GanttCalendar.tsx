@@ -17,12 +17,13 @@ const DAY_W      = 100
 const ROW_H      = 52
 
 interface GanttCalendarProps {
-  bookings:    BookingDetail[]
-  taxis:       any[]
-  onRefresh?:  () => void
+  bookings:       BookingDetail[]
+  taxis:          any[]
+  showCompleted?: boolean
+  onRefresh?:     () => void
 }
 
-export default function GanttCalendar({ bookings, taxis }: GanttCalendarProps) {
+export default function GanttCalendar({ bookings, taxis, showCompleted = false }: GanttCalendarProps) {
   const [view,    setView]   = useState<ViewMode>('day')
   const [cursor,  setCursor] = useState(new Date())
   const dayRef  = useRef<HTMLDivElement>(null)
@@ -60,9 +61,10 @@ export default function GanttCalendar({ bookings, taxis }: GanttCalendarProps) {
     return format(cursor, 'MMMM yyyy', { locale: idLocale })
   }
 
-  // Only confirmed bookings on Gantt
-  const activeBookings = bookings.filter(b =>
-    ['booked', 'on_trip', 'waiting_trip'].includes(b.status)
+  const ganttBookings = bookings.filter(b =>
+    showCompleted
+      ? ['booked', 'on_trip', 'waiting_trip', 'completed'].includes(b.status)
+      : ['booked', 'on_trip', 'waiting_trip'].includes(b.status)
   )
 
   return (
@@ -92,9 +94,9 @@ export default function GanttCalendar({ bookings, taxis }: GanttCalendarProps) {
       </div>
 
       {/* ── Views ── */}
-      {view === 'day'   && <DayGantt   bookings={activeBookings} taxis={taxis} cursor={cursor} scrollRef={dayRef} />}
-      {view === 'week'  && <WeekGantt  bookings={activeBookings} taxis={taxis} cursor={cursor} scrollRef={weekRef} />}
-      {view === 'month' && <MonthView  bookings={activeBookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} />}
+      {view === 'day'   && <DayGantt   bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={dayRef} />}
+      {view === 'week'  && <WeekGantt  bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={weekRef} />}
+      {view === 'month' && <MonthView  bookings={ganttBookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} />}
     </div>
   )
 }
@@ -103,8 +105,10 @@ export default function GanttCalendar({ bookings, taxis }: GanttCalendarProps) {
 function DayGantt({ bookings, taxis, cursor, scrollRef }: {
   bookings: BookingDetail[]; taxis: any[]; cursor: Date; scrollRef: React.RefObject<HTMLDivElement>
 }) {
-  const today  = new Date()
-  const dayBks = bookings.filter(b => isSameDay(new Date(b.scheduled_at), cursor))
+  const today     = new Date()
+  const dayBks    = bookings.filter(b => isSameDay(new Date(b.scheduled_at), cursor))
+  const activeCnt = dayBks.filter(b => b.status !== 'completed').length
+  const doneCnt   = dayBks.filter(b => b.status === 'completed').length
   const hours  = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => i + HOUR_START)
   const totalW = hours.length * HOUR_W
 
@@ -112,7 +116,12 @@ function DayGantt({ bookings, taxis, cursor, scrollRef }: {
     <div style={{ paddingBottom: 4 }}>
       <div style={{ padding: '8px 16px 4px', display: 'flex', justifyContent: 'space-between' }}>
         <span style={{ fontSize: '11px', color: '#9ca3af' }}>← scroll →</span>
-        <span style={{ fontSize: '11px', color: '#9ca3af' }}>{dayBks.length} confirmed</span>
+        <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+          {activeCnt > 0 && `${activeCnt} confirmed`}
+          {activeCnt > 0 && doneCnt > 0 && ' · '}
+          {doneCnt > 0 && `${doneCnt} done`}
+          {activeCnt === 0 && doneCnt === 0 && 'No trips'}
+        </span>
       </div>
       <div style={{ overflowX: 'auto' }} ref={scrollRef}>
         <div style={{ minWidth: totalW + 90 }}>
@@ -143,20 +152,29 @@ function DayGantt({ bookings, taxis, cursor, scrollRef }: {
               ) : null}
               bookings={dayBks.filter(b => b.taxi_id === taxi.id)}
               renderBlock={(b) => {
-                const dt     = new Date(b.scheduled_at)
-                const startH = dt.getHours() + dt.getMinutes() / 60
-                const left   = (startH - HOUR_START) * HOUR_W
-                const durH   = b.trip_type === 'WAITING'
-                  ? Math.min(b.wait_minutes / 60 + 2, HOUR_END - startH)
-                  : Math.min(2, HOUR_END - startH)
+                const dt          = new Date(b.scheduled_at)
+                const startH      = dt.getHours() + dt.getMinutes() / 60
+                const left        = (startH - HOUR_START) * HOUR_W
+                const isDone      = b.status === 'completed'
+                let durH: number
+                if (isDone && b.completed_at) {
+                  const endH = new Date(b.completed_at).getHours() + new Date(b.completed_at).getMinutes() / 60
+                  durH = Math.min(Math.max(endH - startH, 0.3), HOUR_END - startH)
+                } else {
+                  durH = b.trip_type === 'WAITING'
+                    ? Math.min(b.wait_minutes / 60 + 2, HOUR_END - startH)
+                    : Math.min(2, HOUR_END - startH)
+                }
                 const width = Math.max(durH * HOUR_W - 4, 44)
                 return (
-                  <div key={b.id} style={{ position: 'absolute', left: left + 2, top: 5, width, height: ROW_H - 10, background: taxi.color + '22', border: `1.5px solid ${taxi.color}`, borderRadius: '7px', padding: '4px 6px', overflow: 'hidden', zIndex: 5 }}>
-                    <p style={{ fontSize: '10px', fontWeight: 800, color: taxi.color, margin: '0 0 1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {b.passenger_name ? `${b.passenger_name} → ` : ''}{b.destination}
+                  <div key={b.id} style={{ position: 'absolute', left: left + 2, top: 5, width, height: ROW_H - 10, background: isDone ? '#F1F5F9' : taxi.color + '22', border: `1.5px solid ${isDone ? '#CBD5E1' : taxi.color}`, borderRadius: '7px', padding: '4px 6px', overflow: 'hidden', zIndex: 5, opacity: isDone ? 0.85 : 1 }}>
+                    <p style={{ fontSize: '10px', fontWeight: 800, color: isDone ? '#64748B' : taxi.color, margin: '0 0 1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {isDone ? '✓ ' : ''}{b.passenger_name ? `${b.passenger_name} → ` : ''}{b.destination}
                     </p>
-                    <p style={{ fontSize: '9px', color: taxi.color, opacity: 0.8, margin: 0, whiteSpace: 'nowrap' }}>
-                      {format(dt, 'HH:mm')} · {b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}m`}
+                    <p style={{ fontSize: '9px', color: isDone ? '#94a3b8' : taxi.color, opacity: isDone ? 1 : 0.8, margin: 0, whiteSpace: 'nowrap' }}>
+                      {isDone && b.completed_at
+                        ? `Done ${format(new Date(b.completed_at), 'HH:mm')}`
+                        : `${format(dt, 'HH:mm')} · ${b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}m`}`}
                     </p>
                   </div>
                 )
@@ -231,13 +249,16 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef }: {
                   const dt     = new Date(b.scheduled_at)
                   const dayIdx = days.findIndex(d => isSameDay(dt, d))
                   if (dayIdx < 0) return null
+                  const isDone = b.status === 'completed'
                   return (
-                    <div key={b.id} style={{ position: 'absolute', left: dayIdx * DAY_W + 2, top: 5, width: DAY_W - 6, height: ROW_H - 10, background: taxi.color + '22', border: `1.5px solid ${taxi.color}`, borderRadius: '7px', padding: '4px 6px', overflow: 'hidden', zIndex: 5 }}>
-                      <p style={{ fontSize: '10px', fontWeight: 800, color: taxi.color, margin: '0 0 1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {b.destination}
+                    <div key={b.id} style={{ position: 'absolute', left: dayIdx * DAY_W + 2, top: 5, width: DAY_W - 6, height: ROW_H - 10, background: isDone ? '#F1F5F9' : taxi.color + '22', border: `1.5px solid ${isDone ? '#CBD5E1' : taxi.color}`, borderRadius: '7px', padding: '4px 6px', overflow: 'hidden', zIndex: 5, opacity: isDone ? 0.85 : 1 }}>
+                      <p style={{ fontSize: '10px', fontWeight: 800, color: isDone ? '#64748B' : taxi.color, margin: '0 0 1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {isDone ? '✓ ' : ''}{b.destination}
                       </p>
-                      <p style={{ fontSize: '9px', color: taxi.color, opacity: 0.8, margin: 0 }}>
-                        {format(dt, 'HH:mm')} · {b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}m`}
+                      <p style={{ fontSize: '9px', color: isDone ? '#94a3b8' : taxi.color, opacity: isDone ? 1 : 0.8, margin: 0 }}>
+                        {isDone && b.completed_at
+                          ? `Done ${format(new Date(b.completed_at), 'HH:mm')}`
+                          : `${format(dt, 'HH:mm')} · ${b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}m`}`}
                       </p>
                     </div>
                   )
@@ -336,7 +357,11 @@ function GanttLegend() {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
         <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px solid #9ca3af', borderRadius: 2 }} />
-        <span style={{ fontSize: '10px', color: '#9ca3af' }}>Confirmed booking</span>
+        <span style={{ fontSize: '10px', color: '#9ca3af' }}>Confirmed</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px solid #CBD5E1', borderRadius: 2, background: '#F1F5F9' }} />
+        <span style={{ fontSize: '10px', color: '#9ca3af' }}>✓ Completed</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
         <span style={{ fontSize: '10px', color: '#9ca3af' }}>Tap month day → Day view</span>

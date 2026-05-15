@@ -181,12 +181,18 @@ export default function BookPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify({
-          pickup: form.pickup, destination: form.destination,
-          trip_type: form.trip_type,
-          wait_minutes: form.trip_type === 'WAITING' ? form.wait_minutes : 0,
-          notes: form.notes || null,
-          scheduled_at: scheduledDate.toISOString(),
-          status, auto_complete_at: autoCompleteAt.toISOString(),
+          pickup:          form.pickup,
+          destination:     form.destination,
+          trip_type:       form.trip_type,
+          wait_minutes:    form.trip_type === 'WAITING' ? form.wait_minutes : 0,
+          notes:           form.notes || null,
+          scheduled_at:    scheduledDate.toISOString(),
+          status,
+          auto_complete_at: autoCompleteAt.toISOString(),
+          pickup_lat:      pickupCoords?.lat ?? null,
+          pickup_lng:      pickupCoords?.lng ?? null,
+          destination_lat: destCoords?.lat   ?? null,
+          destination_lng: destCoords?.lng   ?? null,
         }),
       })
 
@@ -199,32 +205,6 @@ export default function BookPage() {
       const code = data.booking.booking_code
       const assigned = data.assigned
         ? `&taxi=${encodeURIComponent(data.taxi_name)}&driver=${encodeURIComponent(data.driver_name)}` : ''
-
-      // Non-blocking: store coordinates on the booking
-      // Use picker coords if available, otherwise geocode the text address
-      if (data.booking.id) {
-        const bookingId = data.booking.id
-        const pc = pickupCoords
-        const dc = destCoords
-        if (pc || dc) {
-          supabase.from('bookings').update({
-            ...(pc ? { pickup_lat: pc.lat, pickup_lng: pc.lng } : {}),
-            ...(dc ? { destination_lat: dc.lat, destination_lng: dc.lng } : {}),
-          }).eq('id', bookingId)
-        } else {
-          import('@/lib/geocode').then(({ geocodeAddress }) => {
-            Promise.all([geocodeAddress(form.pickup), geocodeAddress(form.destination)])
-              .then(([p, d]) => {
-                if (p || d) {
-                  supabase.from('bookings').update({
-                    ...(p ? { pickup_lat: p.lat, pickup_lng: p.lng } : {}),
-                    ...(d ? { destination_lat: d.lat, destination_lng: d.lng } : {}),
-                  }).eq('id', bookingId)
-                }
-              })
-          })
-        }
-      }
 
       router.push(`/staff/success?code=${code}${assigned}`)
     } catch (e: any) {

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <!-- Rich dark-to-mid teal gradient -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0%" stop-color="#00313A"/>
+      <stop offset="100%" stop-color="#006670"/>
+    </linearGradient>
+    <!-- Ambient top glow for depth -->
+    <radialGradient id="topGlow" cx="50%" cy="0%" r="70%" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.16)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <!-- Premium warm gold gradient -->
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFE055"/>
+      <stop offset="60%" stop-color="#F0AA00"/>
+      <stop offset="100%" stop-color="#BF8200"/>
+    </linearGradient>
+    <!-- Drop shadow on V for depth -->
+    <filter id="vShadow" x="-8%" y="-8%" width="116%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="rgba(0,15,20,0.45)"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+
+  <!-- Ambient top-light glow -->
+  <ellipse cx="256" cy="30" rx="230" ry="140" fill="url(#topGlow)"/>
+
+  <!-- V mark — crisp white with shadow for lift -->
+  <polygon
+    points="58,90 116,90 256,418 396,90 454,90 256,430"
+    fill="white"
+    opacity="0.95"
+    filter="url(#vShadow)"
+  />
+
+  <!-- Gold accent — upper-right arm, geometrically accurate -->
+  <polygon
+    points="396,90 454,90 388,206 349,206"
+    fill="url(#gold)"
+  />
+
+  <!-- Subtle glass rim for premium finish -->
+  <rect width="510" height="510" x="1" y="1" rx="95.5" fill="none"
+        stroke="rgba(255,255,255,0.10)" stroke-width="2"/>
+</svg>

@@ -35,7 +35,7 @@ export default function BoardPage() {
   const loadData = useCallback(async () => {
     const [{ data: bks }, { data: txs }] = await Promise.all([
       supabase.from('booking_details').select('*')
-        .in('status', ['booked','on_trip','waiting_trip','pending_driver_approval','submitted','pending_coordinator_approval'])
+        .in('status', ['booked','on_trip','waiting_trip','pending_driver_approval','submitted','pending_coordinator_approval','completed'])
         .order('scheduled_at', { ascending: true }),
       supabase.from('taxis').select('*, users!driver_id(name)')
         .eq('is_active', true).order('name'),
@@ -101,11 +101,10 @@ export default function BoardPage() {
       {/* ── Top bar ── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #D4E8EA', padding: '0 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 32, height: 32, background: '#007B8A', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: 16 }}>🚗</span>
-          </div>
+          <img src="/vale-logo.svg" alt="PT Vale" style={{ height: 32, display: 'block' }} />
+          <div style={{ width: 1, height: 22, background: 'rgba(0,0,0,0.1)' }} />
           <div>
-            <p style={{ fontSize: 15, fontWeight: 700, margin: 0, letterSpacing: '-0.2px' }}>TaxiBook</p>
+            <p style={{ fontSize: 15, fontWeight: 700, margin: 0, letterSpacing: '-0.2px' }}>TaxiBook EPS</p>
             <p style={{ fontSize: 11, color: '#9CA3AF', margin: 0 }}>Dispatch Board</p>
           </div>
         </div>
@@ -270,20 +269,29 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip }: any) {
               {txBks.map((b: any) => {
                 const dt     = new Date(b.scheduled_at)
                 const startH = dt.getHours() + dt.getMinutes() / 60
-                const durH   = b.trip_type === 'WAITING' ? Math.min(b.wait_minutes / 60 + 2, HOUR_E - startH) : Math.min(2, HOUR_E - startH)
-                const left   = (startH - HOUR_S) * HOUR_W
-                const width  = Math.max(durH * HOUR_W - 4, 50)
+                const isDone = b.status === 'completed'
                 const isPend = b.status.includes('pending')
+                let durH: number
+                if (isDone && b.completed_at) {
+                  const endH = new Date(b.completed_at).getHours() + new Date(b.completed_at).getMinutes() / 60
+                  durH = Math.min(Math.max(endH - startH, 0.3), HOUR_E - startH)
+                } else {
+                  durH = b.trip_type === 'WAITING' ? Math.min(b.wait_minutes / 60 + 2, HOUR_E - startH) : Math.min(2, HOUR_E - startH)
+                }
+                const left  = (startH - HOUR_S) * HOUR_W
+                const width = Math.max(durH * HOUR_W - 4, 50)
                 return (
                   <div
                     key={b.id}
                     onMouseEnter={e => setTooltip({ b, x: (e.target as HTMLElement).getBoundingClientRect().right + 8, y: (e.target as HTMLElement).getBoundingClientRect().top })}
                     onMouseLeave={() => setTooltip(null)}
-                    style={{ position: 'absolute', left: left + 2, top: 6, width, height: ROW_H - 12, background: t.color + '22', border: `1.5px ${isPend ? 'dashed' : 'solid'} ${t.color}`, borderRadius: 7, padding: '4px 7px', overflow: 'hidden', zIndex: 5, cursor: 'pointer' }}
+                    style={{ position: 'absolute', left: left + 2, top: 6, width, height: ROW_H - 12, background: isDone ? '#F1F5F9' : t.color + '22', border: `1.5px ${isPend ? 'dashed' : 'solid'} ${isDone ? '#CBD5E1' : t.color}`, borderRadius: 7, padding: '4px 7px', overflow: 'hidden', zIndex: 5, cursor: 'pointer', opacity: isDone ? 0.85 : 1 }}
                   >
-                    <p style={{ fontSize: 11, fontWeight: 700, color: t.color, margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.passenger_name}</p>
-                    <p style={{ fontSize: 10, color: t.color, opacity: 0.8, margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.destination}</p>
-                    <p style={{ fontSize: 9, color: t.color, opacity: 0.6, margin: 0 }}>{format(dt, 'HH:mm')} · {b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}m`}</p>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: isDone ? '#64748B' : t.color, margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isDone ? '✓ ' : ''}{b.passenger_name}</p>
+                    <p style={{ fontSize: 10, color: isDone ? '#94a3b8' : t.color, opacity: isDone ? 1 : 0.8, margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.destination}</p>
+                    <p style={{ fontSize: 9, color: isDone ? '#94a3b8' : t.color, opacity: isDone ? 1 : 0.6, margin: 0 }}>
+                      {isDone && b.completed_at ? `Done ${format(new Date(b.completed_at), 'HH:mm')}` : `${format(dt, 'HH:mm')} · ${b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}m`}`}
+                    </p>
                   </div>
                 )
               })}
@@ -348,20 +356,29 @@ function WeekView({ bookings, cursor, today, tooltip, setTooltip }: any) {
               {dayBks.map((b: any) => {
                 const dt     = new Date(b.scheduled_at)
                 const startH = dt.getHours() + dt.getMinutes() / 60
-                const durH   = b.trip_type === 'WAITING' ? Math.min(b.wait_minutes / 60 + 2, HOUR_E - startH) : Math.min(2, HOUR_E - startH)
+                const isDone = b.status === 'completed'
+                const isPend = b.status.includes('pending')
+                let durH: number
+                if (isDone && b.completed_at) {
+                  const endH = new Date(b.completed_at).getHours() + new Date(b.completed_at).getMinutes() / 60
+                  durH = Math.min(Math.max(endH - startH, 0.3), HOUR_E - startH)
+                } else {
+                  durH = b.trip_type === 'WAITING' ? Math.min(b.wait_minutes / 60 + 2, HOUR_E - startH) : Math.min(2, HOUR_E - startH)
+                }
                 const top    = (startH - HOUR_S) * H_PX
                 const height = Math.max(durH * H_PX - 2, 22)
                 const color  = b.taxi_color || '#888'
-                const isPend = b.status.includes('pending')
                 return (
                   <div
                     key={b.id}
                     onMouseEnter={e => setTooltip({ b, x: (e.target as HTMLElement).getBoundingClientRect().right, y: (e.target as HTMLElement).getBoundingClientRect().top })}
                     onMouseLeave={() => setTooltip(null)}
-                    style={{ position: 'absolute', left: 2, right: 2, top, height, background: color + '22', border: `1px ${isPend ? 'dashed' : 'solid'} ${color}`, borderRadius: 5, padding: '2px 5px', overflow: 'hidden', zIndex: 5, cursor: 'pointer' }}
+                    style={{ position: 'absolute', left: 2, right: 2, top, height, background: isDone ? '#F1F5F9' : color + '22', border: `1px ${isPend ? 'dashed' : 'solid'} ${isDone ? '#CBD5E1' : color}`, borderRadius: 5, padding: '2px 5px', overflow: 'hidden', zIndex: 5, cursor: 'pointer', opacity: isDone ? 0.85 : 1 }}
                   >
-                    <p style={{ fontSize: 10, fontWeight: 700, color, margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.passenger_name}</p>
-                    <p style={{ fontSize: 9, color, opacity: 0.8, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.destination}</p>
+                    <p style={{ fontSize: 10, fontWeight: 700, color: isDone ? '#64748B' : color, margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isDone ? '✓ ' : ''}{b.passenger_name}</p>
+                    <p style={{ fontSize: 9, color: isDone ? '#94a3b8' : color, opacity: isDone ? 1 : 0.8, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isDone && b.completed_at ? `Done ${format(new Date(b.completed_at), 'HH:mm')}` : b.destination}
+                    </p>
                   </div>
                 )
               })}
@@ -433,6 +450,10 @@ function Legend({ taxis }: { taxis: any[] }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px dashed #9ca3af', borderRadius: 2 }} />
           <span style={{ fontSize: 11, color: '#9CA3AF' }}>Pending</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px solid #CBD5E1', borderRadius: 2, background: '#F1F5F9' }} />
+          <span style={{ fontSize: 11, color: '#9CA3AF' }}>✓ Done</span>
         </div>
       </div>
     </div>

@@ -45,6 +45,17 @@ export interface User {
   updated_at: string
 }
 
+export interface RegisteredLocation {
+  id: string
+  name: string
+  address: string | null
+  lat: number
+  lng: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Taxi {
   id: string
   name: string

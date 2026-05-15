@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
       pickup, destination, trip_type,
       wait_minutes = 0, notes, scheduled_at,
       status, auto_complete_at,
+      pickup_lat = null, pickup_lng = null,
+      destination_lat = null, destination_lng = null,
     } = await request.json()
 
     if (!pickup || !destination || !trip_type || !scheduled_at) {
@@ -37,6 +39,10 @@ export async function POST(request: NextRequest) {
         status,
         auto_complete_at,
         created_by:       user.id,
+        pickup_lat,
+        pickup_lng,
+        destination_lat,
+        destination_lng,
       })
       .select('id, booking_code, status, passenger_id, taxi_id, destination, scheduled_at, trip_type, wait_minutes, auto_complete_at')
       .single()

@@ -34,9 +34,10 @@ create table public.taxis (
   name        text not null,           -- 'Taxi 01'
   plate       text,                    -- 'DD 1234 AB'
   driver_id   uuid references public.users(id) on delete set null,
-  color       text default '#2563EB',  -- hex color for display
-  is_active   boolean default true,
-  created_at  timestamptz default now()
+  color        text default '#2563EB',  -- hex color for display
+  is_active    boolean default true,
+  is_available boolean default true,
+  created_at   timestamptz default now()
 );
 
 -- RLS
@@ -208,17 +209,7 @@ create table public.notifications (
   booking_id  uuid references public.bookings(id) on delete cascade,
   title       text not null,
   body        text not null,
-  type        text not null check (type in (
-                'booking_confirmed',
-                'booking_rejected',
-                'booking_reassigned',
-                'driver_assigned',
-                'driver_declined',
-                'trip_completed',
-                'needs_approval',
-                'driver_reassigned',
-                'auto_completed'
-              )),
+  type        text not null,
   is_read     boolean default false,
   sent_at     timestamptz default now()
 );
@@ -289,9 +280,9 @@ where t.is_active = true;
 -- ============================================================
 
 -- Driver real-time GPS on taxis table
-alter table public.taxis add column if not exists latitude          float8;
-alter table public.taxis add column if not exists longitude         float8;
-alter table public.taxis add column if not exists location_updated_at timestamptz;
+alter table public.taxis add column if not exists latitude             float8;
+alter table public.taxis add column if not exists longitude            float8;
+alter table public.taxis add column if not exists location_updated_at  timestamptz;
 
 -- Allow drivers to update their own taxi's location
 do $$
@@ -309,7 +300,111 @@ end;
 $$;
 
 -- Pre-geocoded coordinates stored on bookings (populated async after creation)
-alter table public.bookings add column if not exists pickup_lat      float8;
-alter table public.bookings add column if not exists pickup_lng      float8;
-alter table public.bookings add column if not exists destination_lat float8;
-alter table public.bookings add column if not exists destination_lng float8;
+alter table public.bookings add column if not exists pickup_lat       float8;
+alter table public.bookings add column if not exists pickup_lng       float8;
+alter table public.bookings add column if not exists destination_lat  float8;
+alter table public.bookings add column if not exists destination_lng  float8;
+
+-- Recreate booking_details so b.* expands to include the new coordinate columns
+-- (PostgreSQL expands * at view-creation time, so the original view omits these columns)
+-- Must drop first — CREATE OR REPLACE cannot change existing column positions
+drop view if exists public.booking_details;
+create view public.booking_details as
+select
+  b.*,
+  p.name        as passenger_name,
+  p.email       as passenger_email,
+  p.phone       as passenger_phone,
+  t.name        as taxi_name,
+  t.plate       as taxi_plate,
+  t.color       as taxi_color,
+  d.name        as driver_name,
+  d.phone       as driver_phone
+from public.bookings b
+left join public.users p  on p.id = b.passenger_id
+left join public.taxis t  on t.id = b.taxi_id
+left join public.users d  on d.id = t.driver_id;
+
+-- ============================================================
+-- REGISTERED LOCATIONS TABLE
+-- Named places (offices, gates, etc.) pinned by coordinators
+-- ============================================================
+create table if not exists public.registered_locations (
+  id         uuid primary key default uuid_generate_v4(),
+  name       text not null,
+  address    text,
+  lat        float8 not null,
+  lng        float8 not null,
+  created_by uuid references public.users(id) on delete set null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.registered_locations enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where tablename = 'registered_locations'
+    and policyname = 'Authenticated users can view registered locations'
+  ) then
+    execute $p$
+      create policy "Authenticated users can view registered locations" on public.registered_locations
+        for select using (auth.uid() is not null)
+    $p$;
+  end if;
+
+  if not exists (
+    select 1 from pg_policies where tablename = 'registered_locations'
+    and policyname = 'Coordinator can manage registered locations'
+  ) then
+    execute $p$
+      create policy "Coordinator can manage registered locations" on public.registered_locations
+        for all using (
+          exists (select 1 from public.users where id = auth.uid() and role = 'coordinator')
+        )
+    $p$;
+  end if;
+end;
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_trigger
+    where tgname = 'registered_locations_updated_at'
+  ) then
+    execute $p$
+      create trigger registered_locations_updated_at
+        before update on public.registered_locations
+        for each row execute function update_updated_at()
+    $p$;
+  end if;
+end;
+$$;
+
+-- ============================================================
+-- MIGRATION: taxis is_available + notification reminder types
+-- Run these in Supabase SQL Editor on existing databases
+-- ============================================================
+
+-- Add is_available column to taxis if it doesn't already exist
+alter table public.taxis add column if not exists is_available boolean default true;
+
+-- Remove the strict type check constraint from notifications.
+-- The type values are enforced by application code; the constraint
+-- causes failures when new notification types are added over time.
+do $$
+declare
+  cname text;
+begin
+  select conname into cname
+  from pg_constraint
+  where conrelid = 'public.notifications'::regclass
+    and contype = 'c'
+    and pg_get_constraintdef(oid) like '%booking_confirmed%';
+  if cname is not null then
+    execute format('alter table public.notifications drop constraint %I', cname);
+  end if;
+end;
+$$;

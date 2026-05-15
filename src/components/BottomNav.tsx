@@ -44,7 +44,7 @@ const NAV: Record<string, NavItem[]> = {
     { href: '/coordinator/profile',       label: 'Profile', iconKey: 'person'    },
   ],
   driver: [
-    { href: '/driver/home',          label: 'Trips',   iconKey: 'taxi'   },
+    { href: '/driver/home',          label: 'Trips',   iconKey: 'home'   },
     { href: '/driver/notifications', label: 'Alerts',  iconKey: 'bell'   },
     { href: '/driver/profile',       label: 'Profile', iconKey: 'person' },
   ],

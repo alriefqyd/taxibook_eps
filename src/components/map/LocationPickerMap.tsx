@@ -1,12 +1,14 @@
 'use client'
-import { useState, useRef } from 'react'
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
+import { useState, useRef, useEffect } from 'react'
+import { MapContainer, TileLayer, Marker, Tooltip, useMapEvents, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { reverseGeocode, geocodeAddress } from '@/lib/geocode'
 import type { Coords } from '@/lib/geocode'
+import { createClient } from '@/lib/supabase/client'
+import type { RegisteredLocation } from '@/types'
 
-const TILE_URL   = `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY ?? ''}`
+const TILE_URL  = `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY ?? ''}`
 const SOROWAKO: [number, number] = [-2.5397, 121.3588]
 
 function pinIcon() {
@@ -15,6 +17,15 @@ function pinIcon() {
     className: '',
     iconSize: [28, 28],
     iconAnchor: [14, 28],
+  })
+}
+
+function savedLocIcon() {
+  return L.divIcon({
+    html: `<div style="width:30px;height:30px;background:#D97706;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 10px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-weight:800">★</div>`,
+    className: '',
+    iconSize: [30, 30],
+    iconAnchor: [15, 30],
   })
 }
 
@@ -40,15 +51,45 @@ interface Props {
 }
 
 export default function LocationPickerMap({ title, onConfirm, onClose }: Props) {
+  const supabase = createClient()
+
   const [picked,      setPicked]      = useState<(Coords & { address: string }) | null>(null)
   const [loading,     setLoading]     = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searching,   setSearching]   = useState(false)
   const [searchErr,   setSearchErr]   = useState('')
   const [flyTarget,   setFlyTarget]   = useState<[number, number] | null>(null)
+  const [savedLocs,   setSavedLocs]   = useState<RegisteredLocation[]>([])
+  const [dropdown,    setDropdown]    = useState<RegisteredLocation[]>([])
+
+  useEffect(() => {
+    supabase
+      .from('registered_locations')
+      .select('id, name, address, lat, lng, created_by, created_at, updated_at')
+      .order('name')
+      .then(({ data }) => setSavedLocs(data || []))
+  }, [])
+
+  useEffect(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) { setDropdown([]); return }
+    setDropdown(
+      savedLocs
+        .filter(l => l.name.toLowerCase().includes(q) || (l.address || '').toLowerCase().includes(q))
+        .slice(0, 6)
+    )
+  }, [searchQuery, savedLocs])
+
+  function selectSavedLoc(loc: RegisteredLocation) {
+    setFlyTarget([loc.lat, loc.lng])
+    setPicked({ lat: loc.lat, lng: loc.lng, address: loc.name })
+    setSearchQuery('')
+    setDropdown([])
+  }
 
   async function handlePick(lat: number, lng: number) {
     setLoading(true)
+    setDropdown([])
     setPicked({ lat, lng, address: 'Getting address...' })
     const address = await reverseGeocode(lat, lng)
     setPicked({ lat, lng, address: address || `${lat.toFixed(5)}, ${lng.toFixed(5)}` })
@@ -58,6 +99,9 @@ export default function LocationPickerMap({ title, onConfirm, onClose }: Props) 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault()
     if (!searchQuery.trim()) return
+    // If a saved location matches exactly, select it directly
+    const exact = savedLocs.find(l => l.name.toLowerCase() === searchQuery.trim().toLowerCase())
+    if (exact) { selectSavedLoc(exact); return }
     setSearching(true)
     setSearchErr('')
     const coords = await geocodeAddress(searchQuery.trim())
@@ -91,7 +135,7 @@ export default function LocationPickerMap({ title, onConfirm, onClose }: Props) 
           }}>←</button>
           <div>
             <p style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{title}</p>
-            <p style={{ fontSize: 11, margin: 0, opacity: 0.75 }}>Search or tap the map to pin a location</p>
+            <p style={{ fontSize: 11, margin: 0, opacity: 0.75 }}>Search a saved place or tap the map to pin</p>
           </div>
         </div>
 
@@ -101,7 +145,7 @@ export default function LocationPickerMap({ title, onConfirm, onClose }: Props) 
             type="text"
             value={searchQuery}
             onChange={e => { setSearchQuery(e.target.value); setSearchErr('') }}
-            placeholder="Search location, e.g. Karebbe..."
+            placeholder="Search saved places or address..."
             style={{
               flex: 1, padding: '10px 14px', fontSize: 13,
               border: 'none', borderRadius: 10,
@@ -118,8 +162,33 @@ export default function LocationPickerMap({ title, onConfirm, onClose }: Props) 
             {searching ? '...' : 'Search'}
           </button>
         </form>
-        {searchErr && (
-          <p style={{ fontSize: 11, color: '#fca5a5', margin: 0 }}>{searchErr}</p>
+        {searchErr && <p style={{ fontSize: 11, color: '#fca5a5', margin: 0 }}>{searchErr}</p>}
+
+        {/* Saved locations dropdown */}
+        {dropdown.length > 0 && (
+          <div style={{
+            background: '#fff', borderRadius: 10, overflow: 'hidden',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+          }}>
+            {dropdown.map((loc, i) => (
+              <button
+                key={loc.id}
+                onClick={() => selectSavedLoc(loc)}
+                style={{
+                  width: '100%', padding: '10px 14px',
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
+                  borderBottom: i < dropdown.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none',
+                }}
+              >
+                <span style={{ fontSize: 16, color: '#D97706', flexShrink: 0 }}>★</span>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: '#1a1c1b', margin: 0 }}>{loc.name}</p>
+                  {loc.address && <p style={{ fontSize: 11, color: '#9ca3af', margin: '1px 0 0' }}>{loc.address}</p>}
+                </div>
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
@@ -135,6 +204,16 @@ export default function LocationPickerMap({ title, onConfirm, onClose }: Props) 
           <ClickHandler onPick={handlePick} />
           <FlyTo target={flyTarget} />
           {picked && <Marker position={[picked.lat, picked.lng]} icon={pinIcon()} />}
+          {savedLocs.map(loc => (
+            <Marker
+              key={loc.id}
+              position={[loc.lat, loc.lng]}
+              icon={savedLocIcon()}
+              eventHandlers={{ click: () => selectSavedLoc(loc) }}
+            >
+              <Tooltip direction="top" offset={[0, -18]} opacity={0.92}>{loc.name}</Tooltip>
+            </Marker>
+          ))}
         </MapContainer>
 
         {!picked && (
@@ -147,6 +226,25 @@ export default function LocationPickerMap({ title, onConfirm, onClose }: Props) 
             whiteSpace: 'nowrap',
           }}>
             Tap anywhere to select
+          </div>
+        )}
+
+        {/* Legend */}
+        {savedLocs.length > 0 && (
+          <div style={{
+            position: 'absolute', top: 10, right: 10, zIndex: 999,
+            background: 'rgba(255,255,255,0.93)', borderRadius: 10,
+            padding: '7px 11px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            display: 'flex', flexDirection: 'column', gap: 5,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 13, color: '#D97706' }}>★</span>
+              <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 600 }}>Saved place</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 13 }}>📍</span>
+              <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 600 }}>Custom pin</span>
+            </div>
           </div>
         )}
       </div>

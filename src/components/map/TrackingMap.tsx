@@ -43,9 +43,13 @@ interface Props {
   pickup: string
   destination: string
   status: string   // 'booked' | 'on_trip' | 'waiting_trip'
+  pickupLat?: number | null
+  pickupLng?: number | null
+  destLat?: number | null
+  destLng?: number | null
 }
 
-export default function TrackingMap({ taxiId, taxiColor, pickup, destination, status }: Props) {
+export default function TrackingMap({ taxiId, taxiColor, pickup, destination, status, pickupLat, pickupLng, destLat, destLng }: Props) {
   const [driverPos,  setDriverPos]  = useState<[number, number] | null>(null)
   const [targetPos,  setTargetPos]  = useState<[number, number] | null>(null)
   const [route,      setRoute]      = useState<[number, number][] | null>(null)
@@ -82,13 +86,19 @@ export default function TrackingMap({ taxiId, taxiColor, pickup, destination, st
     return () => { supabase.removeChannel(ch) }
   }, [taxiId])
 
-  // Geocode target when status or addresses change
+  // Resolve target coordinates — use stored coords first, fall back to geocoding
   useEffect(() => {
     setTargetPos(null)
     setRoute(null)
     setEta(null)
-    geocodeAddress(targetAddress).then(c => { if (c) setTargetPos([c.lat, c.lng]) })
-  }, [targetAddress])
+    const lat = headingToPickup ? pickupLat : destLat
+    const lng = headingToPickup ? pickupLng : destLng
+    if (lat != null && lng != null) {
+      setTargetPos([lat, lng])
+    } else {
+      geocodeAddress(targetAddress).then(c => { if (c) setTargetPos([c.lat, c.lng]) })
+    }
+  }, [targetAddress, headingToPickup, pickupLat, pickupLng, destLat, destLng])
 
   // Fetch route when both positions ready
   useEffect(() => {
