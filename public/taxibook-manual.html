@@ -1,0 +1,1696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TaxiBook EPS — User Manual</title>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --teal:      #006064;
+    --teal-dark: #004047;
+    --teal-light:#E0F2F1;
+    --gold:      #ECB833;
+    --gold-dark: #B8860B;
+    --gray:      #6B7280;
+    --gray-light:#F5F5F2;
+    --border:    rgba(0,0,0,0.08);
+    --font:      'Segoe UI', 'Inter', Arial, sans-serif;
+    --mono:      'Courier New', monospace;
+  }
+
+  html { font-size: 13px; }
+
+  body {
+    font-family: var(--font);
+    color: #1a1c1b;
+    background: #fff;
+    line-height: 1.6;
+  }
+
+  /* ── Page layout for print ── */
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto 8mm;
+    padding: 18mm 18mm 16mm;
+    background: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+
+  @media print {
+    html, body { background: #fff; }
+    .page {
+      margin: 0;
+      padding: 15mm 16mm 14mm;
+      page-break-after: always;
+      box-shadow: none !important;
+    }
+    .page:last-child { page-break-after: avoid; }
+    @page { size: A4; margin: 0; }
+  }
+
+  @media screen {
+    body { background: #e8e8e8; padding: 12px 0; }
+    .page {
+      box-shadow: 0 4px 24px rgba(0,0,0,0.14);
+      border-radius: 4px;
+    }
+  }
+
+  /* ── Cover ── */
+  .cover {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: var(--teal-dark);
+    color: #fff;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .cover-top {
+    padding: 22mm 18mm 0;
+  }
+
+  .cover-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 60px;
+  }
+
+  .cover-v {
+    width: 54px;
+    height: 54px;
+  }
+
+  .cover-brand-text { }
+  .cover-brand-text .app-name {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #fff;
+  }
+  .cover-brand-text .sub {
+    font-size: 11px;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .cover-title {
+    font-size: 38px;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -1px;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+
+  .cover-subtitle {
+    font-size: 14px;
+    color: rgba(255,255,255,0.65);
+    max-width: 340px;
+    line-height: 1.55;
+    margin-bottom: 40px;
+  }
+
+  .cover-pills {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 48px;
+  }
+
+  .cover-pill {
+    padding: 5px 14px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1.5px solid rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.85);
+    letter-spacing: 0.3px;
+  }
+
+  .cover-bottom {
+    background: rgba(0,0,0,0.25);
+    padding: 14px 18mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .cover-bottom p {
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 0.4px;
+  }
+
+  .cover-wave {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+    padding: 0 18mm;
+  }
+
+  .cover-gold-bar {
+    height: 4px;
+    background: linear-gradient(90deg, var(--gold), transparent);
+    width: 120px;
+    border-radius: 2px;
+    margin-bottom: 32px;
+  }
+
+  /* ── TOC ── */
+  .toc-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--teal-dark);
+    margin-bottom: 28px;
+    padding-bottom: 12px;
+    border-bottom: 2.5px solid var(--gold);
+    display: inline-block;
+  }
+
+  .toc-section { margin-bottom: 6px; }
+
+  .toc-section-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray);
+    margin-top: 18px;
+    margin-bottom: 4px;
+  }
+
+  .toc-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0;
+    padding: 5px 0;
+    border-bottom: 1px dotted rgba(0,0,0,0.1);
+  }
+
+  .toc-num {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--teal);
+    width: 28px;
+    flex-shrink: 0;
+  }
+
+  .toc-label {
+    font-size: 12px;
+    color: #1a1c1b;
+    flex: 1;
+  }
+
+  .toc-sub {
+    font-size: 11px;
+    color: var(--gray);
+    flex: 1;
+    padding-left: 28px;
+  }
+
+  .toc-dots {
+    flex: 1;
+    border-bottom: 1px dotted rgba(0,0,0,0.15);
+    margin: 0 8px 3px;
+  }
+
+  .toc-page {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--teal);
+    width: 24px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* ── Section headers ── */
+  .section-banner {
+    background: var(--teal-dark);
+    color: #fff;
+    margin: 0 -18mm 24px;
+    padding: 18px 18mm;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .section-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .section-banner h1 {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    line-height: 1.2;
+  }
+
+  .section-banner p {
+    font-size: 11px;
+    color: rgba(255,255,255,0.65);
+    margin-top: 2px;
+  }
+
+  .role-badge {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.9);
+    flex-shrink: 0;
+  }
+
+  /* ── Content typography ── */
+  h2 {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--teal-dark);
+    margin: 24px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  h2::after {
+    content: '';
+    flex: 1;
+    height: 1.5px;
+    background: var(--teal-light);
+    border-radius: 1px;
+  }
+
+  h3 {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--teal);
+    margin: 16px 0 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  p { font-size: 12px; margin-bottom: 8px; color: #374151; }
+
+  /* ── Steps ── */
+  .steps { margin: 12px 0 16px; }
+
+  .step {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--teal);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step-body { flex: 1; }
+  .step-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1a1c1b;
+    margin-bottom: 2px;
+  }
+  .step-desc { font-size: 11px; color: var(--gray); margin: 0; }
+
+  /* ── Info boxes ── */
+  .info-box {
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 12px 0;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .info-box.tip  { background: #E0F2F1; border-left: 3px solid var(--teal); }
+  .info-box.warn { background: #FEF3C7; border-left: 3px solid #D97706; }
+  .info-box.note { background: #EFF6FF; border-left: 3px solid #3B82F6; }
+
+  .info-icon { font-size: 14px; margin-top: 1px; flex-shrink: 0; }
+  .info-content { font-size: 11px; color: #374151; }
+  .info-content strong { display: block; font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+
+  /* ── Status pills ── */
+  .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+
+  .pill {
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .pill-submitted     { background: #DBEAFE; color: #1E3A5F; }
+  .pill-approval      { background: #FEF3C7; color: #92400E; }
+  .pill-driver        { background: #FEF3C7; color: #92400E; }
+  .pill-booked        { background: #D1FAE5; color: #065F46; }
+  .pill-ontrip        { background: #D1FAE5; color: #065F46; }
+  .pill-waiting       { background: #EDE9FE; color: #4C1D95; }
+  .pill-completed     { background: #F1F5F9; color: #475569; }
+  .pill-rejected      { background: #FEE2E2; color: #991B1B; }
+  .pill-cancelled     { background: #F1F5F9; color: #6B7280; }
+
+  .pill-drop          { background: #DBEAFE; color: #1E3A5F; }
+  .pill-waiting-trip  { background: #EDE9FE; color: #4C1D95; }
+
+  /* ── Feature cards ── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 12px 0;
+  }
+
+  .card {
+    background: var(--gray-light);
+    border-radius: 10px;
+    padding: 12px 13px;
+    border-left: 3px solid var(--teal);
+  }
+
+  .card-icon { font-size: 18px; margin-bottom: 6px; }
+  .card-title { font-size: 12px; font-weight: 700; color: var(--teal-dark); margin-bottom: 3px; }
+  .card-desc  { font-size: 10px; color: var(--gray); line-height: 1.5; }
+
+  /* ── Table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin: 12px 0;
+  }
+
+  th {
+    background: var(--teal-dark);
+    color: #fff;
+    padding: 7px 10px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    color: #374151;
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) td { background: var(--gray-light); }
+
+  /* ── Flow diagram ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 14px 0;
+    flex-wrap: wrap;
+  }
+
+  .flow-step {
+    background: var(--teal-light);
+    border: 1.5px solid var(--teal);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--teal-dark);
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .flow-arrow {
+    color: var(--teal);
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .flow-step.gold {
+    background: #FEF3C7;
+    border-color: var(--gold-dark);
+    color: #78350F;
+  }
+
+  .flow-step.done {
+    background: #D1FAE5;
+    border-color: #059669;
+    color: #065F46;
+  }
+
+  /* ── Phone mockup ── */
+  .screen-box {
+    background: var(--gray-light);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 14px;
+    margin: 12px 0;
+    font-size: 11px;
+  }
+
+  .screen-box .screen-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gray);
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Page footer ── */
+  .page-footer {
+    position: absolute;
+    bottom: 12mm;
+    left: 18mm;
+    right: 18mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    padding-top: 6px;
+  }
+
+  .page-footer p {
+    font-size: 9px;
+    color: #9ca3af;
+    margin: 0;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  /* ── Role header accent ── */
+  .role-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    border-radius: 10px;
+  }
+
+  .role-staff       { background: #EFF6FF; border: 1.5px solid #BFDBFE; }
+  .role-driver      { background: #ECFDF5; border: 1.5px solid #A7F3D0; }
+  .role-coordinator { background: var(--teal-light); border: 1.5px solid #99F6E4; }
+
+  .role-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .role-header p { margin: 0; font-size: 11px; color: #374151; }
+  .role-header strong { font-size: 12px; display: block; }
+
+  ul, ol { padding-left: 18px; margin: 8px 0; }
+  li { font-size: 11px; color: #374151; margin-bottom: 4px; }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .highlight {
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #92400E;
+    display: inline;
+  }
+
+  code {
+    background: #F1F5F9;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: #006064;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- COVER PAGE                                             -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page cover">
+  <div class="cover-top">
+    <div class="cover-brand">
+      <!-- Vale V mark SVG inline -->
+      <svg class="cover-v" viewBox="0 0 54 54" xmlns="http://www.w3.org/2000/svg">
+        <rect width="54" height="54" rx="10" fill="rgba(255,255,255,0.1)"/>
+        <polygon points="6,10 12,10 27,44 42,10 48,10 27,47" fill="white" opacity="0.95"/>
+        <polygon points="42,10 48,10 41,22 37,22" fill="#ECB833"/>
+      </svg>
+      <div class="cover-brand-text">
+        <div class="app-name">TaxiBook EPS</div>
+        <div class="sub">PT Vale Indonesia</div>
+      </div>
+    </div>
+
+    <div class="cover-gold-bar"></div>
+
+    <div class="cover-title">User Manual<br/>&amp; Feature Guide</div>
+    <div class="cover-subtitle">
+      A complete reference for Staff, Drivers, and Coordinators using the TaxiBook EPS company fleet booking system.
+    </div>
+
+    <div class="cover-pills">
+      <div class="cover-pill">👤 Staff Guide</div>
+      <div class="cover-pill">🚗 Driver Guide</div>
+      <div class="cover-pill">📋 Coordinator Guide</div>
+      <div class="cover-pill">🖥️ Dispatch Board</div>
+      <div class="cover-pill">🔔 Notifications</div>
+      <div class="cover-pill">📱 PWA Install</div>
+    </div>
+  </div>
+
+  <div style="flex:1;"></div>
+
+  <!-- decorative diagonal stripe -->
+  <div style="position:absolute;right:-40px;top:80px;width:220px;height:600px;background:rgba(255,255,255,0.04);transform:rotate(18deg);border-radius:40px;"></div>
+  <div style="position:absolute;right:20px;top:60px;width:120px;height:600px;background:rgba(255,255,255,0.03);transform:rotate(18deg);border-radius:40px;"></div>
+
+  <div class="cover-bottom">
+    <p>Version 1.0 &nbsp;|&nbsp; May 2026</p>
+    <p>CONFIDENTIAL — FOR INTERNAL USE ONLY</p>
+    <p>PT Vale Indonesia Tbk</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- TABLE OF CONTENTS                                      -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="toc-title">Table of Contents</div>
+
+  <div class="toc-section-label">Introduction</div>
+  <div class="toc-item"><span class="toc-num">1.</span><span class="toc-label">Overview &amp; System Roles</span><span class="toc-dots"></span><span class="toc-page">3</span></div>
+  <div class="toc-item"><span class="toc-num">2.</span><span class="toc-label">How to Install the App (PWA)</span><span class="toc-dots"></span><span class="toc-page">3</span></div>
+  <div class="toc-item"><span class="toc-num">3.</span><span class="toc-label">Login</span><span class="toc-dots"></span><span class="toc-page">3</span></div>
+  <div class="toc-item"><span class="toc-num">4.</span><span class="toc-label">Booking Status Reference</span><span class="toc-dots"></span><span class="toc-page">4</span></div>
+
+  <div class="toc-section-label">Staff Guide</div>
+  <div class="toc-item"><span class="toc-num">5.</span><span class="toc-label">Home — Upcoming Trips</span><span class="toc-dots"></span><span class="toc-page">5</span></div>
+  <div class="toc-item"><span class="toc-num">6.</span><span class="toc-label">Book a Trip</span><span class="toc-dots"></span><span class="toc-page">5</span></div>
+  <div class="toc-item"><span class="toc-num">7.</span><span class="toc-label">Trip Types: DROP vs WAITING</span><span class="toc-dots"></span><span class="toc-page">5</span></div>
+  <div class="toc-item"><span class="toc-num">8.</span><span class="toc-label">Live Trip Tracking Map</span><span class="toc-dots"></span><span class="toc-page">6</span></div>
+
+  <div class="toc-section-label">Driver Guide</div>
+  <div class="toc-item"><span class="toc-num">9.</span><span class="toc-label">Driver Home — Trip Queue</span><span class="toc-dots"></span><span class="toc-page">7</span></div>
+  <div class="toc-item"><span class="toc-num">10.</span><span class="toc-label">Accept or Decline a Booking</span><span class="toc-dots"></span><span class="toc-page">7</span></div>
+  <div class="toc-item"><span class="toc-num">11.</span><span class="toc-label">Running a Trip (Start → Complete)</span><span class="toc-dots"></span><span class="toc-page">7</span></div>
+  <div class="toc-item"><span class="toc-num">12.</span><span class="toc-label">GPS Tracking</span><span class="toc-dots"></span><span class="toc-page">8</span></div>
+
+  <div class="toc-section-label">Coordinator Guide</div>
+  <div class="toc-item"><span class="toc-num">13.</span><span class="toc-label">Coordinator Home — Booking Management</span><span class="toc-dots"></span><span class="toc-page">9</span></div>
+  <div class="toc-item"><span class="toc-num">14.</span><span class="toc-label">Approve &amp; Reject Bookings</span><span class="toc-dots"></span><span class="toc-page">9</span></div>
+  <div class="toc-item"><span class="toc-num">15.</span><span class="toc-label">Calendar View (Gantt)</span><span class="toc-dots"></span><span class="toc-page">9</span></div>
+  <div class="toc-item"><span class="toc-num">16.</span><span class="toc-label">Fleet Map View</span><span class="toc-dots"></span><span class="toc-page">10</span></div>
+  <div class="toc-item"><span class="toc-num">17.</span><span class="toc-label">Driver Management</span><span class="toc-dots"></span><span class="toc-page">10</span></div>
+  <div class="toc-item"><span class="toc-num">18.</span><span class="toc-label">Saved Locations</span><span class="toc-dots"></span><span class="toc-page">10</span></div>
+
+  <div class="toc-section-label">Dispatch Board</div>
+  <div class="toc-item"><span class="toc-num">19.</span><span class="toc-label">Dispatch Board Overview (/board)</span><span class="toc-dots"></span><span class="toc-page">11</span></div>
+  <div class="toc-item"><span class="toc-num">20.</span><span class="toc-label">Day / Week / Month / Map Views</span><span class="toc-dots"></span><span class="toc-page">11</span></div>
+
+  <div class="toc-section-label">System Features</div>
+  <div class="toc-item"><span class="toc-num">21.</span><span class="toc-label">Push Notifications</span><span class="toc-dots"></span><span class="toc-page">12</span></div>
+  <div class="toc-item"><span class="toc-num">22.</span><span class="toc-label">Auto-Complete &amp; Reminders</span><span class="toc-dots"></span><span class="toc-page">12</span></div>
+  <div class="toc-item"><span class="toc-num">23.</span><span class="toc-label">Glossary</span><span class="toc-dots"></span><span class="toc-page">13</span></div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>User Manual v1.0</p>
+    <p>Page 2</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PAGE 3 — OVERVIEW + GETTING STARTED                   -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner">
+    <div class="section-icon">🏢</div>
+    <div>
+      <h1>Overview &amp; Getting Started</h1>
+      <p>Introduction, roles, installation, and login</p>
+    </div>
+  </div>
+
+  <h2>1. What is TaxiBook EPS?</h2>
+  <p>TaxiBook EPS is PT Vale Indonesia's internal company fleet booking system. It allows employees to request taxi trips within the company site, enables drivers to manage and execute those trips, and gives coordinators full visibility and control over the entire fleet — all in real time.</p>
+
+  <div class="card-grid" style="margin-top:14px;">
+    <div class="card">
+      <div class="card-icon">👤</div>
+      <div class="card-title">Staff (Passenger)</div>
+      <div class="card-desc">Employees who book taxi trips for business travel within the PT Vale site.</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🚗</div>
+      <div class="card-title">Driver</div>
+      <div class="card-desc">Company taxi drivers who receive, accept, and execute bookings. GPS location is tracked live.</div>
+    </div>
+    <div class="card" style="border-color:var(--gold-dark);">
+      <div class="card-icon">📋</div>
+      <div class="card-title">Coordinator</div>
+      <div class="card-desc">Fleet supervisors who approve bookings, monitor the fleet, and manage drivers and locations.</div>
+    </div>
+    <div class="card" style="border-color:#6B7280;">
+      <div class="card-icon">🖥️</div>
+      <div class="card-title">Dispatch Board</div>
+      <div class="card-desc">A full-screen real-time dashboard for control rooms, showing the full fleet schedule and map.</div>
+    </div>
+  </div>
+
+  <h2>2. Install the App (PWA)</h2>
+  <p>TaxiBook EPS is a <strong>Progressive Web App</strong> — no app store needed. Install it directly from your mobile browser.</p>
+  <div class="two-col">
+    <div>
+      <h3>Android (Chrome)</h3>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Open Chrome</div><div class="step-desc">Navigate to the TaxiBook EPS URL provided by your admin.</div></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Tap the menu (⋮)</div><div class="step-desc">Tap the three-dot menu in the top-right corner.</div></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Add to Home Screen</div><div class="step-desc">Tap "Add to Home screen" and confirm. The TaxiBook icon will appear on your home screen.</div></div></div>
+      </div>
+    </div>
+    <div>
+      <h3>iOS (Safari)</h3>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Open Safari</div><div class="step-desc">Navigate to the TaxiBook EPS URL. <em>Must use Safari — not Chrome.</em></div></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Tap Share (↑)</div><div class="step-desc">Tap the share icon at the bottom of the screen.</div></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Add to Home Screen</div><div class="step-desc">Scroll down and tap "Add to Home Screen", then tap Add.</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-icon">💡</div>
+    <div class="info-content"><strong>Enable Notifications</strong>When prompted, allow push notifications so you receive real-time booking alerts and trip reminders even when the app is in the background.</div>
+  </div>
+
+  <h2>3. Login</h2>
+  <p>All users share the same login screen. Your <strong>role</strong> (Staff, Driver, or Coordinator) is determined by your account and assigned by the admin — you do not select it manually.</p>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Enter your work email</div><div class="step-desc">Use the email address registered by your PT Vale administrator.</div></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Enter your password</div><div class="step-desc">Contact your admin if you have forgotten your credentials.</div></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Tap Sign in</div><div class="step-desc">You will be redirected automatically to the correct home screen for your role.</div></div></div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>User Manual v1.0</p>
+    <p>Page 3</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PAGE 4 — BOOKING STATUS REFERENCE                     -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner">
+    <div class="section-icon">🏷️</div>
+    <div>
+      <h1>Booking Status Reference</h1>
+      <p>Understanding every status label in the system</p>
+    </div>
+  </div>
+
+  <h2>4. Booking Statuses</h2>
+  <p>Every booking moves through a series of statuses from creation to completion. The table below explains each one.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Status Label</th>
+        <th>Meaning</th>
+        <th>Next Step</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="pill pill-submitted">Submitted</span></td>
+        <td>Booking has been created by staff and is waiting for processing.</td>
+        <td>System assigns a driver automatically, or coordinator reviews.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-approval">Needs Approval</span></td>
+        <td>This booking requires coordinator review before it can proceed.</td>
+        <td>Coordinator must Approve or Reject.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-driver">Awaiting Driver</span></td>
+        <td>A taxi has been assigned and the driver has been notified.</td>
+        <td>Driver must Accept or Decline within the time limit.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-booked">Booked</span></td>
+        <td>Driver has accepted. The trip is confirmed.</td>
+        <td>Driver starts the trip at the scheduled time.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-ontrip">On Trip</span></td>
+        <td>The trip is currently in progress. Driver is en route.</td>
+        <td>Driver marks the trip as Waiting or Completed.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-waiting">Waiting</span></td>
+        <td>Driver has arrived at the destination and is waiting for the passenger (WAITING trip type).</td>
+        <td>Driver marks as Completed when done.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-completed">✓ Completed</span></td>
+        <td>Trip is finished. Recorded with actual completion timestamp.</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-rejected">Rejected</span></td>
+        <td>Coordinator or system rejected the booking.</td>
+        <td>Staff may re-submit or contact coordinator.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-cancelled">Cancelled</span></td>
+        <td>Booking was cancelled before the trip started.</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Booking Flow</h2>
+  <div class="flow">
+    <div class="flow-step">Submitted</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step gold">Needs Approval<br/><span style="font-weight:400;font-size:9px;">(if required)</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">Awaiting Driver</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">Booked</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">On Trip</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step done">Completed</div>
+  </div>
+
+  <h2>Trip Types</h2>
+  <div class="two-col" style="margin-top:8px;">
+    <div class="info-box note" style="margin:0;">
+      <div class="info-icon">📍</div>
+      <div class="info-content">
+        <strong>DROP</strong>
+        Driver drops the passenger at the destination and leaves immediately. No waiting required. Standard one-way trip.
+      </div>
+    </div>
+    <div class="info-box tip" style="margin:0;">
+      <div class="info-icon">⏱️</div>
+      <div class="info-content">
+        <strong>WAITING</strong>
+        Driver drops the passenger and waits at the destination for a return trip. Staff specifies the number of wait minutes when booking.
+      </div>
+    </div>
+  </div>
+
+  <h2>User Role Summary</h2>
+  <table>
+    <thead>
+      <tr><th>Feature</th><th>Staff</th><th>Driver</th><th>Coordinator</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Book a trip</td><td>✅</td><td>—</td><td>—</td></tr>
+      <tr><td>View own bookings</td><td>✅</td><td>—</td><td>—</td></tr>
+      <tr><td>Live trip tracking map</td><td>✅</td><td>✅</td><td>✅</td></tr>
+      <tr><td>Accept / decline bookings</td><td>—</td><td>✅</td><td>—</td></tr>
+      <tr><td>Start / complete trips</td><td>—</td><td>✅</td><td>—</td></tr>
+      <tr><td>Approve / reject bookings</td><td>—</td><td>—</td><td>✅</td></tr>
+      <tr><td>View all bookings</td><td>—</td><td>—</td><td>✅</td></tr>
+      <tr><td>Gantt calendar</td><td>—</td><td>—</td><td>✅</td></tr>
+      <tr><td>Fleet map (all drivers)</td><td>—</td><td>—</td><td>✅</td></tr>
+      <tr><td>Manage saved locations</td><td>—</td><td>—</td><td>✅</td></tr>
+      <tr><td>Push notifications</td><td>✅</td><td>✅</td><td>✅</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>User Manual v1.0</p>
+    <p>Page 4</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PAGE 5 — STAFF GUIDE                                  -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner">
+    <div class="section-icon">👤</div>
+    <div>
+      <h1>Staff Guide</h1>
+      <p>Booking trips, tracking your ride, and managing notifications</p>
+    </div>
+    <div class="role-badge">STAFF</div>
+  </div>
+
+  <div class="role-header role-staff">
+    <div class="role-dot" style="background:#3B82F6;"></div>
+    <div>
+      <strong>Who is this for?</strong>
+      <p>PT Vale employees who need to request a company taxi for business travel within or around the site.</p>
+    </div>
+  </div>
+
+  <h2>5. Home Screen</h2>
+  <p>After login, Staff sees their personal booking dashboard. The home screen shows:</p>
+  <ul>
+    <li><strong>Active trip card</strong> — if you have an ongoing trip, it appears prominently at the top with a live map button.</li>
+    <li><strong>Upcoming bookings</strong> — confirmed trips scheduled for today and the near future.</li>
+    <li><strong>Recent history</strong> — past completed or cancelled trips.</li>
+    <li><strong>Quick actions</strong> — Book a Trip button prominently available.</li>
+  </ul>
+
+  <div class="info-box tip">
+    <div class="info-icon">💡</div>
+    <div class="info-content"><strong>Real-time updates</strong>Booking cards update automatically without refreshing the page. Status changes (e.g. "Driver Accepted") appear live.</div>
+  </div>
+
+  <h2>6. How to Book a Trip</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Tap "Book a Trip"</div>
+        <div class="step-desc">From the Home screen or the Book tab in the bottom navigation bar.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Enter Pickup Location</div>
+        <div class="step-desc">Type your pickup address, or choose a saved PT Vale site location from the list. Using saved locations avoids GPS errors inside the plant.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Enter Destination</div>
+        <div class="step-desc">Type your destination or select from saved locations.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Set Date &amp; Time</div>
+        <div class="step-desc">Choose the date and time you need the taxi. You can book in advance.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">Select Trip Type</div>
+        <div class="step-desc">Choose <span class="pill pill-drop">DROP</span> for a one-way trip, or <span class="pill pill-waiting-trip">WAITING</span> if the driver should wait for you. For WAITING, set the estimated wait time in minutes.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <div class="step-title">Add Notes (optional)</div>
+        <div class="step-desc">Enter any special instructions for the driver or coordinator.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">7</div>
+      <div class="step-body">
+        <div class="step-title">Submit</div>
+        <div class="step-desc">Tap Submit. You will receive a push notification when your booking is confirmed and a driver is assigned.</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>7. Trip Types Explained</h2>
+  <table>
+    <thead><tr><th>Type</th><th>When to use</th><th>Driver behaviour</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="pill pill-drop">DROP</span></td>
+        <td>One-way journey. You don't need the driver to wait.</td>
+        <td>Drops you off and the trip ends immediately.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-waiting-trip">WAITING</span></td>
+        <td>You need the driver to wait at the destination (e.g., a meeting with a return trip).</td>
+        <td>Drops you off, waits for the specified minutes, then you return. The booking spans the full duration.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box warn">
+    <div class="info-icon">⚠️</div>
+    <div class="info-content"><strong>Booking lead time</strong>Always book at least 15 minutes before your required departure time to allow the system to assign and notify a driver.</div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>User Manual v1.0</p>
+    <p>Page 5</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PAGE 6 — STAFF GUIDE (continued)                      -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner" style="background:#1E3A5F;">
+    <div class="section-icon">🗺️</div>
+    <div>
+      <h1>Staff Guide — Live Tracking</h1>
+      <p>Follow your trip in real time on the map</p>
+    </div>
+    <div class="role-badge">STAFF</div>
+  </div>
+
+  <h2>8. Live Trip Tracking Map</h2>
+  <p>Once your trip is confirmed and the driver starts the journey, you can track the driver's position in real time.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Open the active trip card</div>
+        <div class="step-desc">On your Home screen, tap the active booking card when the status is <span class="pill pill-ontrip">On Trip</span>.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">View the live map</div>
+        <div class="step-desc">A map opens showing the driver's current position (blue car marker) and the route line from their location to your destination.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Route updates automatically</div>
+        <div class="step-desc">The driver's position and the route recalculate as the vehicle moves. No manual refresh needed.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen-box">
+    <div class="screen-title">📱 What you see on the map</div>
+    <ul>
+      <li><strong>🚗 Driver marker</strong> — live GPS position of your taxi</li>
+      <li><strong>📍 Destination pin</strong> — your drop-off point</li>
+      <li><strong>Blue route line</strong> — road-following route from driver to destination</li>
+      <li><strong>Trip details panel</strong> — driver name, taxi name, pickup, destination</li>
+    </ul>
+  </div>
+
+  <h2>Notifications You Will Receive</h2>
+  <table>
+    <thead><tr><th>Event</th><th>Notification</th></tr></thead>
+    <tbody>
+      <tr><td>Booking submitted</td><td>Confirmation that your booking was received.</td></tr>
+      <tr><td>Coordinator approved</td><td>Your booking has been approved and is proceeding.</td></tr>
+      <tr><td>Driver assigned &amp; accepted</td><td>"Your driver [Name] in [Taxi] is confirmed for your trip."</td></tr>
+      <tr><td>Driver declined</td><td>A new driver will be assigned automatically.</td></tr>
+      <tr><td>Booking rejected</td><td>Reason for rejection included (if provided by coordinator).</td></tr>
+      <tr><td>15-minute reminder</td><td>Reminder 15 minutes before your scheduled departure.</td></tr>
+      <tr><td>Trip started</td><td>Driver has started your trip.</td></tr>
+      <tr><td>Trip completed</td><td>Your trip has been marked as completed.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Notification Bell (Alerts Tab)</h2>
+  <p>All notifications are stored in the <strong>Alerts</strong> tab (bell icon in the bottom navigation). Unread notifications show a red dot badge on the icon. Tap any notification to mark it as read.</p>
+
+  <h2>Profile</h2>
+  <p>Access your profile via the <strong>Profile</strong> tab in the bottom navigation. From here you can:</p>
+  <ul>
+    <li>View your account name, email, and role</li>
+    <li>Sign out of the application</li>
+  </ul>
+
+  <div class="info-box note">
+    <div class="info-icon">ℹ️</div>
+    <div class="info-content"><strong>Account management</strong>To change your password or update your profile details, contact your PT Vale system administrator. Self-service account editing is not available in this version.</div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>User Manual v1.0</p>
+    <p>Page 6</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PAGE 7 — DRIVER GUIDE                                 -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner" style="background:#065F46;">
+    <div class="section-icon">🚗</div>
+    <div>
+      <h1>Driver Guide</h1>
+      <p>Receiving, accepting, and executing company taxi trips</p>
+    </div>
+    <div class="role-badge">DRIVER</div>
+  </div>
+
+  <div class="role-header role-driver">
+    <div class="role-dot" style="background:#059669;"></div>
+    <div>
+      <strong>Who is this for?</strong>
+      <p>PT Vale company taxi drivers who are assigned to a specific vehicle (taxi) and execute bookings for staff passengers.</p>
+    </div>
+  </div>
+
+  <h2>9. Driver Home — Trip Queue</h2>
+  <p>After logging in, drivers see their personal trip dashboard:</p>
+  <ul>
+    <li><strong>Active trip</strong> — the current in-progress trip with map and controls.</li>
+    <li><strong>Upcoming trips</strong> — accepted bookings scheduled for later today.</li>
+    <li><strong>Pending requests</strong> — new bookings waiting for your Accept/Decline response.</li>
+  </ul>
+  <p>The screen updates in real time whenever a new booking is assigned to your taxi.</p>
+
+  <div class="info-box warn">
+    <div class="info-icon">⚠️</div>
+    <div class="info-content"><strong>Keep the app open</strong>For GPS tracking to work and for instant booking alerts, keep TaxiBook EPS open or installed as a PWA on your device during working hours.</div>
+  </div>
+
+  <h2>10. Accept or Decline a Booking</h2>
+  <p>When a new trip is assigned to your taxi, you receive a push notification and the booking appears in your home screen as a pending request.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Review the booking details</div>
+        <div class="step-desc">Check the pickup point, destination, scheduled time, and trip type (DROP or WAITING).</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Tap Accept or Decline</div>
+        <div class="step-desc">If you can fulfil the trip, tap <strong>Accept</strong>. The passenger is notified immediately. If you cannot, tap <strong>Decline</strong> — the system will attempt to reassign to another available driver.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-icon">💡</div>
+    <div class="info-content"><strong>Repeated declines are tracked</strong>The coordinator can see how many trips you have declined today. Excessive declines may trigger a coordinator review.</div>
+  </div>
+
+  <h2>11. Running a Trip</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Tap "Start Trip"</div>
+        <div class="step-desc">When you depart to pick up the passenger, tap Start Trip. The booking status changes to <span class="pill pill-ontrip">On Trip</span>. The passenger can now see your live location on their map.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Drive to destination</div>
+        <div class="step-desc">Your GPS position updates automatically every few seconds. Keep the app open and the screen on for best tracking accuracy.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">For WAITING trips — tap "Arrived / Waiting"</div>
+        <div class="step-desc">When you reach the destination and the passenger exits, tap this button. Status becomes <span class="pill pill-waiting">Waiting</span> and the timer starts.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Tap "Complete Trip"</div>
+        <div class="step-desc">Once the trip is fully done (passenger delivered, or waiting period complete), tap Complete Trip. The booking records the actual finish timestamp and closes.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>User Manual v1.0</p>
+    <p>Page 7</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PAGE 8 — DRIVER GUIDE (continued)                     -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner" style="background:#065F46;">
+    <div class="section-icon">📡</div>
+    <div>
+      <h1>Driver Guide — GPS &amp; Map</h1>
+      <p>Location tracking and the active trip map</p>
+    </div>
+    <div class="role-badge">DRIVER</div>
+  </div>
+
+  <h2>12. GPS Tracking</h2>
+  <p>TaxiBook EPS tracks your vehicle's position automatically when you have an active trip. This location is shared with the passenger and with the coordinator's fleet map.</p>
+
+  <div class="screen-box">
+    <div class="screen-title">📱 GPS Requirements</div>
+    <ul>
+      <li>Enable <strong>Location Services</strong> on your device and allow TaxiBook EPS to access your location.</li>
+      <li>For Android: set location permission to <strong>"Allow all the time"</strong> for background tracking.</li>
+      <li>GPS accuracy is best outdoors. Inside buildings, accuracy may be reduced.</li>
+      <li>Your last known position is stored — if GPS signal is lost briefly, the last known location is shown.</li>
+    </ul>
+  </div>
+
+  <h2>Driver Map View</h2>
+  <p>During an active trip, the driver home screen shows a live map with:</p>
+  <ul>
+    <li><strong>Your position</strong> — updated every few seconds</li>
+    <li><strong>Route line</strong> — road-following route from your current position to the destination (powered by OpenRouteService)</li>
+    <li><strong>Destination marker</strong> — clearly labeled with the address</li>
+  </ul>
+
+  <div class="info-box tip">
+    <div class="info-icon">💡</div>
+    <div class="info-content"><strong>Wake Lock</strong>The app keeps your screen active during a trip to prevent GPS from stopping. Your device may use more battery — keep it charged or plugged in during long trips.</div>
+  </div>
+
+  <h2>Notifications Drivers Receive</h2>
+  <table>
+    <thead><tr><th>Event</th><th>Notification</th></tr></thead>
+    <tbody>
+      <tr><td>New booking assigned</td><td>Alert with passenger name, pickup, destination, and time. Tap to open.</td></tr>
+      <tr><td>Booking reassigned</td><td>A previously assigned booking has been moved to another driver.</td></tr>
+      <tr><td>15-minute reminder</td><td>Reminder 15 minutes before the trip start time.</td></tr>
+      <tr><td>Trip start reminder</td><td>Reminder at the exact scheduled departure time.</td></tr>
+      <tr><td>Overdue alert</td><td>If a trip has not been started significantly past the scheduled time.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Driver Profile</h2>
+  <p>Access your profile from the <strong>Profile</strong> tab in the bottom navigation. Your profile shows:</p>
+  <ul>
+    <li>Your name and contact information</li>
+    <li>The taxi you are currently assigned to</li>
+    <li>Your online/offline availability status</li>
+  </ul>
+
+  <h2>Bottom Navigation — Driver</h2>
+  <table>
+    <thead><tr><th>Tab</th><th>Icon</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Trips</strong></td><td>🏠</td><td>Main home screen — view pending, active, and upcoming trips.</td></tr>
+      <tr><td><strong>Alerts</strong></td><td>🔔</td><td>All push notifications. Red dot indicates unread alerts.</td></tr>
+      <tr><td><strong>Profile</strong></td><td>👤</td><td>Your account info and sign out.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="info-box warn">
+    <div class="info-icon">⚠️</div>
+    <div class="info-content"><strong>GPS staleness</strong>The system considers your GPS as "inactive" if no location update has been sent in the last 10 minutes. The coordinator can see whether your GPS is active or stale on the fleet map. Always keep the app open while on duty.</div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>User Manual v1.0</p>
+    <p>Page 8</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PAGE 9 — COORDINATOR GUIDE                            -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner">
+    <div class="section-icon">📋</div>
+    <div>
+      <h1>Coordinator Guide</h1>
+      <p>Managing bookings, fleet, and approvals</p>
+    </div>
+    <div class="role-badge">COORDINATOR</div>
+  </div>
+
+  <div class="role-header role-coordinator">
+    <div class="role-dot" style="background:#006064;"></div>
+    <div>
+      <strong>Who is this for?</strong>
+      <p>Fleet supervisors responsible for approving bookings, monitoring all drivers in real time, and managing the PT Vale fleet schedule.</p>
+    </div>
+  </div>
+
+  <h2>13. Coordinator Home — Booking Management</h2>
+  <p>The coordinator home screen is a full dispatch dashboard with three view tabs at the top:</p>
+
+  <table>
+    <thead><tr><th>Tab</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Bookings</strong></td><td>List of all bookings with status filters, date range selector, and approval actions.</td></tr>
+      <tr><td><strong>Calendar</strong></td><td>Gantt-style visual schedule of all taxi trips (Day / Week / Month views).</td></tr>
+      <tr><td><strong>Map</strong></td><td>Live fleet map embedded directly in the home screen.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Bookings Tab — Filters</h3>
+  <div class="pill-row">
+    <span class="pill pill-submitted" style="cursor:default;">All</span>
+    <span class="pill pill-driver">Pending</span>
+    <span class="pill pill-booked">Confirmed</span>
+    <span class="pill pill-completed">Done</span>
+  </div>
+  <p>Use the <strong>date range picker</strong> to filter bookings by scheduled date. A <strong>Today</strong> shortcut resets to today's date. Use <strong>Load more</strong> to paginate through older bookings.</p>
+
+  <h2>14. Approve &amp; Reject Bookings</h2>
+  <p>Some bookings require coordinator approval before a driver can be assigned. These appear in a highlighted section at the very top of the Bookings tab with an orange badge showing the count.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Review the booking card</div>
+        <div class="step-desc">Check the passenger name, pickup, destination, time, and trip type.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Tap Approve or Reject</div>
+        <div class="step-desc">Approving forwards the booking to driver assignment. Rejecting cancels the booking — you may optionally enter a reason.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Reassign Taxi (if needed)</div>
+        <div class="step-desc">Tap the "🔄 Reassign taxi" button on a confirmed booking to move it to a different available driver.</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>15. Calendar View (Gantt)</h2>
+  <p>Switch to the <strong>Calendar</strong> tab to see a visual timeline of all trips. The calendar has three view modes:</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-title">📅 Day View</div>
+      <div class="card-desc">Horizontal Gantt. Each row is a taxi. Each block is a booking. Scroll left/right through hours 07:00–19:00. The red "Now" line shows the current time.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🗓️ Week View</div>
+      <div class="card-desc">One column per day of the week. Each taxi row shows bookings as color-coded blocks. Useful for spotting busy days.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🗓️ Month View</div>
+      <div class="card-desc">Traditional monthly calendar with colored dots per booking. Tap a day to drill down into Day View.</div>
+    </div>
+    <div class="card" style="border-color:var(--gold-dark);">
+      <div class="card-title">✓ Completed Trips</div>
+      <div class="card-desc">Completed trips appear as muted gray blocks on the Gantt showing the actual finish time (Done HH:mm). Only visible on the coordinator calendar.</div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>User Manual v1.0</p>
+    <p>Page 9</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PAGE 10 — COORDINATOR (continued)                     -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner">
+    <div class="section-icon">🗺️</div>
+    <div>
+      <h1>Coordinator Guide — Fleet &amp; Locations</h1>
+      <p>Live fleet map, driver management, and saved locations</p>
+    </div>
+    <div class="role-badge">COORDINATOR</div>
+  </div>
+
+  <h2>16. Fleet Map View</h2>
+  <p>The <strong>Map</strong> tab on the coordinator home, and the dedicated <strong>Fleet Map</strong> page (accessible from the bottom navigation), both show a live overhead map of all company taxis.</p>
+
+  <div class="screen-box">
+    <div class="screen-title">🗺️ What you see on the Fleet Map</div>
+    <ul>
+      <li><strong>Driver markers</strong> — each taxi shown as a color-coded pin at their current GPS position.</li>
+      <li><strong>Route lines</strong> — for on-trip drivers, a road-following route line (in the taxi's color) runs from the driver to their current destination.</li>
+      <li><strong>Destination labels</strong> — a pill label shows the taxi name at the destination point so routes don't get confused.</li>
+      <li><strong>Stale GPS</strong> — drivers whose location has not updated in 10+ minutes appear at reduced opacity.</li>
+    </ul>
+  </div>
+
+  <h3>Fleet Map — Driver Board Panel</h3>
+  <p>A floating panel at the bottom of the map shows a scrollable list of all drivers:</p>
+  <ul>
+    <li>Color-coded border matching the taxi color</li>
+    <li><strong>● Online</strong> / <strong>○ Offline</strong> status (based on driver assignment and availability)</li>
+    <li>GPS active indicator (green satellite icon)</li>
+    <li>For on-trip drivers: pickup → destination route shown as a colored row</li>
+  </ul>
+  <p>The header pills show a live count: <strong>X online · Y offline · N GPS active</strong>.</p>
+
+  <h2>17. Driver Management</h2>
+  <p>Access the <strong>Drivers</strong> page from the bottom navigation to see all registered drivers and taxis.</p>
+  <ul>
+    <li>View each driver's name, assigned taxi, and current availability status.</li>
+    <li>See trips completed today and number of declines (a high decline count is highlighted in red as a warning).</li>
+    <li>Toggle a taxi's <strong>available/unavailable</strong> status directly from this screen.</li>
+  </ul>
+
+  <div class="info-box warn">
+    <div class="info-icon">⚠️</div>
+    <div class="info-content"><strong>Marking a taxi unavailable</strong>When you mark a taxi as unavailable, it will no longer receive new booking assignments. Use this when a vehicle is under maintenance or the driver is off duty.</div>
+  </div>
+
+  <h2>18. Saved Locations</h2>
+  <p>The <strong>Saved Locations</strong> feature lets coordinators register named places within the PT Vale site. These locations appear as selectable options when staff book a trip, preventing GPS geocoding errors inside the plant.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Open Saved Locations</div>
+        <div class="step-desc">Tap your avatar (top-right) → "Saved Locations" from the dropdown menu.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Add a new location</div>
+        <div class="step-desc">Tap the map to drop a pin, or search by address. Enter a descriptive name (e.g., "Warehouse Gate 3", "Kantor Pusat"). Save.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Manage existing locations</div>
+        <div class="step-desc">Tap any saved location pin to edit its name or delete it. Changes take effect immediately for all users.</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Coordinator Navigation</h2>
+  <table>
+    <thead><tr><th>Tab</th><th>Icon</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Home</strong></td><td>⊞</td><td>Dispatch dashboard — bookings, calendar, and map.</td></tr>
+      <tr><td><strong>Drivers</strong></td><td>👥</td><td>All drivers and taxis, status and stats.</td></tr>
+      <tr><td><strong>Map</strong></td><td>🗺️</td><td>Dedicated full-screen fleet map with driver board.</td></tr>
+      <tr><td><strong>Alerts</strong></td><td>🔔</td><td>Coordinator notifications (approvals, issues).</td></tr>
+      <tr><td><strong>Profile</strong></td><td>👤</td><td>Account info and sign out.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>User Manual v1.0</p>
+    <p>Page 10</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PAGE 11 — DISPATCH BOARD                              -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner" style="background:#1a1c1b;">
+    <div class="section-icon">🖥️</div>
+    <div>
+      <h1>Dispatch Board</h1>
+      <p>Full-screen real-time dashboard for control rooms and large displays</p>
+    </div>
+    <div class="role-badge">ALL ROLES</div>
+  </div>
+
+  <h2>19. Dispatch Board Overview</h2>
+  <p>The Dispatch Board is a dedicated full-screen view accessible at <code>/board</code>. It is designed for large monitors in control rooms or reception areas, providing a complete real-time overview of the entire fleet and schedule without needing to navigate between pages.</p>
+
+  <div class="card-grid">
+    <div class="card" style="border-color:#1a1c1b;">
+      <div class="card-icon">📊</div>
+      <div class="card-title">Stats Bar</div>
+      <div class="card-desc">Live counters at the top: Active Trips, Confirmed bookings, Pending approvals, Available taxis.</div>
+    </div>
+    <div class="card" style="border-color:#1a1c1b;">
+      <div class="card-icon">🚗</div>
+      <div class="card-title">Fleet Strip</div>
+      <div class="card-desc">A card for each taxi showing: current status (active trip destination, next booking time, or Free/Unavailable).</div>
+    </div>
+    <div class="card" style="border-color:#1a1c1b;">
+      <div class="card-icon">⏱️</div>
+      <div class="card-title">Live Clock</div>
+      <div class="card-desc">Large digital clock (HH:MM:SS) and full date displayed in the top-right corner, updated every second.</div>
+    </div>
+    <div class="card" style="border-color:#1a1c1b;">
+      <div class="card-icon">🔄</div>
+      <div class="card-title">Real-time Updates</div>
+      <div class="card-desc">All data refreshes automatically via live database subscriptions — no manual refresh needed.</div>
+    </div>
+  </div>
+
+  <h2>20. Calendar Views</h2>
+  <p>Four views are selectable from the tab bar at the top of the calendar section:</p>
+
+  <table>
+    <thead><tr><th>View</th><th>Best for</th><th>Key features</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Day</strong></td>
+        <td>Today's operational schedule</td>
+        <td>Horizontal Gantt per taxi, hours 07:00–20:00, red "Now" line, hover tooltip with booking details</td>
+      </tr>
+      <tr>
+        <td><strong>Week</strong></td>
+        <td>Weekly planning and load balancing</td>
+        <td>Vertical time axis, 7-day columns, booking blocks by taxi color</td>
+      </tr>
+      <tr>
+        <td><strong>Month</strong></td>
+        <td>Long-range visibility</td>
+        <td>Standard month calendar with booking dots, click a day to drill into Day view</td>
+      </tr>
+      <tr>
+        <td><strong>Map</strong></td>
+        <td>Fleet location overview</td>
+        <td>Live fleet map embedded in the board — all driver positions and on-trip routes</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Completed Trips on the Calendar</h3>
+  <p>Completed trips appear on the Day and Week Gantt views as <strong>muted gray blocks</strong> with a <strong>✓</strong> checkmark. The block spans from the scheduled start time to the <em>actual</em> completion time, and shows <strong>"Done HH:mm"</strong> — giving coordinators an accurate picture of how long each trip actually took.</p>
+
+  <div class="screen-box">
+    <div class="screen-title">🗺️ Hover Tooltip — Booking Details</div>
+    <p style="margin:0;font-size:11px;">In the Day and Week views, hovering over any booking block shows a popup with: passenger name, scheduled time, destination, trip type, taxi name, and current status.</p>
+  </div>
+
+  <h3>Legend</h3>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin:10px 0;">
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="display:inline-block;width:20px;height:2px;background:#EF4444;"></span> Now (current time)</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="display:inline-block;width:20px;height:10px;border:1.5px dashed #9ca3af;border-radius:2px;"></span> Pending booking</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="display:inline-block;width:20px;height:10px;border:1.5px solid #006064;border-radius:2px;background:rgba(0,96,100,0.15);"></span> Confirmed booking</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="display:inline-block;width:20px;height:10px;border:1.5px solid #CBD5E1;border-radius:2px;background:#F1F5F9;"></span> ✓ Completed trip</div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>User Manual v1.0</p>
+    <p>Page 11</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PAGE 12 — NOTIFICATIONS & AUTOMATION                  -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner" style="background:#4C1D95;">
+    <div class="section-icon">🔔</div>
+    <div>
+      <h1>Push Notifications &amp; Automation</h1>
+      <p>How the system keeps everyone informed automatically</p>
+    </div>
+  </div>
+
+  <h2>21. Push Notifications</h2>
+  <p>TaxiBook EPS sends push notifications to all roles — even when the app is closed — as long as the app is installed as a PWA and notifications are enabled.</p>
+
+  <div class="info-box note">
+    <div class="info-icon">ℹ️</div>
+    <div class="info-content"><strong>First-time setup</strong>When you first open TaxiBook EPS, you will be prompted to allow notifications. Tap <strong>Allow</strong>. If you accidentally tapped Block, go to your browser/device Settings → Site Permissions → Notifications → enable for the TaxiBook EPS URL.</div>
+  </div>
+
+  <h3>Full Notification Reference</h3>
+  <table>
+    <thead><tr><th>Event</th><th>Sent to</th><th>Message</th></tr></thead>
+    <tbody>
+      <tr><td>Booking submitted</td><td>Coordinator</td><td>New booking from [Staff name] needs attention.</td></tr>
+      <tr><td>Booking approved</td><td>Staff</td><td>Your booking has been approved.</td></tr>
+      <tr><td>Booking rejected</td><td>Staff</td><td>Your booking was rejected. [Reason if given]</td></tr>
+      <tr><td>Driver assigned</td><td>Driver</td><td>New trip assigned: [Passenger] → [Destination] at [Time].</td></tr>
+      <tr><td>Driver accepted</td><td>Staff</td><td>[Driver name] in [Taxi] has accepted your booking.</td></tr>
+      <tr><td>Driver declined</td><td>Staff, Coordinator</td><td>Driver declined the trip. Reassignment in progress.</td></tr>
+      <tr><td>15-min reminder</td><td>Staff, Driver</td><td>Your trip starts in 15 minutes.</td></tr>
+      <tr><td>Start reminder</td><td>Driver</td><td>Time to start your trip to [Destination].</td></tr>
+      <tr><td>Overdue alert</td><td>Driver, Coordinator</td><td>Trip [ID] is overdue and has not been started.</td></tr>
+      <tr><td>Trip completed</td><td>Staff</td><td>Your trip has been completed. Thank you.</td></tr>
+      <tr><td>Auto-completed</td><td>Staff, Coordinator</td><td>Trip auto-completed by system after scheduled end time.</td></tr>
+      <tr><td>Taxi reassigned</td><td>Staff, Driver</td><td>Your booking has been reassigned to a different taxi.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>22. Auto-Complete &amp; Reminders</h2>
+  <p>The system runs automated jobs to handle trips and reminders without manual intervention:</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-title">⏰ Auto-Complete</div>
+      <div class="card-desc">If a driver forgets to mark a trip as completed, the system automatically closes it after the expected end time has passed. A notification is sent to both parties.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🔔 15-Minute Reminder</div>
+      <div class="card-desc">Sent to both staff and driver 15 minutes before the scheduled departure time, so everyone is prepared.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🚨 Start Reminder</div>
+      <div class="card-desc">Sent to the driver at exactly the scheduled departure time if the trip has not yet been started.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">⚠️ Overdue Alert</div>
+      <div class="card-desc">If a trip is significantly past its start time and still not started, the coordinator is alerted so they can intervene.</div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-icon">💡</div>
+    <div class="info-content"><strong>Coordinator: Run Cron Manually</strong>From the coordinator home, the overflow menu includes a "Run Cron" option to trigger the automation cycle immediately — useful for testing or forcing reminders outside the normal schedule.</div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>User Manual v1.0</p>
+    <p>Page 12</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- PAGE 13 — GLOSSARY                                    -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner">
+    <div class="section-icon">📖</div>
+    <div>
+      <h1>Glossary</h1>
+      <p>Key terms used throughout TaxiBook EPS</p>
+    </div>
+  </div>
+
+  <h2>23. Terms &amp; Definitions</h2>
+
+  <table>
+    <thead><tr><th>Term</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Booking</strong></td><td>A single taxi trip request created by a staff member, containing pickup, destination, date/time, and trip type.</td></tr>
+      <tr><td><strong>Booking Code</strong></td><td>A unique identifier assigned to each booking for tracking and reference purposes.</td></tr>
+      <tr><td><strong>DROP</strong></td><td>A one-way trip type where the driver drops the passenger and immediately ends the booking.</td></tr>
+      <tr><td><strong>WAITING</strong></td><td>A trip type where the driver waits at the destination for the passenger before returning. Duration is specified in minutes.</td></tr>
+      <tr><td><strong>EPS</strong></td><td>Employee Passenger Services — the internal fleet management program at PT Vale Indonesia.</td></tr>
+      <tr><td><strong>Fleet Map</strong></td><td>A live map showing the GPS positions of all company taxis and their current routes.</td></tr>
+      <tr><td><strong>Gantt Calendar</strong></td><td>A visual timeline view where each row is a taxi and each block is a booking, arranged along a time axis.</td></tr>
+      <tr><td><strong>GPS Active</strong></td><td>A driver whose location has been updated within the last 10 minutes. Shown with a green satellite icon on the fleet map.</td></tr>
+      <tr><td><strong>GPS Stale</strong></td><td>A driver whose location has not updated for more than 10 minutes — the last known position is shown at reduced opacity.</td></tr>
+      <tr><td><strong>OpenRouteService</strong></td><td>The mapping API used to calculate road-following routes between two GPS coordinates. Routes follow actual roads, not straight lines.</td></tr>
+      <tr><td><strong>PWA</strong></td><td>Progressive Web App — a web application installable on a mobile device like a native app, without going through an app store.</td></tr>
+      <tr><td><strong>Push Notification</strong></td><td>An alert delivered to your device even when the TaxiBook EPS app is not open, powered by the browser's push service.</td></tr>
+      <tr><td><strong>Reassign</strong></td><td>Moving an existing booking from one taxi/driver to another. Only coordinators can reassign trips.</td></tr>
+      <tr><td><strong>Saved Locations</strong></td><td>Named GPS coordinates registered by the coordinator for common PT Vale site locations, selectable during booking to avoid geocoding errors.</td></tr>
+      <tr><td><strong>Wake Lock</strong></td><td>A browser feature that prevents the device screen from turning off during an active trip, ensuring continuous GPS tracking.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="divider"></div>
+
+  <div style="background:var(--teal-dark);color:#fff;border-radius:12px;padding:20px 22px;display:flex;gap:18px;align-items:center;">
+    <svg width="48" height="48" viewBox="0 0 54 54" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;">
+      <rect width="54" height="54" rx="10" fill="rgba(255,255,255,0.12)"/>
+      <polygon points="6,10 12,10 27,44 42,10 48,10 27,47" fill="white" opacity="0.95"/>
+      <polygon points="42,10 48,10 41,22 37,22" fill="#ECB833"/>
+    </svg>
+    <div>
+      <p style="font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;">TaxiBook EPS — PT Vale Indonesia</p>
+      <p style="font-size:11px;color:rgba(255,255,255,0.6);margin:0;">For support or to report an issue, contact your PT Vale system administrator. This document is for internal use only.</p>
+      <p style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:8px;">Version 1.0 &nbsp;·&nbsp; May 2026 &nbsp;·&nbsp; Confidential</p>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>User Manual v1.0</p>
+    <p>Page 13</p>
+  </div>
+</div>
+
+</body>
+</html>
