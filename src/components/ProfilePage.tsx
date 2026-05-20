@@ -33,17 +33,66 @@ export default function ProfilePage({ role }: Props) {
   const [notifPerm,      setNotifPerm]      = useState<NotificationPermission | 'unsupported'>('default')
   const [enablingNotif,  setEnablingNotif]  = useState(false)
   const [isPWA,          setIsPWA]          = useState(false)
+  const [subStatus,      setSubStatus]      = useState<'idle' | 'checking' | 'registered' | 'failed'>('idle')
+
+  // Shared helper — subscribe browser to push and save endpoint to DB.
+  // Returns null on success, or an error string on failure.
+  async function subscribeAndSave(): Promise<string | null> {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window))
+        return 'Push not supported on this browser'
+
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      if (!vapidKey) return 'VAPID key not configured'
+
+      // serviceWorker.ready hangs forever if no SW is registered (e.g. dev mode).
+      const reg: ServiceWorkerRegistration = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Service worker not ready — reload the app and try again')), 8000)
+        ),
+      ])
+
+      let sub = await reg.pushManager.getSubscription()
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly:      true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as BufferSource,
+        })
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return 'Session expired — please log in again'
+
+      const res = await fetch('/api/push/subscribe', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body:    JSON.stringify({ subscription: sub }),
+      })
+
+      if (res.ok) return null
+      const d = await res.json()
+      return d.error || 'Server error saving subscription'
+    } catch (err: any) {
+      return err.message || 'Unknown error'
+    }
+  }
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsPWA(
-        window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone === true
-      )
-      if ('Notification' in window) setNotifPerm(Notification.permission)
-      else setNotifPerm('unsupported')
+    if (typeof window === 'undefined') return
+    setIsPWA(
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true
+    )
+    if (!('Notification' in window)) { setNotifPerm('unsupported'); return }
+    const perm = Notification.permission
+    setNotifPerm(perm)
+    // If already granted, register this device automatically on load
+    if (perm === 'granted') {
+      setSubStatus('checking')
+      subscribeAndSave().then(err => setSubStatus(err ? 'failed' : 'registered'))
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     async function init() {
@@ -105,31 +154,12 @@ export default function ProfilePage({ role }: Props) {
     setTestingPush(true)
     setPushResult(null)
     try {
+      // Ensure subscription is saved before sending test
+      const subErr = await subscribeAndSave()
+      if (subErr) { setPushResult('❌ ' + subErr); setTestingPush(false); return }
+
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { setPushResult('❌ Not logged in'); setTestingPush(false); return }
-
-      // First ensure subscribed
-      if ('serviceWorker' in navigator && 'PushManager' in window) {
-        const reg = await navigator.serviceWorker.ready
-        let sub = await reg.pushManager.getSubscription()
-        if (!sub) {
-          const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-          if (vapidKey) {
-            const perm = await Notification.requestPermission()
-            if (perm === 'granted') {
-              sub = await reg.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
-              })
-              await fetch('/api/push/subscribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                body: JSON.stringify({ subscription: sub }),
-              })
-            }
-          }
-        }
-      }
 
       const res  = await fetch('/api/push/test', {
         method:  'POST',
@@ -150,62 +180,25 @@ export default function ProfilePage({ role }: Props) {
   async function enableNotifications() {
     setEnablingNotif(true)
     setPushResult(null)
-    try {
-      const permission = await Notification.requestPermission()
-      setNotifPerm(permission)
 
-      if (permission !== 'granted') {
-        if (permission === 'denied')
-          setPushResult('❌ Blocked. Enable notifications in your browser/phone settings, then reload.')
-        setEnablingNotif(false)
-        return
-      }
+    const permission = await Notification.requestPermission()
+    setNotifPerm(permission)
 
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        setPushResult('❌ Push not supported on this browser.')
-        setEnablingNotif(false)
-        return
-      }
+    if (permission !== 'granted') {
+      if (permission === 'denied')
+        setPushResult('❌ Blocked. Go to phone/browser settings and allow notifications, then reload.')
+      setEnablingNotif(false)
+      return
+    }
 
-      // navigator.serviceWorker.ready hangs forever when no SW is registered
-      // (dev mode has PWA disabled). Race with a 6s timeout so it fails fast.
-      const reg = await Promise.race([
-        navigator.serviceWorker.ready,
-        new Promise<null>((_, reject) =>
-          setTimeout(() => reject(new Error('Service worker not ready — try reloading the app')), 6000)
-        ),
-      ]) as ServiceWorkerRegistration
-
-      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-      if (!vapidKey) { setPushResult('❌ Push not configured.'); setEnablingNotif(false); return }
-
-      let sub = await reg.pushManager.getSubscription()
-      if (!sub) {
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly:      true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as BufferSource,
-        })
-      }
-
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { setPushResult('❌ Session expired — please log in again.'); setEnablingNotif(false); return }
-
-      const res = await fetch('/api/push/subscribe', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body:    JSON.stringify({ subscription: sub }),
-      })
-
-      if (res.ok) {
-        setPushResult('✅ Notifications enabled! You\'ll receive trip alerts on this device.')
-      } else {
-        const d = await res.json()
-        setPushResult(`❌ Failed to save subscription: ${d.error || 'unknown error'}`)
-      }
-
-    } catch (err: any) {
-      console.error('[Push] Enable error:', err)
-      setPushResult('❌ ' + (err.message || 'Something went wrong'))
+    setSubStatus('checking')
+    const err = await subscribeAndSave()
+    if (err) {
+      setSubStatus('failed')
+      setPushResult('❌ ' + err)
+    } else {
+      setSubStatus('registered')
+      setPushResult('✅ Notifications enabled! This device is now registered.')
     }
     setEnablingNotif(false)
   }
@@ -364,14 +357,36 @@ export default function ProfilePage({ role }: Props) {
               {/* Granted */}
               {notifPerm === 'granted' && (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '8px 12px', background: '#D8F3DC', borderRadius: 10 }}>
-                    <span style={{ fontSize: 15 }}>✅</span>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: '#2D6A4F', margin: 0 }}>Notifications enabled</p>
-                  </div>
+                  {/* Device registration status */}
+                  {subStatus === 'checking' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '8px 12px', background: '#F3F4F6', borderRadius: 10 }}>
+                      <span style={{ fontSize: 13, color: '#6b7280' }}>Registering device…</span>
+                    </div>
+                  )}
+                  {subStatus === 'registered' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '8px 12px', background: '#D8F3DC', borderRadius: 10 }}>
+                      <span style={{ fontSize: 15 }}>✅</span>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: '#2D6A4F', margin: 0 }}>Device registered — notifications active</p>
+                    </div>
+                  )}
+                  {subStatus === 'failed' && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 12px', background: '#FEE2E2', borderRadius: 10 }}>
+                        <span style={{ fontSize: 15 }}>⚠️</span>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: '#991B1B', margin: 0 }}>Device not registered</p>
+                      </div>
+                      <button
+                        onClick={async () => { setSubStatus('checking'); const e = await subscribeAndSave(); setSubStatus(e ? 'failed' : 'registered'); if (e) setPushResult('❌ ' + e) }}
+                        style={{ width: '100%', padding: '9px', background: '#006064', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, marginBottom: 8 }}
+                      >
+                        Retry registration
+                      </button>
+                    </div>
+                  )}
                   <button
                     onClick={testPush}
-                    disabled={testingPush}
-                    style={{ width: '100%', padding: '10px', background: testingPush ? 'rgba(0,0,0,0.08)' : '#006064', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, marginBottom: pushResult ? 10 : 0 }}
+                    disabled={testingPush || subStatus === 'checking'}
+                    style={{ width: '100%', padding: '10px', background: (testingPush || subStatus === 'checking') ? 'rgba(0,0,0,0.08)' : '#006064', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, marginBottom: pushResult ? 10 : 0 }}
                   >
                     {testingPush ? 'Sending…' : 'Send test notification'}
                   </button>
