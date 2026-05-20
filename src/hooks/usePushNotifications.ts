@@ -19,21 +19,23 @@ export function usePushNotifications() {
         const permission = await Notification.requestPermission()
         if (permission !== 'granted') return
 
-        // Wait for next-pwa's sw.js to be ready (it has the push handler)
-        const reg = await navigator.serviceWorker.ready
+        const reg = await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Service worker not ready')), 8000)
+          ),
+        ])
         console.log('[Push] SW ready:', reg.scope)
 
-        // Get or create push subscription using the active sw.js
-        let sub = await reg.pushManager.getSubscription()
-        if (!sub) {
-          sub = await reg.pushManager.subscribe({
-            userVisibleOnly:      true,
-            applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as BufferSource,
-          })
-          console.log('[Push] New subscription:', sub.endpoint.slice(0, 60))
-        } else {
-          console.log('[Push] Existing subscription:', sub.endpoint.slice(0, 60))
-        }
+        // Always unsubscribe the stale sub first so we get a fresh, valid endpoint
+        const existing = await reg.pushManager.getSubscription()
+        if (existing) await existing.unsubscribe()
+
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly:      true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as BufferSource,
+        })
+        console.log('[Push] Subscribed:', sub.endpoint.slice(0, 60))
 
         // Save to DB
         const { data: { session } } = await supabase.auth.getSession()

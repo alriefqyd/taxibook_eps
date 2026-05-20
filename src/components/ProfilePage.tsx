@@ -53,13 +53,13 @@ export default function ProfilePage({ role }: Props) {
         ),
       ])
 
-      let sub = await reg.pushManager.getSubscription()
-      if (!sub) {
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly:      true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as BufferSource,
-        })
-      }
+      const existing = await reg.pushManager.getSubscription()
+      if (existing) await existing.unsubscribe()
+
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly:      true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as BufferSource,
+      })
 
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return 'Session expired — please log in again'
@@ -90,7 +90,14 @@ export default function ProfilePage({ role }: Props) {
     // If already granted, register this device automatically on load
     if (perm === 'granted') {
       setSubStatus('checking')
-      subscribeAndSave().then(err => setSubStatus(err ? 'failed' : 'registered'))
+      subscribeAndSave().then(err => {
+        if (err) {
+          setSubStatus('failed')
+          setPushResult('❌ ' + err)
+        } else {
+          setSubStatus('registered')
+        }
+      })
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -371,12 +378,17 @@ export default function ProfilePage({ role }: Props) {
                   )}
                   {subStatus === 'failed' && (
                     <div style={{ marginBottom: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 12px', background: '#FEE2E2', borderRadius: 10 }}>
-                        <span style={{ fontSize: 15 }}>⚠️</span>
-                        <p style={{ fontSize: 13, fontWeight: 600, color: '#991B1B', margin: 0 }}>Device not registered</p>
+                      <div style={{ marginBottom: 8, padding: '8px 12px', background: '#FEE2E2', borderRadius: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: pushResult ? 4 : 0 }}>
+                          <span style={{ fontSize: 15 }}>⚠️</span>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: '#991B1B', margin: 0 }}>Device not registered</p>
+                        </div>
+                        {pushResult && (
+                          <p style={{ fontSize: 11, color: '#991B1B', margin: '0 0 0 23px', lineHeight: 1.4 }}>{pushResult.replace('❌ ', '')}</p>
+                        )}
                       </div>
                       <button
-                        onClick={async () => { setSubStatus('checking'); const e = await subscribeAndSave(); setSubStatus(e ? 'failed' : 'registered'); if (e) setPushResult('❌ ' + e) }}
+                        onClick={async () => { setPushResult(null); setSubStatus('checking'); const e = await subscribeAndSave(); setSubStatus(e ? 'failed' : 'registered'); if (e) setPushResult('❌ ' + e) }}
                         style={{ width: '100%', padding: '9px', background: '#006064', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, marginBottom: 8 }}
                       >
                         Retry registration
