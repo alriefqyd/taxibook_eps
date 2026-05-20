@@ -40,8 +40,13 @@ export default function StaffHomePage() {
   const [view,         setView]         = useState<ViewMode>('day')
   const [cursor,       setCursor]       = useState(new Date())
   const [selectedBk,   setSelectedBk]   = useState<any | null>(null)
+  const [refreshing,   setRefreshing]   = useState(false)
+  const [pullY,        setPullY]        = useState(0)
   const dayScrollRef  = useRef<HTMLDivElement>(null)
   const weekScrollRef = useRef<HTMLDivElement>(null)
+  const touchStartY   = useRef(0)
+  const atTopRef      = useRef(false)
+  const PULL_THRESHOLD = 60
 
   async function loadData(userId: string) {
     const [{ data: bks }, { data: txs }] = await Promise.all([
@@ -79,6 +84,29 @@ export default function StaffHomePage() {
       ...t,
       driver_name: t.users?.name || 'No driver',
     })))
+  }
+
+  async function refresh() {
+    if (!user?.id || refreshing) return
+    setRefreshing(true)
+    await loadData(user.id)
+    setRefreshing(false)
+  }
+
+  function onTouchStart(e: React.TouchEvent) {
+    atTopRef.current = window.scrollY === 0
+    touchStartY.current = e.touches[0].clientY
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    if (!atTopRef.current) return
+    const dist = e.touches[0].clientY - touchStartY.current
+    setPullY(dist > 0 ? Math.min(dist * 0.45, PULL_THRESHOLD) : 0)
+  }
+
+  function onTouchEnd() {
+    if (pullY >= PULL_THRESHOLD) refresh()
+    setPullY(0)
   }
 
   useEffect(() => {
@@ -156,7 +184,23 @@ export default function StaffHomePage() {
   }
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif", minHeight:'100vh', background:'#F5F5F2' }}>
+    <div
+      style={{ fontFamily: "'Inter', sans-serif", minHeight:'100vh', background:'#F5F5F2' }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+
+      {/* Pull-to-refresh indicator */}
+      {pullY > 0 && (
+        <div style={{ height: pullY, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#E0F2F1', overflow: 'hidden' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#006064', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-block', transform: pullY >= PULL_THRESHOLD ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>↓</span>
+            {pullY >= PULL_THRESHOLD ? 'Release to refresh' : 'Pull to refresh'}
+          </span>
+        </div>
+      )}
 
       {/* ── TopAppBar ── */}
       <header style={{
@@ -176,6 +220,18 @@ export default function StaffHomePage() {
             </div>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+            <button
+              onClick={refresh}
+              disabled={refreshing}
+              title="Refresh"
+              style={{ width:40, height:40, borderRadius:'50%', background:'none', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', padding:0, color:'#006064' }}
+            >
+              <span style={{ display:'flex', animation: refreshing ? 'spin 0.7s linear infinite' : 'none' }}>
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+              </span>
+            </button>
             <Link href="/staff/notifications" style={{ textDecoration:'none', width:40, height:40, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></Link>
             <div style={{ position: 'relative' }}>
               <div onClick={() => setMenuOpen(o => !o)} style={{ width: 36, height: 36, borderRadius: '50%', background: '#006064', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: '2px solid rgba(0,96,100,0.3)' }}>

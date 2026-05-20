@@ -116,10 +116,6 @@ export async function GET(request: NextRequest) {
       }
 
       await notify(notifs)
-      for (const notif of notifs) {
-        const url = notif.type?.includes('driver') ? '/driver/home' : '/staff/home'
-        await sendPushToUser(notif.user_id, notif.title, notif.body, url)
-      }
       results.reminded_start++
     }
 

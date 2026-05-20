@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TaxiBook EPS — UAT Checklist</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --teal:       #006064;
+    --teal-dark:  #004047;
+    --teal-light: #E0F2F1;
+    --gold:       #ECB833;
+    --gold-dark:  #B8860B;
+    --gray:       #6B7280;
+    --gray-light: #F5F5F2;
+    --border:     rgba(0,0,0,0.08);
+    --font:       'Segoe UI', 'Inter', Arial, sans-serif;
+    --red:        #DC2626;
+    --green:      #059669;
+    --amber:      #D97706;
+  }
+
+  html { font-size: 13px; }
+  body { font-family: var(--font); color: #1a1c1b; background: #fff; line-height: 1.6; }
+
+  /* ── Page ── */
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto 8mm;
+    padding: 18mm 18mm 16mm;
+    background: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+
+  @media print {
+    html, body { background: #fff; }
+    .page {
+      margin: 0; padding: 15mm 16mm 14mm;
+      page-break-after: always; box-shadow: none !important;
+    }
+    .page:last-child { page-break-after: avoid; }
+    @page { size: A4; margin: 0; }
+    .no-print { display: none !important; }
+  }
+
+  @media screen {
+    body { background: #e8e8e8; padding: 12px 0; }
+    .page { box-shadow: 0 4px 24px rgba(0,0,0,0.14); border-radius: 4px; }
+  }
+
+  /* ── Cover ── */
+  .cover-bar {
+    background: linear-gradient(135deg, var(--teal-dark) 0%, var(--teal) 60%, #00838f 100%);
+    margin: -18mm -18mm 0;
+    padding: 22mm 18mm 18mm;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover-bar::after {
+    content: '';
+    position: absolute; bottom: -30px; right: -30px;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+  }
+  .cover-bar .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px; padding: 4px 12px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: rgba(255,255,255,0.85);
+    margin-bottom: 14px;
+  }
+  .cover-bar h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.15; margin-bottom: 6px; }
+  .cover-bar .sub { font-size: 13px; color: rgba(255,255,255,0.7); margin-bottom: 20px; }
+  .cover-meta {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    border-top: 1px solid rgba(255,255,255,0.15);
+    padding-top: 14px; margin-top: 14px;
+  }
+  .cover-meta span { font-size: 11px; color: rgba(255,255,255,0.65); }
+  .cover-meta strong { color: #fff; }
+
+  /* ── Section headers ── */
+  .session-header {
+    display: flex; align-items: center; gap: 10px;
+    margin: 20px 0 10px;
+  }
+  .session-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--teal); color: #fff;
+    font-size: 12px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .session-title { font-size: 14px; font-weight: 800; color: var(--teal-dark); letter-spacing: -0.2px; }
+  .session-tag {
+    margin-left: auto; font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; padding: 2px 8px; border-radius: 10px;
+    flex-shrink: 0;
+  }
+  .tag-setup   { background: #E0F2F1; color: var(--teal); }
+  .tag-staff   { background: #DBEAFE; color: #1E40AF; }
+  .tag-coord   { background: #FEF3C7; color: var(--amber); }
+  .tag-driver  { background: #D1FAE5; color: #065F46; }
+  .tag-cron    { background: #EDE9FE; color: #5B21B6; }
+  .tag-edge    { background: #FEE2E2; color: var(--red); }
+  .tag-ios     { background: #F3F4F6; color: #374151; }
+  .tag-all     { background: #F0FDF4; color: var(--green); }
+
+  /* ── Checklist items ── */
+  .checklist { list-style: none; padding: 0; margin: 0 0 4px; }
+  .checklist li {
+    display: flex; align-items: flex-start; gap: 9px;
+    padding: 5px 8px; border-radius: 6px;
+    font-size: 11.5px; line-height: 1.45; color: #374151;
+    transition: background 0.1s;
+  }
+  .checklist li:hover { background: var(--gray-light); }
+  .checklist li input[type="checkbox"] {
+    margin-top: 2px; width: 13px; height: 13px;
+    accent-color: var(--teal); flex-shrink: 0; cursor: pointer;
+  }
+  @media print {
+    .checklist li input[type="checkbox"] {
+      -webkit-appearance: none; appearance: none;
+      width: 11px; height: 11px;
+      border: 1.5px solid #9ca3af; border-radius: 2px;
+      background: #fff; display: inline-block; margin-top: 2px;
+    }
+  }
+  .checklist li .item-text { flex: 1; }
+  .checklist li .item-text strong { color: #1a1c1b; font-weight: 700; }
+  .checklist li .item-text .note {
+    display: block; font-size: 10px; color: var(--gray); margin-top: 1px;
+  }
+  .checklist li.critical .item-text { font-weight: 600; }
+  .checklist li.critical { border-left: 2px solid var(--red); padding-left: 6px; }
+
+  /* ── Priority legend ── */
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    background: var(--gray-light); border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 18px;
+    font-size: 10px; color: var(--gray);
+  }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Info boxes ── */
+  .info-box {
+    border-radius: 8px; padding: 10px 13px; margin: 10px 0 14px;
+    font-size: 11px; line-height: 1.5;
+  }
+  .info-box.amber { background: #FFFBEB; border-left: 3px solid var(--amber); color: #78350F; }
+  .info-box.teal  { background: var(--teal-light); border-left: 3px solid var(--teal); color: var(--teal-dark); }
+  .info-box.red   { background: #FEF2F2; border-left: 3px solid var(--red); color: #7F1D1D; }
+  .info-box strong { font-weight: 700; }
+
+  /* ── Result table ── */
+  .result-table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 11px; }
+  .result-table th {
+    text-align: left; padding: 6px 10px;
+    background: var(--teal); color: #fff; font-weight: 700; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .result-table th:first-child { border-radius: 6px 0 0 0; }
+  .result-table th:last-child  { border-radius: 0 6px 0 0; }
+  .result-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .result-table tr:last-child td { border-bottom: none; }
+  .result-table tr:nth-child(even) td { background: var(--gray-light); }
+  .result-table .status-cell { width: 80px; }
+  .status-pass  { display: inline-block; background: #D1FAE5; color: #065F46; font-weight: 700; font-size: 9px; padding: 2px 7px; border-radius: 10px; text-transform: uppercase; }
+  .status-fail  { display: inline-block; background: #FEE2E2; color: var(--red);  font-weight: 700; font-size: 9px; padding: 2px 7px; border-radius: 10px; text-transform: uppercase; }
+  .status-blank { display: inline-block; background: #F3F4F6; color: #9CA3AF;    font-weight: 700; font-size: 9px; padding: 2px 7px; border-radius: 10px; text-transform: uppercase; }
+
+  /* ── Divider ── */
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  /* ── Footer ── */
+  .page-footer {
+    position: absolute; bottom: 12mm; left: 18mm; right: 18mm;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 9px; color: #9CA3AF;
+    border-top: 1px solid var(--border); padding-top: 6px;
+  }
+
+  /* ── Print button ── */
+  .print-btn {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--teal); color: #fff;
+    border: none; border-radius: 12px; padding: 12px 22px;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,96,100,0.35);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .print-btn:hover { background: var(--teal-dark); }
+
+  /* ── Columns ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* ── Device tags ── */
+  .device {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    padding: 1px 6px; border-radius: 8px; letter-spacing: 0.05em;
+    white-space: nowrap; flex-shrink: 0; margin-top: 2px;
+  }
+  .dev-staff  { background: #DBEAFE; color: #1E40AF; }
+  .dev-driver { background: #D1FAE5; color: #065F46; }
+  .dev-coord  { background: #FEF3C7; color: var(--amber); }
+  .dev-all    { background: #F3F4F6; color: #374151; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     COVER PAGE
+     ══════════════════════════════════════════════ -->
+<div class="page">
+  <div class="cover-bar">
+    <div class="badge">User Acceptance Testing</div>
+    <h1>TaxiBook EPS<br/>UAT Checklist</h1>
+    <p class="sub">Real-device testing guide for v1.0 — PT Vale Indonesia</p>
+    <div class="cover-meta">
+      <span><strong>Version</strong> 1.0</span>
+      <span><strong>Date</strong> May 2026</span>
+      <span><strong>Roles</strong> Staff · Driver · Coordinator</span>
+      <span><strong>Sessions</strong> 10</span>
+    </div>
+  </div>
+
+  <div style="margin-top:22px;">
+    <h2 style="font-size:13px;font-weight:800;color:var(--teal-dark);margin-bottom:12px;">What you need before starting</h2>
+    <div class="two-col" style="margin-bottom:14px;">
+      <div class="info-box teal">
+        <strong>3 Devices or browser tabs</strong><br/>
+        One per role: Staff, Driver, Coordinator. Real devices recommended for push notification testing.
+      </div>
+      <div class="info-box teal">
+        <strong>3 Test accounts</strong><br/>
+        One account per role already created in Supabase. At least 1 taxi active and assigned to the driver.
+      </div>
+      <div class="info-box amber">
+        <strong>Verify cron-job.org</strong><br/>
+        Confirm the job sends <code style="background:rgba(0,0,0,0.07);padding:1px 4px;border-radius:3px;">Authorization: Bearer &lt;CRON_SECRET&gt;</code> header — otherwise auto-complete silently fails.
+      </div>
+      <div class="info-box amber">
+        <strong>App deployed on Vercel</strong><br/>
+        Test against the production URL, not localhost — push notifications and PWA install require HTTPS.
+      </div>
+    </div>
+
+    <h2 style="font-size:13px;font-weight:800;color:var(--teal-dark);margin-bottom:10px;">Sessions overview</h2>
+    <table class="result-table">
+      <thead>
+        <tr><th>#</th><th>Session</th><th>Roles involved</th><th>Priority</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>Pre-test Setup & Cron Verification</td><td>Admin</td><td><span class="status-fail">Critical</span></td></tr>
+        <tr><td>2</td><td>PWA Installation</td><td>All</td><td><span class="status-fail">Critical</span></td></tr>
+        <tr><td>3</td><td>Staff Books a Trip</td><td>Staff + Coordinator</td><td><span class="status-fail">Critical</span></td></tr>
+        <tr><td>4</td><td>Coordinator Approves / Rejects</td><td>Coordinator + Staff</td><td><span class="status-fail">Critical</span></td></tr>
+        <tr><td>5</td><td>Driver Accepts / Declines</td><td>Driver + Coordinator</td><td><span class="status-fail">Critical</span></td></tr>
+        <tr><td>6</td><td>Running the Trip (GPS + Map)</td><td>Driver + Coordinator + Staff</td><td><span class="status-fail">Critical</span></td></tr>
+        <tr><td>7</td><td>Cron Auto-Complete & Reminders</td><td>All + cron-job.org</td><td><span class="status-pass">High</span></td></tr>
+        <tr><td>8</td><td>Coordinator Tools</td><td>Coordinator</td><td><span class="status-pass">High</span></td></tr>
+        <tr><td>9</td><td>Notifications Deep Check</td><td>All</td><td><span class="status-pass">High</span></td></tr>
+        <tr><td>10</td><td>Edge Cases & Error Handling</td><td>All</td><td><span class="status-blank">Normal</span></td></tr>
+      </tbody>
+    </table>
+
+    <div class="legend">
+      <span><span class="dot" style="background:var(--red)"></span> Critical — must pass before any real users</span>
+      <span><span class="dot" style="background:var(--green)"></span> High — test in first session</span>
+      <span><span class="dot" style="background:#9CA3AF"></span> Normal — test when time allows</span>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>TaxiBook EPS — UAT Checklist v1.0</span>
+    <span>PT Vale Indonesia · EPS Department</span>
+    <span>Page 1</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PAGE 2 — Sessions 1–3
+     ══════════════════════════════════════════════ -->
+<div class="page">
+
+  <!-- SESSION 1 -->
+  <div class="session-header">
+    <div class="session-num">1</div>
+    <div class="session-title">Pre-Test Setup & Cron Verification</div>
+    <span class="session-tag tag-setup">Setup</span>
+  </div>
+  <div class="info-box red">
+    <strong>Do this before anything else.</strong> If the cron secret is wrong, auto-complete and reminders will silently fail for all real users.
+  </div>
+  <ul class="checklist">
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>CRON_SECRET set in Vercel</strong>
+        <span class="note">Vercel → Project → Settings → Environment Variables → confirm CRON_SECRET exists</span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>cron-job.org sends Authorization header</strong>
+        <span class="note">Job → Advanced → Request Headers: <code style="background:rgba(0,0,0,0.07);padding:1px 3px;border-radius:2px;">Authorization: Bearer &lt;same value&gt;</code></span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Manually call the cron endpoint and get 200</strong>
+        <span class="note">GET https://your-app.vercel.app/api/cron/auto-complete — with Authorization header — response: <code>{"success":true,...}</code></span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">At least 1 active taxi assigned to driver test account in Supabase</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">All 3 role accounts can log in successfully</div>
+    </li>
+  </ul>
+
+  <div class="divider"></div>
+
+  <!-- SESSION 2 -->
+  <div class="session-header">
+    <div class="session-num">2</div>
+    <div class="session-title">PWA Installation</div>
+    <span class="session-tag tag-all">All roles</span>
+  </div>
+  <ul class="checklist">
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Android — Add to Home Screen</strong>
+        <span class="note">Chrome → ⋮ menu → "Add to Home Screen" → icon shows Vale logo, name shows "TaxiBook EPS"</span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>iOS — Add to Home Screen</strong>
+        <span class="note">Safari → Share → "Add to Home Screen" → icon shows Vale logo, name shows "TaxiBook EPS"</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Opening from home screen icon launches full-screen (no browser address bar)</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Notification permission prompt appears on first open — user taps Allow</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>iOS only:</strong> Notification permission requested after add-to-home-screen (not just browser)</div>
+    </li>
+  </ul>
+
+  <div class="divider"></div>
+
+  <!-- SESSION 3 -->
+  <div class="session-header">
+    <div class="session-num">3</div>
+    <div class="session-title">Staff Books a Trip</div>
+    <span class="session-tag tag-staff">Staff</span>
+  </div>
+  <div class="info-box teal">
+    Have the <strong>Coordinator device open</strong> on the home page — you'll verify real-time updates appear without refreshing.
+  </div>
+  <ul class="checklist">
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Login as Staff</strong> → lands on home page, shows booking list (empty is OK)
+        <span class="device dev-staff">Staff device</span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Tap Book a Trip</strong> → booking form opens
+        <span class="device dev-staff">Staff device</span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text">Fill in pickup, destination, date/time, passenger count — tap Submit
+        <span class="device dev-staff">Staff device</span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text">Booking appears on Staff home with status <strong>Submitted</strong>
+        <span class="device dev-staff">Staff device</span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Coordinator sees new booking in "Needs Approval" in real time</strong> — no refresh needed
+        <span class="device dev-coord">Coordinator device</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Try booking with <strong>Saved Location</strong> as pickup or destination (if locations are configured)
+        <span class="device dev-staff">Staff device</span>
+      </div>
+    </li>
+  </ul>
+
+  <div class="page-footer">
+    <span>TaxiBook EPS — UAT Checklist v1.0</span>
+    <span>Sessions 1–3</span>
+    <span>Page 2</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PAGE 3 — Sessions 4–6
+     ══════════════════════════════════════════════ -->
+<div class="page">
+
+  <!-- SESSION 4 -->
+  <div class="session-header">
+    <div class="session-num">4</div>
+    <div class="session-title">Coordinator Approves / Rejects</div>
+    <span class="session-tag tag-coord">Coordinator</span>
+  </div>
+  <ul class="checklist">
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Tap Approve</strong> on the pending booking — status changes to <strong>Booked</strong>
+        <span class="device dev-coord">Coordinator device</span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Staff receives push notification</strong> "Booking confirmed" — while app is in background
+        <span class="device dev-staff">Staff device</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Booking appears in <strong>Calendar tab</strong> at correct time slot with taxi color
+        <span class="device dev-coord">Coordinator device</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Booking appears in <strong>Dispatch Board</strong> Day view at correct hour
+        <span class="note">Avatar menu → Dispatch Board (opens new tab)</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Reject a different booking</strong> — enter a reason — confirm staff receives rejection push
+        <span class="device dev-coord">Coordinator device</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Rejected booking disappears from Coordinator list, shows "Rejected" on Staff home
+        <span class="device dev-staff">Staff device</span>
+      </div>
+    </li>
+  </ul>
+
+  <div class="divider"></div>
+
+  <!-- SESSION 5 -->
+  <div class="session-header">
+    <div class="session-num">5</div>
+    <div class="session-title">Driver Accepts / Declines</div>
+    <span class="session-tag tag-driver">Driver</span>
+  </div>
+  <ul class="checklist">
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Trip request card appears on Driver home</strong> after coordinator approves
+        <span class="device dev-driver">Driver device</span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Driver taps Accept</strong> — status → <strong>Booked</strong>, driver confirmed
+        <span class="device dev-driver">Driver device</span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text">Staff receives push notification "Driver accepted your trip"
+        <span class="device dev-staff">Staff device</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Test Decline</strong> — book a second trip → driver declines → booking returns to coordinator
+        <span class="note">Coordinator should see it re-appear in pending queue</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Driver receives push notification for incoming trip even when app is closed
+        <span class="device dev-driver">Driver device</span>
+      </div>
+    </li>
+  </ul>
+
+  <div class="divider"></div>
+
+  <!-- SESSION 6 -->
+  <div class="session-header">
+    <div class="session-num">6</div>
+    <div class="session-title">Running the Trip (GPS + Map)</div>
+    <span class="session-tag tag-all">All roles</span>
+  </div>
+  <div class="info-box teal">
+    This is the most important session. Have all 3 devices open. The driver should be in a real vehicle or walking with the phone to generate GPS movement.
+  </div>
+  <ul class="checklist">
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Driver taps "Start Trip"</strong> — status → <strong>On Trip</strong>
+        <span class="device dev-driver">Driver device</span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text">Staff home shows <strong>On Trip</strong> badge in real time — no refresh
+        <span class="device dev-staff">Staff device</span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Driver marker appears on Coordinator fleet map</strong> with taxi name label
+        <span class="device dev-coord">Coordinator device</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Route line (road-following) appears from driver to destination on map
+        <span class="device dev-coord">Coordinator device</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Driver GPS marker moves on map as driver moves
+        <span class="device dev-coord">Coordinator device</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Fullscreen button</strong> on map works — browser goes fullscreen, Esc exits
+        <span class="device dev-coord">Coordinator device</span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Driver taps "Complete Trip"</strong> — status → <strong>Completed</strong>
+        <span class="device dev-driver">Driver device</span>
+      </div>
+    </li>
+    <li class="critical">
+      <input type="checkbox"/>
+      <div class="item-text">Staff receives "Trip completed" push notification
+        <span class="device dev-staff">Staff device</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Completed trip appears in Coordinator <strong>Calendar</strong> in gray with ✓ prefix and actual finish time
+        <span class="device dev-coord">Coordinator device</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Completed trip appears in <strong>Dispatch Board</strong> calendar with gray block
+        <span class="note">Open Dispatch Board → Day view → find the completed trip</span>
+      </div>
+    </li>
+  </ul>
+
+  <div class="page-footer">
+    <span>TaxiBook EPS — UAT Checklist v1.0</span>
+    <span>Sessions 4–6</span>
+    <span>Page 3</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PAGE 4 — Sessions 7–8
+     ══════════════════════════════════════════════ -->
+<div class="page">
+
+  <!-- SESSION 7 -->
+  <div class="session-header">
+    <div class="session-num">7</div>
+    <div class="session-title">Cron Auto-Complete &amp; Reminders</div>
+    <span class="session-tag tag-cron">Cron</span>
+  </div>
+  <div class="info-box amber">
+    <strong>Tip:</strong> To test without waiting — edit a booking's <code style="background:rgba(0,0,0,0.07);padding:1px 3px;border-radius:2px;">auto_complete_at</code> in Supabase to 1 minute in the past, then wait for cron to fire (up to 5 min).
+  </div>
+  <ul class="checklist">
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Auto-complete fires correctly</strong>
+        <span class="note">A past-due booking gets status → Completed automatically, staff + driver receive push notification</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Start-time reminder fires</strong> (T±2 min before trip)
+        <span class="note">Staff gets "Your taxi is arriving now", driver gets "Time to pick up passenger"</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Overdue reminder fires</strong> (trip not started, past scheduled time)
+        <span class="note">Driver gets overdue alert, passenger gets delay notification after 5 min</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Coordinator manual trigger works — tap cron button on home page → result dialog shows correct counts</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Reminder is NOT sent twice — check that second cron run for the same booking skips it</div>
+    </li>
+  </ul>
+
+  <div class="divider"></div>
+
+  <!-- SESSION 8 -->
+  <div class="session-header">
+    <div class="session-num">8</div>
+    <div class="session-title">Coordinator Tools</div>
+    <span class="session-tag tag-coord">Coordinator</span>
+  </div>
+  <ul class="checklist">
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Calendar — Day view</strong> shows all bookings for today in correct time slots</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Calendar — Week view</strong> renders without blank screen</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Calendar — Month view</strong> shows correct booking counts per day, tap day → switches to Day view</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Fleet Map (bottom nav)</strong> → all active drivers visible with name labels</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Driver panel collapses / expands with tap on the panel bar (▲ ▼)</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Driver chips show correct status: GPS indicator, "trip" badge, "off" for offline</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Saved Locations</strong> (avatar menu) → add a new pin via map → location appears in Staff booking form pickup/destination list</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Dispatch Board</strong> (avatar menu → new tab) — Day / Week / Month / Map tabs all load</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Dispatch Board — <strong>Map tab</strong> fills full screen edge-to-edge (no padding/border)</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Dispatch Board — fullscreen button (top-right of map) works</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Dispatch Board clock ticks in real time</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Reassign taxi</strong> on a booking via the Dispatch page — correct taxi assigned</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Date range filter on home page — change dates → booking list updates correctly</div>
+    </li>
+  </ul>
+
+  <div class="page-footer">
+    <span>TaxiBook EPS — UAT Checklist v1.0</span>
+    <span>Sessions 7–8</span>
+    <span>Page 4</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PAGE 5 — Sessions 9–10 + Result Log
+     ══════════════════════════════════════════════ -->
+<div class="page">
+
+  <!-- SESSION 9 -->
+  <div class="session-header">
+    <div class="session-num">9</div>
+    <div class="session-title">Notifications Deep Check</div>
+    <span class="session-tag tag-all">All roles</span>
+  </div>
+  <div class="info-box teal">
+    For each item below, close the receiving app completely (swipe away) before triggering the notification — this tests background push delivery.
+  </div>
+  <ul class="checklist">
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Push arrives when app is <strong>fully closed</strong> (not just minimized)
+        <span class="note">Close app → trigger booking event → notification appears in system tray</span>
+      </div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Tapping a notification <strong>opens the correct page</strong> in the app</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Notification <strong>bell icon</strong> on home page shows unread count badge</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Notification list shows history of all received alerts</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>iOS</strong>: Push notification received on iPhone (app must be added to home screen first)
+        <span class="note">iOS Safari 16.4+ required. Notification permission must be granted after adding to home screen.</span>
+      </div>
+    </li>
+  </ul>
+  <p style="font-size:10px;color:var(--gray);margin:6px 0 12px 8px;">Notification types to verify at least once:</p>
+  <div class="two-col">
+    <ul class="checklist">
+      <li><input type="checkbox"/><div class="item-text">Booking submitted (coord)</div></li>
+      <li><input type="checkbox"/><div class="item-text">Booking confirmed (staff)</div></li>
+      <li><input type="checkbox"/><div class="item-text">Booking rejected (staff)</div></li>
+      <li><input type="checkbox"/><div class="item-text">Driver accepted (staff)</div></li>
+    </ul>
+    <ul class="checklist">
+      <li><input type="checkbox"/><div class="item-text">Trip started (staff)</div></li>
+      <li><input type="checkbox"/><div class="item-text">Trip completed (staff + driver)</div></li>
+      <li><input type="checkbox"/><div class="item-text">Overdue reminder (driver)</div></li>
+      <li><input type="checkbox"/><div class="item-text">Auto-completed (staff + driver)</div></li>
+    </ul>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- SESSION 10 -->
+  <div class="session-header">
+    <div class="session-num">10</div>
+    <div class="session-title">Edge Cases &amp; Error Handling</div>
+    <span class="session-tag tag-edge">Edge cases</span>
+  </div>
+  <ul class="checklist">
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Staff cancels before driver accepts</strong> → disappears from driver queue</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Round Trip booking</strong> → two bookings created, both appear in calendar</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Two bookings on same taxi at overlapping time → check how calendar/board displays them</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Driver with no GPS</strong> → fleet map shows stale/gray marker, no route line drawn</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Open app with no internet</strong> → error boundary shows friendly message (not blank white screen)</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text"><strong>Wake lock</strong>: screen stays on while driver is on active trip page (Android)</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">iOS — no layout issues with notch / Dynamic Island on newer iPhones</div>
+    </li>
+    <li>
+      <input type="checkbox"/>
+      <div class="item-text">Booking list loads more (pagination) when scrolling past 10 bookings</div>
+    </li>
+  </ul>
+
+  <div class="divider"></div>
+
+  <!-- Result log -->
+  <h2 style="font-size:13px;font-weight:800;color:var(--teal-dark);margin-bottom:10px;">Test Result Log</h2>
+  <table class="result-table">
+    <thead>
+      <tr><th>#</th><th>Session</th><th>Tester</th><th>Device / OS</th><th>Result</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>Setup & Cron</td><td></td><td></td><td><span class="status-blank">—</span></td><td></td></tr>
+      <tr><td>2</td><td>PWA Install</td><td></td><td></td><td><span class="status-blank">—</span></td><td></td></tr>
+      <tr><td>3</td><td>Staff Books Trip</td><td></td><td></td><td><span class="status-blank">—</span></td><td></td></tr>
+      <tr><td>4</td><td>Coord Approves</td><td></td><td></td><td><span class="status-blank">—</span></td><td></td></tr>
+      <tr><td>5</td><td>Driver Accepts</td><td></td><td></td><td><span class="status-blank">—</span></td><td></td></tr>
+      <tr><td>6</td><td>Trip + GPS + Map</td><td></td><td></td><td><span class="status-blank">—</span></td><td></td></tr>
+      <tr><td>7</td><td>Cron Reminders</td><td></td><td></td><td><span class="status-blank">—</span></td><td></td></tr>
+      <tr><td>8</td><td>Coordinator Tools</td><td></td><td></td><td><span class="status-blank">—</span></td><td></td></tr>
+      <tr><td>9</td><td>Notifications</td><td></td><td></td><td><span class="status-blank">—</span></td><td></td></tr>
+      <tr><td>10</td><td>Edge Cases</td><td></td><td></td><td><span class="status-blank">—</span></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">
+    <span>TaxiBook EPS — UAT Checklist v1.0</span>
+    <span>Sessions 9–10 · Result Log</span>
+    <span>Page 5</span>
+  </div>
+</div>
+
+<!-- Print button -->
+<button class="print-btn no-print" onclick="window.print()">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+  Print / Save PDF
+</button>
+
+</body>
+</html>

@@ -221,6 +221,7 @@ export default function BookPage() {
       {pickerField && (
         <LocationPickerMap
           title={pickerField === 'pickup' ? 'Select pickup location' : 'Select destination'}
+          autoGps={pickerField === 'pickup'}
           onClose={() => setPickerField(null)}
           onConfirm={(address, coords) => {
             if (pickerField === 'pickup') {

@@ -48,9 +48,10 @@ interface Props {
   title: string
   onConfirm: (address: string, coords: Coords) => void
   onClose: () => void
+  autoGps?: boolean
 }
 
-export default function LocationPickerMap({ title, onConfirm, onClose }: Props) {
+export default function LocationPickerMap({ title, onConfirm, onClose, autoGps }: Props) {
   const supabase = createClient()
 
   const [picked,      setPicked]      = useState<(Coords & { address: string }) | null>(null)
@@ -69,6 +70,20 @@ export default function LocationPickerMap({ title, onConfirm, onClose }: Props) 
       .order('name')
       .then(({ data }) => setSavedLocs(data || []))
   }, [])
+
+  useEffect(() => {
+    if (!autoGps || !navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        setFlyTarget([lat, lng])
+        handlePick(lat, lng)
+      },
+      () => {}, // silently ignore — map stays at SOROWAKO default
+      { timeout: 8000, maximumAge: 30000 },
+    )
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const q = searchQuery.trim().toLowerCase()

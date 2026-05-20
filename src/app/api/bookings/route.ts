@@ -238,7 +238,7 @@ async function notifyCoordinators(
 
   if (!coordinators?.length) return
 
-  await admin.from('notifications').insert(
+  await notify(
     coordinators.map((c: any) => ({
       user_id:    c.id,
       booking_id: booking.id,

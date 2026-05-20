@@ -606,6 +606,7 @@
       <div class="cover-pill">🚗 Driver Guide</div>
       <div class="cover-pill">📋 Coordinator Guide</div>
       <div class="cover-pill">🖥️ Dispatch Board</div>
+      <div class="cover-pill">🗺️ Saved Locations Map</div>
       <div class="cover-pill">🔔 Notifications</div>
       <div class="cover-pill">📱 PWA Install</div>
     </div>
@@ -618,7 +619,7 @@
   <div style="position:absolute;right:20px;top:60px;width:120px;height:600px;background:rgba(255,255,255,0.03);transform:rotate(18deg);border-radius:40px;"></div>
 
   <div class="cover-bottom">
-    <p>Version 1.0 &nbsp;|&nbsp; May 2026</p>
+    <p>Version 1.1 &nbsp;|&nbsp; May 2026</p>
     <p>CONFIDENTIAL — FOR INTERNAL USE ONLY</p>
     <p>PT Vale Indonesia Tbk</p>
   </div>
@@ -668,7 +669,7 @@
 
   <div class="page-footer">
     <p>TaxiBook EPS — PT Vale Indonesia</p>
-    <p>User Manual v1.0</p>
+    <p>User Manual v1.1</p>
     <p>Page 2</p>
   </div>
 </div>
@@ -748,7 +749,7 @@
 
   <div class="page-footer">
     <p>TaxiBook EPS — PT Vale Indonesia</p>
-    <p>User Manual v1.0</p>
+    <p>User Manual v1.1</p>
     <p>Page 3</p>
   </div>
 </div>
@@ -881,7 +882,7 @@
 
   <div class="page-footer">
     <p>TaxiBook EPS — PT Vale Indonesia</p>
-    <p>User Manual v1.0</p>
+    <p>User Manual v1.1</p>
     <p>Page 4</p>
   </div>
 </div>
@@ -999,7 +1000,7 @@
 
   <div class="page-footer">
     <p>TaxiBook EPS — PT Vale Indonesia</p>
-    <p>User Manual v1.0</p>
+    <p>User Manual v1.1</p>
     <p>Page 5</p>
   </div>
 </div>
@@ -1070,8 +1071,8 @@
     </tbody>
   </table>
 
-  <h2>Notification Bell (Alerts Tab)</h2>
-  <p>All notifications are stored in the <strong>Alerts</strong> tab (bell icon in the bottom navigation). Unread notifications show a red dot badge on the icon. Tap any notification to mark it as read.</p>
+  <h2>Viewing Your Notifications</h2>
+  <p>Tap the <strong>🔔 bell icon</strong> in the top-right corner of your Home screen to open the Notifications panel. All past notifications are listed there in chronological order. Unread notifications are highlighted — tap any to mark it as read.</p>
 
   <h2>Profile</h2>
   <p>Access your profile via the <strong>Profile</strong> tab in the bottom navigation. From here you can:</p>
@@ -1087,7 +1088,7 @@
 
   <div class="page-footer">
     <p>TaxiBook EPS — PT Vale Indonesia</p>
-    <p>User Manual v1.0</p>
+    <p>User Manual v1.1</p>
     <p>Page 6</p>
   </div>
 </div>
@@ -1186,7 +1187,7 @@
 
   <div class="page-footer">
     <p>TaxiBook EPS — PT Vale Indonesia</p>
-    <p>User Manual v1.0</p>
+    <p>User Manual v1.1</p>
     <p>Page 7</p>
   </div>
 </div>
@@ -1256,8 +1257,7 @@
     <thead><tr><th>Tab</th><th>Icon</th><th>Description</th></tr></thead>
     <tbody>
       <tr><td><strong>Trips</strong></td><td>🏠</td><td>Main home screen — view pending, active, and upcoming trips.</td></tr>
-      <tr><td><strong>Alerts</strong></td><td>🔔</td><td>All push notifications. Red dot indicates unread alerts.</td></tr>
-      <tr><td><strong>Profile</strong></td><td>👤</td><td>Your account info and sign out.</td></tr>
+      <tr><td><strong>Profile</strong></td><td>👤</td><td>Your account info, availability toggle, and sign out.</td></tr>
     </tbody>
   </table>
 
@@ -1268,7 +1268,7 @@
 
   <div class="page-footer">
     <p>TaxiBook EPS — PT Vale Indonesia</p>
-    <p>User Manual v1.0</p>
+    <p>User Manual v1.1</p>
     <p>Page 8</p>
   </div>
 </div>
@@ -1367,7 +1367,7 @@
 
   <div class="page-footer">
     <p>TaxiBook EPS — PT Vale Indonesia</p>
-    <p>User Manual v1.0</p>
+    <p>User Manual v1.1</p>
     <p>Page 9</p>
   </div>
 </div>
@@ -1423,47 +1423,98 @@
   </div>
 
   <h2>18. Saved Locations</h2>
-  <p>The <strong>Saved Locations</strong> feature lets coordinators register named places within the PT Vale site. These locations appear as selectable options when staff book a trip, preventing GPS geocoding errors inside the plant.</p>
+  <p>The <strong>Saved Locations</strong> feature lets coordinators register named places within the PT Vale site. These locations appear as selectable options when staff book a trip, preventing GPS geocoding errors inside the plant area.</p>
 
+  <h3>Opening Saved Locations</h3>
+  <p>From the coordinator home, tap your <strong>avatar (top-right corner)</strong> → select <strong>"Saved Locations"</strong> from the dropdown menu.</p>
+
+  <h3>Page Layout</h3>
+  <p>The Saved Locations page uses a <strong>side-by-side layout</strong>:</p>
+  <div class="two-col" style="margin:10px 0;">
+    <div class="screen-box" style="margin:0;">
+      <div class="screen-title">🗺️ Left — Interactive Map</div>
+      <ul>
+        <li>All saved locations are shown as orange <strong>★ star markers</strong> on the map.</li>
+        <li>Tap any marker to see a <strong>popup</strong> with the location name, address, and exact GPS coordinates.</li>
+        <li>Use the <strong>⊞ fit button</strong> (top-right of the map) to zoom out and show all pins at once.</li>
+        <li>Standard pinch-to-zoom and drag gestures work as expected.</li>
+      </ul>
+    </div>
+    <div class="screen-box" style="margin:0;">
+      <div class="screen-title">📋 Right — Location List</div>
+      <ul>
+        <li>All saved locations listed as cards, sorted by name.</li>
+        <li>Each card shows the location <strong>name</strong>, <strong>address</strong>, and <strong>GPS coordinates</strong>.</li>
+        <li>Tap a card to fly the map to that location's marker.</li>
+        <li>Use <strong>"Load more"</strong> at the bottom of the list to page through locations when there are many.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Adding a New Location</h3>
   <div class="steps">
     <div class="step">
       <div class="step-num">1</div>
       <div class="step-body">
-        <div class="step-title">Open Saved Locations</div>
-        <div class="step-desc">Tap your avatar (top-right) → "Saved Locations" from the dropdown menu.</div>
+        <div class="step-title">Tap "+ Add Location"</div>
+        <div class="step-desc">The button appears at the top of the list panel. A full-screen map picker opens.</div>
       </div>
     </div>
     <div class="step">
       <div class="step-num">2</div>
       <div class="step-body">
-        <div class="step-title">Add a new location</div>
-        <div class="step-desc">Tap the map to drop a pin, or search by address. Enter a descriptive name (e.g., "Warehouse Gate 3", "Kantor Pusat"). Save.</div>
+        <div class="step-title">Pin the exact spot</div>
+        <div class="step-desc">Tap anywhere on the map to drop the pin, or type an address in the search bar to jump to a location. The pin shows the exact coordinates that will be saved.</div>
       </div>
     </div>
     <div class="step">
       <div class="step-num">3</div>
       <div class="step-body">
-        <div class="step-title">Manage existing locations</div>
-        <div class="step-desc">Tap any saved location pin to edit its name or delete it. Changes take effect immediately for all users.</div>
+        <div class="step-title">Enter a name</div>
+        <div class="step-desc">Give the location a clear, descriptive name — e.g., <em>"Gerbang Utama"</em>, <em>"Klinik Sorowako"</em>, <em>"Warehouse Gate 3"</em>. Staff will see this name when booking.</div>
       </div>
     </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Tap Save</div>
+        <div class="step-desc">The location is saved instantly and appears on the map and list for all users.</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Editing or Deleting a Location</h3>
+  <p>Each card in the location list has a <strong>⋮ three-dot menu button</strong> in the top-right corner of the card. Tap it to open a dropdown with two options:</p>
+  <div class="two-col" style="margin:8px 0;">
+    <div class="info-box tip" style="margin:0;">
+      <div class="info-icon">✏️</div>
+      <div class="info-content"><strong>Edit</strong>Opens the location picker so you can move the pin and rename the location. Save to apply.</div>
+    </div>
+    <div class="info-box warn" style="margin:0;">
+      <div class="info-icon">🗑️</div>
+      <div class="info-content"><strong>Delete</strong>Permanently removes the location. It will no longer appear as an option when staff book trips.</div>
+    </div>
+  </div>
+
+  <div class="info-box note">
+    <div class="info-icon">ℹ️</div>
+    <div class="info-content"><strong>Why Saved Locations matter</strong>Inside the PT Vale plant, GPS-based address lookup (geocoding) is unreliable and can return incorrect road addresses. Using pre-pinned saved locations gives staff accurate pickup and drop-off points with exact coordinates — no guesswork needed.</div>
   </div>
 
   <h2>Coordinator Navigation</h2>
   <table>
     <thead><tr><th>Tab</th><th>Icon</th><th>Description</th></tr></thead>
     <tbody>
-      <tr><td><strong>Home</strong></td><td>⊞</td><td>Dispatch dashboard — bookings, calendar, and map.</td></tr>
-      <tr><td><strong>Drivers</strong></td><td>👥</td><td>All drivers and taxis, status and stats.</td></tr>
-      <tr><td><strong>Map</strong></td><td>🗺️</td><td>Dedicated full-screen fleet map with driver board.</td></tr>
-      <tr><td><strong>Alerts</strong></td><td>🔔</td><td>Coordinator notifications (approvals, issues).</td></tr>
-      <tr><td><strong>Profile</strong></td><td>👤</td><td>Account info and sign out.</td></tr>
+      <tr><td><strong>Home</strong></td><td>⊞</td><td>Dispatch dashboard — bookings, calendar, and embedded map.</td></tr>
+      <tr><td><strong>Drivers</strong></td><td>👥</td><td>All drivers and taxis, online status, trip stats, and availability toggle.</td></tr>
+      <tr><td><strong>Map</strong></td><td>🗺️</td><td>Dedicated full-screen fleet map with live driver board panel.</td></tr>
+      <tr><td><strong>Profile</strong></td><td>👤</td><td>Account info, Saved Locations link, and sign out.</td></tr>
     </tbody>
   </table>
 
   <div class="page-footer">
     <p>TaxiBook EPS — PT Vale Indonesia</p>
-    <p>User Manual v1.0</p>
+    <p>User Manual v1.1</p>
     <p>Page 10</p>
   </div>
 </div>
@@ -1555,7 +1606,7 @@
 
   <div class="page-footer">
     <p>TaxiBook EPS — PT Vale Indonesia</p>
-    <p>User Manual v1.0</p>
+    <p>User Manual v1.1</p>
     <p>Page 11</p>
   </div>
 </div>
@@ -1629,7 +1680,7 @@
 
   <div class="page-footer">
     <p>TaxiBook EPS — PT Vale Indonesia</p>
-    <p>User Manual v1.0</p>
+    <p>User Manual v1.1</p>
     <p>Page 12</p>
   </div>
 </div>
@@ -1681,13 +1732,13 @@
     <div>
       <p style="font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;">TaxiBook EPS — PT Vale Indonesia</p>
       <p style="font-size:11px;color:rgba(255,255,255,0.6);margin:0;">For support or to report an issue, contact your PT Vale system administrator. This document is for internal use only.</p>
-      <p style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:8px;">Version 1.0 &nbsp;·&nbsp; May 2026 &nbsp;·&nbsp; Confidential</p>
+      <p style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:8px;">Version 1.1 &nbsp;·&nbsp; May 2026 &nbsp;·&nbsp; Confidential</p>
     </div>
   </div>
 
   <div class="page-footer">
     <p>TaxiBook EPS — PT Vale Indonesia</p>
-    <p>User Manual v1.0</p>
+    <p>User Manual v1.1</p>
     <p>Page 13</p>
   </div>
 </div>

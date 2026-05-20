@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notify } from '@/lib/notify'
-import { sendPushToUser } from '@/lib/push'
 
 export async function POST(
   request: NextRequest,
@@ -59,9 +58,6 @@ export async function POST(
         body:       `Your trip to ${booking.destination} is confirmed — ${booking.taxis?.name} · ${driver?.name}`,
         type:       'booking_confirmed',
       })
-      await sendPushToUser(booking.passenger_id, 'Trip confirmed!',
-        `Your trip to ${booking.destination} is confirmed — ${booking.taxis?.name} · ${driver?.name}`,
-        '/staff/home')
 
       // For instant bookings, immediately push driver to go pick up the passenger
       const minsUntilPickup = (new Date(booking.scheduled_at).getTime() - Date.now()) / 60000
@@ -76,7 +72,6 @@ export async function POST(
           body:       pickupMsg,
           type:       'booking_confirmed',
         })
-        await sendPushToUser(user.id, '🚗 Head to pickup now', pickupMsg, '/driver/home')
       }
 
       return NextResponse.json({ success: true, status: 'booked' })
@@ -222,7 +217,7 @@ export async function POST(
           .from('users').select('id').eq('role', 'coordinator').eq('is_active', true)
 
         if (coordinators?.length) {
-          await admin.from('notifications').insert(
+          await notify(
             coordinators.map((c: any) => ({
               user_id:    c.id,
               booking_id: bookingId,
@@ -277,7 +272,7 @@ export async function POST(
 
       if (coordinators?.length) {
         const newDeclineCount = declinedDriverIds.length + 1
-        await admin.from('notifications').insert(
+        await notify(
           coordinators.map((c: any) => ({
             user_id:    c.id,
             booking_id: bookingId,
@@ -331,7 +326,7 @@ async function notifyCoordinators(admin: any, booking: any, title: string, body:
   const { data: coordinators } = await admin
     .from('users').select('id').eq('role', 'coordinator').eq('is_active', true)
   if (!coordinators?.length) return
-  await admin.from('notifications').insert(
+  await notify(
     coordinators.map((c: any) => ({
       user_id:    c.id,
       booking_id: booking.id,

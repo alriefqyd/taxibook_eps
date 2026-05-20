@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TaxiBook EPS — Panduan Pengguna</title>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --teal:      #006064;
+    --teal-dark: #004047;
+    --teal-light:#E0F2F1;
+    --gold:      #ECB833;
+    --gold-dark: #B8860B;
+    --gray:      #6B7280;
+    --gray-light:#F5F5F2;
+    --border:    rgba(0,0,0,0.08);
+    --font:      'Segoe UI', 'Inter', Arial, sans-serif;
+    --mono:      'Courier New', monospace;
+  }
+
+  html { font-size: 13px; }
+
+  body {
+    font-family: var(--font);
+    color: #1a1c1b;
+    background: #fff;
+    line-height: 1.6;
+  }
+
+  /* ── Page layout for print ── */
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto 8mm;
+    padding: 18mm 18mm 16mm;
+    background: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+
+  @media print {
+    html, body { background: #fff; }
+    .page {
+      margin: 0;
+      padding: 15mm 16mm 14mm;
+      page-break-after: always;
+      box-shadow: none !important;
+    }
+    .page:last-child { page-break-after: avoid; }
+    @page { size: A4; margin: 0; }
+  }
+
+  @media screen {
+    body { background: #e8e8e8; padding: 12px 0; }
+    .page {
+      box-shadow: 0 4px 24px rgba(0,0,0,0.14);
+      border-radius: 4px;
+    }
+  }
+
+  /* ── Cover ── */
+  .cover {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: var(--teal-dark);
+    color: #fff;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .cover-top { padding: 22mm 18mm 0; }
+
+  .cover-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 60px;
+  }
+
+  .cover-v { width: 54px; height: 54px; }
+
+  .cover-brand-text .app-name {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #fff;
+  }
+  .cover-brand-text .sub {
+    font-size: 11px;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .cover-title {
+    font-size: 38px;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -1px;
+    color: #fff;
+    margin-bottom: 16px;
+  }
+
+  .cover-subtitle {
+    font-size: 14px;
+    color: rgba(255,255,255,0.65);
+    max-width: 340px;
+    line-height: 1.55;
+    margin-bottom: 40px;
+  }
+
+  .cover-pills {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 48px;
+  }
+
+  .cover-pill {
+    padding: 5px 14px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1.5px solid rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.85);
+    letter-spacing: 0.3px;
+  }
+
+  .cover-bottom {
+    background: rgba(0,0,0,0.25);
+    padding: 14px 18mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .cover-bottom p {
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 0.4px;
+  }
+
+  .cover-gold-bar {
+    height: 4px;
+    background: linear-gradient(90deg, var(--gold), transparent);
+    width: 120px;
+    border-radius: 2px;
+    margin-bottom: 32px;
+  }
+
+  /* ── TOC ── */
+  .toc-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--teal-dark);
+    margin-bottom: 28px;
+    padding-bottom: 12px;
+    border-bottom: 2.5px solid var(--gold);
+    display: inline-block;
+  }
+
+  .toc-section { margin-bottom: 6px; }
+
+  .toc-section-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray);
+    margin-top: 18px;
+    margin-bottom: 4px;
+  }
+
+  .toc-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0;
+    padding: 5px 0;
+    border-bottom: 1px dotted rgba(0,0,0,0.1);
+  }
+
+  .toc-num {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--teal);
+    width: 28px;
+    flex-shrink: 0;
+  }
+
+  .toc-label {
+    font-size: 12px;
+    color: #1a1c1b;
+    flex: 1;
+  }
+
+  .toc-dots {
+    flex: 1;
+    border-bottom: 1px dotted rgba(0,0,0,0.15);
+    margin: 0 8px 3px;
+  }
+
+  .toc-page {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--teal);
+    width: 24px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* ── Section headers ── */
+  .section-banner {
+    background: var(--teal-dark);
+    color: #fff;
+    margin: 0 -18mm 24px;
+    padding: 18px 18mm;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .section-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .section-banner h1 {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    line-height: 1.2;
+  }
+
+  .section-banner p {
+    font-size: 11px;
+    color: rgba(255,255,255,0.65);
+    margin-top: 2px;
+  }
+
+  .role-badge {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.9);
+    flex-shrink: 0;
+  }
+
+  /* ── Content typography ── */
+  h2 {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--teal-dark);
+    margin: 24px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  h2::after {
+    content: '';
+    flex: 1;
+    height: 1.5px;
+    background: var(--teal-light);
+    border-radius: 1px;
+  }
+
+  h3 {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--teal);
+    margin: 16px 0 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  p { font-size: 12px; margin-bottom: 8px; color: #374151; }
+
+  /* ── Steps ── */
+  .steps { margin: 12px 0 16px; }
+
+  .step {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--teal);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step-body { flex: 1; }
+  .step-title { font-size: 12px; font-weight: 700; color: #1a1c1b; margin-bottom: 2px; }
+  .step-desc  { font-size: 11px; color: var(--gray); margin: 0; }
+
+  /* ── Info boxes ── */
+  .info-box {
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 12px 0;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .info-box.tip  { background: #E0F2F1; border-left: 3px solid var(--teal); }
+  .info-box.warn { background: #FEF3C7; border-left: 3px solid #D97706; }
+  .info-box.note { background: #EFF6FF; border-left: 3px solid #3B82F6; }
+
+  .info-icon { font-size: 14px; margin-top: 1px; flex-shrink: 0; }
+  .info-content { font-size: 11px; color: #374151; }
+  .info-content strong { display: block; font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+
+  /* ── Status pills ── */
+  .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+
+  .pill {
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .pill-submitted     { background: #DBEAFE; color: #1E3A5F; }
+  .pill-approval      { background: #FEF3C7; color: #92400E; }
+  .pill-driver        { background: #FEF3C7; color: #92400E; }
+  .pill-booked        { background: #D1FAE5; color: #065F46; }
+  .pill-ontrip        { background: #D1FAE5; color: #065F46; }
+  .pill-waiting       { background: #EDE9FE; color: #4C1D95; }
+  .pill-completed     { background: #F1F5F9; color: #475569; }
+  .pill-rejected      { background: #FEE2E2; color: #991B1B; }
+  .pill-cancelled     { background: #F1F5F9; color: #6B7280; }
+  .pill-drop          { background: #DBEAFE; color: #1E3A5F; }
+  .pill-waiting-trip  { background: #EDE9FE; color: #4C1D95; }
+
+  /* ── Feature cards ── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 12px 0;
+  }
+
+  .card {
+    background: var(--gray-light);
+    border-radius: 10px;
+    padding: 12px 13px;
+    border-left: 3px solid var(--teal);
+  }
+
+  .card-icon  { font-size: 18px; margin-bottom: 6px; }
+  .card-title { font-size: 12px; font-weight: 700; color: var(--teal-dark); margin-bottom: 3px; }
+  .card-desc  { font-size: 10px; color: var(--gray); line-height: 1.5; }
+
+  /* ── Table ── */
+  table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 12px 0; }
+
+  th {
+    background: var(--teal-dark);
+    color: #fff;
+    padding: 7px 10px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  td { padding: 7px 10px; border-bottom: 1px solid var(--border); color: #374151; vertical-align: top; }
+  tr:nth-child(even) td { background: var(--gray-light); }
+
+  /* ── Flow diagram ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 14px 0;
+    flex-wrap: wrap;
+  }
+
+  .flow-step {
+    background: var(--teal-light);
+    border: 1.5px solid var(--teal);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--teal-dark);
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .flow-arrow { color: var(--teal); font-size: 14px; font-weight: 700; }
+
+  .flow-step.gold { background: #FEF3C7; border-color: var(--gold-dark); color: #78350F; }
+  .flow-step.done { background: #D1FAE5; border-color: #059669; color: #065F46; }
+
+  /* ── Screen box ── */
+  .screen-box {
+    background: var(--gray-light);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 14px;
+    margin: 12px 0;
+    font-size: 11px;
+  }
+
+  .screen-box .screen-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gray);
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Page footer ── */
+  .page-footer {
+    position: absolute;
+    bottom: 12mm;
+    left: 18mm;
+    right: 18mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border);
+    padding-top: 6px;
+  }
+
+  .page-footer p { font-size: 9px; color: #9ca3af; margin: 0; }
+
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+  /* ── Role header ── */
+  .role-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    border-radius: 10px;
+  }
+
+  .role-staff       { background: #EFF6FF; border: 1.5px solid #BFDBFE; }
+  .role-driver      { background: #ECFDF5; border: 1.5px solid #A7F3D0; }
+  .role-coordinator { background: var(--teal-light); border: 1.5px solid #99F6E4; }
+
+  .role-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  .role-header p { margin: 0; font-size: 11px; color: #374151; }
+  .role-header strong { font-size: 12px; display: block; }
+
+  ul, ol { padding-left: 18px; margin: 8px 0; }
+  li { font-size: 11px; color: #374151; margin-bottom: 4px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .highlight {
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #92400E;
+    display: inline;
+  }
+
+  code {
+    background: #F1F5F9;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: #006064;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- HALAMAN SAMPUL                                          -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page cover">
+  <div class="cover-top">
+    <div class="cover-brand">
+      <svg class="cover-v" viewBox="0 0 54 54" xmlns="http://www.w3.org/2000/svg">
+        <rect width="54" height="54" rx="10" fill="rgba(255,255,255,0.1)"/>
+        <polygon points="6,10 12,10 27,44 42,10 48,10 27,47" fill="white" opacity="0.95"/>
+        <polygon points="42,10 48,10 41,22 37,22" fill="#ECB833"/>
+      </svg>
+      <div class="cover-brand-text">
+        <div class="app-name">TaxiBook EPS</div>
+        <div class="sub">PT Vale Indonesia</div>
+      </div>
+    </div>
+
+    <div class="cover-gold-bar"></div>
+
+    <div class="cover-title">Panduan Pengguna<br/>&amp; Panduan Fitur</div>
+    <div class="cover-subtitle">
+      Referensi lengkap bagi Staff, Pengemudi, dan Koordinator yang menggunakan sistem pemesanan armada taksi perusahaan TaxiBook EPS.
+    </div>
+
+    <div class="cover-pills">
+      <div class="cover-pill">👤 Panduan Staff</div>
+      <div class="cover-pill">🚗 Panduan Driver</div>
+      <div class="cover-pill">📋 Panduan Koordinator</div>
+      <div class="cover-pill">🖥️ Papan Dispatch</div>
+      <div class="cover-pill">🗺️ Peta Lokasi Tersimpan</div>
+      <div class="cover-pill">🔔 Notifikasi</div>
+      <div class="cover-pill">📱 Instalasi PWA</div>
+    </div>
+  </div>
+
+  <div style="flex:1;"></div>
+
+  <div style="position:absolute;right:-40px;top:80px;width:220px;height:600px;background:rgba(255,255,255,0.04);transform:rotate(18deg);border-radius:40px;"></div>
+  <div style="position:absolute;right:20px;top:60px;width:120px;height:600px;background:rgba(255,255,255,0.03);transform:rotate(18deg);border-radius:40px;"></div>
+
+  <div class="cover-bottom">
+    <p>Versi 1.1 &nbsp;|&nbsp; Mei 2026</p>
+    <p>RAHASIA — HANYA UNTUK PENGGUNAAN INTERNAL</p>
+    <p>PT Vale Indonesia Tbk</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- DAFTAR ISI                                             -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="toc-title">Daftar Isi</div>
+
+  <div class="toc-section-label">Pengantar</div>
+  <div class="toc-item"><span class="toc-num">1.</span><span class="toc-label">Gambaran Umum &amp; Peran Pengguna</span><span class="toc-dots"></span><span class="toc-page">3</span></div>
+  <div class="toc-item"><span class="toc-num">2.</span><span class="toc-label">Cara Menginstal Aplikasi (PWA)</span><span class="toc-dots"></span><span class="toc-page">3</span></div>
+  <div class="toc-item"><span class="toc-num">3.</span><span class="toc-label">Masuk ke Aplikasi (Login)</span><span class="toc-dots"></span><span class="toc-page">3</span></div>
+  <div class="toc-item"><span class="toc-num">4.</span><span class="toc-label">Referensi Status Pemesanan</span><span class="toc-dots"></span><span class="toc-page">4</span></div>
+
+  <div class="toc-section-label">Panduan Staff</div>
+  <div class="toc-item"><span class="toc-num">5.</span><span class="toc-label">Beranda — Perjalanan Mendatang</span><span class="toc-dots"></span><span class="toc-page">5</span></div>
+  <div class="toc-item"><span class="toc-num">6.</span><span class="toc-label">Cara Memesan Perjalanan</span><span class="toc-dots"></span><span class="toc-page">5</span></div>
+  <div class="toc-item"><span class="toc-num">7.</span><span class="toc-label">Jenis Perjalanan: DROP vs WAITING</span><span class="toc-dots"></span><span class="toc-page">5</span></div>
+  <div class="toc-item"><span class="toc-num">8.</span><span class="toc-label">Peta Pelacakan Perjalanan Langsung</span><span class="toc-dots"></span><span class="toc-page">6</span></div>
+
+  <div class="toc-section-label">Panduan Driver</div>
+  <div class="toc-item"><span class="toc-num">9.</span><span class="toc-label">Beranda Driver — Antrean Perjalanan</span><span class="toc-dots"></span><span class="toc-page">7</span></div>
+  <div class="toc-item"><span class="toc-num">10.</span><span class="toc-label">Terima atau Tolak Pemesanan</span><span class="toc-dots"></span><span class="toc-page">7</span></div>
+  <div class="toc-item"><span class="toc-num">11.</span><span class="toc-label">Menjalankan Perjalanan (Mulai → Selesai)</span><span class="toc-dots"></span><span class="toc-page">7</span></div>
+  <div class="toc-item"><span class="toc-num">12.</span><span class="toc-label">Pelacakan GPS</span><span class="toc-dots"></span><span class="toc-page">8</span></div>
+
+  <div class="toc-section-label">Panduan Koordinator</div>
+  <div class="toc-item"><span class="toc-num">13.</span><span class="toc-label">Beranda Koordinator — Manajemen Pemesanan</span><span class="toc-dots"></span><span class="toc-page">9</span></div>
+  <div class="toc-item"><span class="toc-num">14.</span><span class="toc-label">Setujui &amp; Tolak Pemesanan</span><span class="toc-dots"></span><span class="toc-page">9</span></div>
+  <div class="toc-item"><span class="toc-num">15.</span><span class="toc-label">Tampilan Kalender (Gantt)</span><span class="toc-dots"></span><span class="toc-page">9</span></div>
+  <div class="toc-item"><span class="toc-num">16.</span><span class="toc-label">Tampilan Peta Armada</span><span class="toc-dots"></span><span class="toc-page">10</span></div>
+  <div class="toc-item"><span class="toc-num">17.</span><span class="toc-label">Manajemen Pengemudi</span><span class="toc-dots"></span><span class="toc-page">10</span></div>
+  <div class="toc-item"><span class="toc-num">18.</span><span class="toc-label">Lokasi Tersimpan</span><span class="toc-dots"></span><span class="toc-page">10</span></div>
+
+  <div class="toc-section-label">Papan Dispatch</div>
+  <div class="toc-item"><span class="toc-num">19.</span><span class="toc-label">Gambaran Umum Papan Dispatch (/board)</span><span class="toc-dots"></span><span class="toc-page">11</span></div>
+  <div class="toc-item"><span class="toc-num">20.</span><span class="toc-label">Tampilan Hari / Minggu / Bulan / Peta</span><span class="toc-dots"></span><span class="toc-page">11</span></div>
+
+  <div class="toc-section-label">Fitur Sistem</div>
+  <div class="toc-item"><span class="toc-num">21.</span><span class="toc-label">Notifikasi Push</span><span class="toc-dots"></span><span class="toc-page">12</span></div>
+  <div class="toc-item"><span class="toc-num">22.</span><span class="toc-label">Auto-Complete &amp; Pengingat Otomatis</span><span class="toc-dots"></span><span class="toc-page">12</span></div>
+  <div class="toc-item"><span class="toc-num">23.</span><span class="toc-label">Glosarium</span><span class="toc-dots"></span><span class="toc-page">13</span></div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>Panduan Pengguna v1.1</p>
+    <p>Halaman 2</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- HALAMAN 3 — GAMBARAN UMUM & MEMULAI                   -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner">
+    <div class="section-icon">🏢</div>
+    <div>
+      <h1>Gambaran Umum &amp; Cara Memulai</h1>
+      <p>Pengantar, peran pengguna, instalasi, dan login</p>
+    </div>
+  </div>
+
+  <h2>1. Apa itu TaxiBook EPS?</h2>
+  <p>TaxiBook EPS adalah sistem pemesanan armada taksi internal PT Vale Indonesia. Aplikasi ini memungkinkan karyawan mengajukan perjalanan taksi di dalam area perusahaan, membantu pengemudi mengelola dan menjalankan perjalanan tersebut, serta memberikan koordinator visibilitas penuh dan kendali atas seluruh armada secara real-time.</p>
+
+  <div class="card-grid" style="margin-top:14px;">
+    <div class="card">
+      <div class="card-icon">👤</div>
+      <div class="card-title">Staff (Penumpang)</div>
+      <div class="card-desc">Karyawan yang memesan perjalanan taksi untuk keperluan dinas di dalam area PT Vale.</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🚗</div>
+      <div class="card-title">Driver (Pengemudi)</div>
+      <div class="card-desc">Pengemudi taksi perusahaan yang menerima, menyetujui, dan menjalankan pemesanan. Posisi GPS dilacak secara langsung.</div>
+    </div>
+    <div class="card" style="border-color:var(--gold-dark);">
+      <div class="card-icon">📋</div>
+      <div class="card-title">Koordinator</div>
+      <div class="card-desc">Supervisor armada yang menyetujui pemesanan, memantau armada, serta mengelola pengemudi dan lokasi.</div>
+    </div>
+    <div class="card" style="border-color:#6B7280;">
+      <div class="card-icon">🖥️</div>
+      <div class="card-title">Papan Dispatch</div>
+      <div class="card-desc">Dasbor layar penuh secara real-time untuk ruang kendali, menampilkan seluruh jadwal armada dan peta.</div>
+    </div>
+  </div>
+
+  <h2>2. Instalasi Aplikasi (PWA)</h2>
+  <p>TaxiBook EPS adalah <strong>Progressive Web App</strong> — tidak perlu mengunduh dari toko aplikasi. Instal langsung dari browser ponsel Anda.</p>
+  <div class="two-col">
+    <div>
+      <h3>Android (Chrome)</h3>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Buka Chrome</div><div class="step-desc">Buka URL TaxiBook EPS yang diberikan oleh admin Anda.</div></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Ketuk menu (⋮)</div><div class="step-desc">Ketuk tiga titik di sudut kanan atas.</div></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Tambah ke Layar Utama</div><div class="step-desc">Ketuk "Tambahkan ke layar utama" dan konfirmasi. Ikon TaxiBook akan muncul di layar utama Anda.</div></div></div>
+      </div>
+    </div>
+    <div>
+      <h3>iOS (Safari)</h3>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Buka Safari</div><div class="step-desc">Buka URL TaxiBook EPS. <em>Harus menggunakan Safari, bukan Chrome.</em></div></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Ketuk Bagikan (↑)</div><div class="step-desc">Ketuk ikon berbagi di bagian bawah layar.</div></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Tambah ke Layar Utama</div><div class="step-desc">Gulir ke bawah dan ketuk "Tambahkan ke Layar Utama", lalu ketuk Tambah.</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-icon">💡</div>
+    <div class="info-content"><strong>Aktifkan Notifikasi</strong>Saat diminta, izinkan notifikasi push agar Anda menerima peringatan pemesanan dan pengingat perjalanan secara real-time meskipun aplikasi sedang di latar belakang.</div>
+  </div>
+
+  <h2>3. Masuk ke Aplikasi</h2>
+  <p>Semua pengguna menggunakan layar login yang sama. <strong>Peran</strong> Anda (Staff, Driver, atau Koordinator) ditentukan oleh akun yang ditetapkan oleh admin — Anda tidak memilihnya sendiri.</p>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Masukkan email kerja Anda</div><div class="step-desc">Gunakan alamat email yang telah didaftarkan oleh admin PT Vale Anda.</div></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Masukkan kata sandi</div><div class="step-desc">Hubungi admin Anda jika lupa kredensial.</div></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Ketuk Masuk</div><div class="step-desc">Anda akan diarahkan secara otomatis ke layar utama yang sesuai dengan peran Anda.</div></div></div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>Panduan Pengguna v1.1</p>
+    <p>Halaman 3</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- HALAMAN 4 — REFERENSI STATUS PEMESANAN                -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner">
+    <div class="section-icon">🏷️</div>
+    <div>
+      <h1>Referensi Status Pemesanan</h1>
+      <p>Memahami setiap label status dalam sistem</p>
+    </div>
+  </div>
+
+  <h2>4. Status Pemesanan</h2>
+  <p>Setiap pemesanan melewati serangkaian status dari awal hingga selesai. Tabel di bawah menjelaskan masing-masing status.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Label Status</th>
+        <th>Arti</th>
+        <th>Langkah Berikutnya</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="pill pill-submitted">Terkirim</span></td>
+        <td>Pemesanan telah dibuat oleh staff dan menunggu proses lebih lanjut.</td>
+        <td>Sistem menugaskan pengemudi secara otomatis, atau koordinator meninjau.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-approval">Perlu Persetujuan</span></td>
+        <td>Pemesanan ini memerlukan tinjauan koordinator sebelum dapat dilanjutkan.</td>
+        <td>Koordinator harus Menyetujui atau Menolak.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-driver">Menunggu Driver</span></td>
+        <td>Taksi telah ditugaskan dan pengemudi telah diberitahu.</td>
+        <td>Driver harus Menerima atau Menolak dalam batas waktu.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-booked">Terkonfirmasi</span></td>
+        <td>Driver telah menerima. Perjalanan dikonfirmasi.</td>
+        <td>Driver memulai perjalanan pada waktu yang dijadwalkan.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-ontrip">Sedang Berjalan</span></td>
+        <td>Perjalanan sedang berlangsung. Driver sedang dalam perjalanan.</td>
+        <td>Driver menandai perjalanan sebagai Menunggu atau Selesai.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-completed">✓ Selesai</span></td>
+        <td>Perjalanan telah selesai. Dicatat dengan cap waktu penyelesaian aktual.</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-rejected">Ditolak</span></td>
+        <td>Koordinator atau sistem menolak pemesanan.</td>
+        <td>Staff dapat mengajukan ulang atau menghubungi koordinator.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-cancelled">Dibatalkan</span></td>
+        <td>Pemesanan dibatalkan sebelum perjalanan dimulai.</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Alur Pemesanan</h2>
+  <div class="flow">
+    <div class="flow-step">Terkirim</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step gold">Perlu Persetujuan<br/><span style="font-weight:400;font-size:9px;">(jika diperlukan)</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">Menunggu Driver</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">Terkonfirmasi</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">Sedang Berjalan</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step done">Selesai</div>
+  </div>
+
+  <h2>Jenis Perjalanan</h2>
+  <div class="two-col" style="margin-top:8px;">
+    <div class="info-box note" style="margin:0;">
+      <div class="info-icon">📍</div>
+      <div class="info-content">
+        <strong>DROP</strong>
+        Driver mengantar penumpang ke tujuan dan langsung pergi. Tidak perlu menunggu. Perjalanan satu arah standar.
+      </div>
+    </div>
+    <div class="info-box tip" style="margin:0;">
+      <div class="info-icon">⏱️</div>
+      <div class="info-content">
+        <strong>WAITING</strong>
+        Driver mengantar penumpang dan menunggu di tujuan untuk perjalanan pulang. Staff menentukan jumlah menit tunggu saat memesan.
+      </div>
+    </div>
+  </div>
+
+  <h2>Ringkasan Peran Pengguna</h2>
+  <table>
+    <thead>
+      <tr><th>Fitur</th><th>Staff</th><th>Driver</th><th>Koordinator</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Memesan perjalanan</td><td>✅</td><td>—</td><td>—</td></tr>
+      <tr><td>Melihat pemesanan sendiri</td><td>✅</td><td>—</td><td>—</td></tr>
+      <tr><td>Peta pelacakan langsung</td><td>✅</td><td>✅</td><td>✅</td></tr>
+      <tr><td>Terima / tolak pemesanan</td><td>—</td><td>✅</td><td>—</td></tr>
+      <tr><td>Mulai / selesaikan perjalanan</td><td>—</td><td>✅</td><td>—</td></tr>
+      <tr><td>Setujui / tolak pemesanan</td><td>—</td><td>—</td><td>✅</td></tr>
+      <tr><td>Lihat semua pemesanan</td><td>—</td><td>—</td><td>✅</td></tr>
+      <tr><td>Kalender Gantt</td><td>—</td><td>—</td><td>✅</td></tr>
+      <tr><td>Peta armada (semua driver)</td><td>—</td><td>—</td><td>✅</td></tr>
+      <tr><td>Kelola lokasi tersimpan</td><td>—</td><td>—</td><td>✅</td></tr>
+      <tr><td>Notifikasi push</td><td>✅</td><td>✅</td><td>✅</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>Panduan Pengguna v1.1</p>
+    <p>Halaman 4</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- HALAMAN 5 — PANDUAN STAFF                             -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner">
+    <div class="section-icon">👤</div>
+    <div>
+      <h1>Panduan Staff</h1>
+      <p>Memesan perjalanan, melacak taksi, dan mengelola notifikasi</p>
+    </div>
+    <div class="role-badge">STAFF</div>
+  </div>
+
+  <div class="role-header role-staff">
+    <div class="role-dot" style="background:#3B82F6;"></div>
+    <div>
+      <strong>Untuk siapa panduan ini?</strong>
+      <p>Karyawan PTVI khususnya di bawah departemen EPS yang perlu memesan taksi perusahaan untuk perjalanan dinas di dalam atau sekitar area site.</p>
+    </div>
+  </div>
+
+  <h2>5. Layar Beranda</h2>
+  <p>Setelah login, Staff melihat dasbor pemesanan pribadi mereka. Layar beranda menampilkan:</p>
+  <ul>
+    <li><strong>Kartu perjalanan aktif</strong> — jika ada perjalanan yang sedang berlangsung, akan muncul secara menonjol di bagian atas beserta tombol peta langsung.</li>
+    <li><strong>Pemesanan mendatang</strong> — perjalanan terkonfirmasi yang dijadwalkan hari ini dan waktu dekat.</li>
+    <li><strong>Riwayat terkini</strong> — perjalanan selesai atau dibatalkan sebelumnya.</li>
+    <li><strong>Aksi cepat</strong> — tombol Pesan Perjalanan tersedia secara jelas.</li>
+  </ul>
+
+  <div class="info-box tip">
+    <div class="info-icon">💡</div>
+    <div class="info-content"><strong>Pembaruan real-time</strong>Kartu pemesanan diperbarui secara otomatis tanpa perlu menyegarkan halaman. Perubahan status (misalnya "Driver Menerima") muncul secara langsung.</div>
+  </div>
+
+  <h2>6. Cara Memesan Perjalanan</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Ketuk "Pesan Perjalanan"</div>
+        <div class="step-desc">Dari layar Beranda atau tab Pesan di bilah navigasi bawah.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Masukkan Lokasi Jemput</div>
+        <div class="step-desc">Ketik alamat penjemputan, atau pilih lokasi site PT Vale yang telah tersimpan dari daftar. Menggunakan lokasi tersimpan menghindari kesalahan GPS di dalam area pabrik.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Masukkan Tujuan</div>
+        <div class="step-desc">Ketik tujuan atau pilih dari lokasi tersimpan.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Atur Tanggal &amp; Waktu</div>
+        <div class="step-desc">Pilih tanggal dan waktu kebutuhan taksi. Anda dapat memesan lebih awal.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">Pilih Jenis Perjalanan</div>
+        <div class="step-desc">Pilih <span class="pill pill-drop">DROP</span> untuk perjalanan satu arah, atau <span class="pill pill-waiting-trip">WAITING</span> jika driver harus menunggu Anda. Untuk WAITING, atur estimasi waktu tunggu dalam menit.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <div class="step-title">Tambah Catatan (opsional)</div>
+        <div class="step-desc">Masukkan instruksi khusus untuk driver atau koordinator.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">7</div>
+      <div class="step-body">
+        <div class="step-title">Kirim</div>
+        <div class="step-desc">Ketuk Kirim. Anda akan menerima notifikasi push saat pemesanan dikonfirmasi dan driver ditugaskan.</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>7. Penjelasan Jenis Perjalanan</h2>
+  <table>
+    <thead><tr><th>Jenis</th><th>Kapan digunakan</th><th>Perilaku driver</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="pill pill-drop">DROP</span></td>
+        <td>Perjalanan satu arah. Anda tidak memerlukan driver untuk menunggu.</td>
+        <td>Mengantar Anda dan perjalanan langsung berakhir.</td>
+      </tr>
+      <tr>
+        <td><span class="pill pill-waiting-trip">WAITING</span></td>
+        <td>Anda memerlukan driver untuk menunggu di tujuan (misalnya rapat dengan perjalanan pulang).</td>
+        <td>Mengantar Anda, menunggu selama menit yang ditentukan, lalu Anda kembali. Pemesanan mencakup seluruh durasi.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box warn">
+    <div class="info-icon">⚠️</div>
+    <div class="info-content"><strong>Waktu pemesanan minimum</strong>Selalu pesan minimal 15 menit sebelum waktu keberangkatan yang dibutuhkan agar sistem dapat menugaskan dan memberitahu driver.</div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>Panduan Pengguna v1.1</p>
+    <p>Halaman 5</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- HALAMAN 6 — PANDUAN STAFF (lanjutan)                  -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner" style="background:#1E3A5F;">
+    <div class="section-icon">🗺️</div>
+    <div>
+      <h1>Panduan Staff — Pelacakan Langsung</h1>
+      <p>Ikuti perjalanan Anda secara real-time di peta</p>
+    </div>
+    <div class="role-badge">STAFF</div>
+  </div>
+
+  <h2>8. Peta Pelacakan Perjalanan Langsung</h2>
+  <p>Setelah perjalanan dikonfirmasi dan driver memulai perjalanan, Anda dapat melacak posisi driver secara real-time.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Buka kartu perjalanan aktif</div>
+        <div class="step-desc">Di layar Beranda, ketuk kartu pemesanan aktif saat statusnya <span class="pill pill-ontrip">Sedang Berjalan</span>.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Lihat peta langsung</div>
+        <div class="step-desc">Peta terbuka menampilkan posisi driver saat ini (penanda mobil biru) dan garis rute dari lokasi mereka ke tujuan Anda.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Rute diperbarui otomatis</div>
+        <div class="step-desc">Posisi driver dan rute dihitung ulang saat kendaraan bergerak. Tidak perlu menyegarkan secara manual.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen-box">
+    <div class="screen-title">📱 Yang Anda lihat di peta</div>
+    <ul>
+      <li><strong>🚗 Penanda driver</strong> — posisi GPS langsung taksi Anda</li>
+      <li><strong>📍 Pin tujuan</strong> — titik penurunan Anda</li>
+      <li><strong>Garis rute biru</strong> — rute mengikuti jalan dari driver ke tujuan</li>
+      <li><strong>Panel detail perjalanan</strong> — nama driver, nama taksi, titik jemput, tujuan</li>
+    </ul>
+  </div>
+
+  <h2>Notifikasi yang Akan Anda Terima</h2>
+  <table>
+    <thead><tr><th>Kejadian</th><th>Notifikasi</th></tr></thead>
+    <tbody>
+      <tr><td>Pemesanan terkirim</td><td>Konfirmasi bahwa pemesanan Anda telah diterima.</td></tr>
+      <tr><td>Koordinator menyetujui</td><td>Pemesanan Anda telah disetujui dan sedang diproses.</td></tr>
+      <tr><td>Driver ditugaskan &amp; menerima</td><td>"Driver [Nama] di [Taksi] telah dikonfirmasi untuk perjalanan Anda."</td></tr>
+      <tr><td>Driver menolak</td><td>Driver baru akan ditugaskan secara otomatis.</td></tr>
+      <tr><td>Pemesanan ditolak</td><td>Alasan penolakan disertakan (jika diberikan koordinator).</td></tr>
+      <tr><td>Pengingat 15 menit</td><td>Pengingat 15 menit sebelum keberangkatan yang dijadwalkan.</td></tr>
+      <tr><td>Perjalanan dimulai</td><td>Driver telah memulai perjalanan Anda.</td></tr>
+      <tr><td>Perjalanan selesai</td><td>Perjalanan Anda telah ditandai sebagai selesai.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Melihat Notifikasi Anda</h2>
+  <p>Ketuk <strong>ikon 🔔 lonceng</strong> di sudut kanan atas layar Beranda untuk membuka panel Notifikasi. Semua notifikasi sebelumnya tercantum di sana secara kronologis. Notifikasi yang belum dibaca disorot — ketuk untuk menandai sebagai sudah dibaca.</p>
+
+  <h2>Profil</h2>
+  <p>Akses profil Anda melalui tab <strong>Profil</strong> di navigasi bawah. Dari sini Anda dapat:</p>
+  <ul>
+    <li>Melihat nama akun, email, dan peran Anda</li>
+    <li>Keluar dari aplikasi</li>
+  </ul>
+
+  <div class="info-box note">
+    <div class="info-icon">ℹ️</div>
+    <div class="info-content"><strong>Manajemen akun</strong>Untuk mengubah kata sandi atau memperbarui detail profil, hubungi administrator sistem PT Vale Anda. Pengeditan akun mandiri tidak tersedia di versi ini.</div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>Panduan Pengguna v1.1</p>
+    <p>Halaman 6</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- HALAMAN 7 — PANDUAN DRIVER                            -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner" style="background:#065F46;">
+    <div class="section-icon">🚗</div>
+    <div>
+      <h1>Panduan Driver</h1>
+      <p>Menerima, menyetujui, dan menjalankan perjalanan taksi perusahaan</p>
+    </div>
+    <div class="role-badge">DRIVER</div>
+  </div>
+
+  <div class="role-header role-driver">
+    <div class="role-dot" style="background:#059669;"></div>
+    <div>
+      <strong>Untuk siapa panduan ini?</strong>
+      <p>Driver departemen EPS yang ditugaskan pada unit taksi perusahaan, bertanggung jawab menjemput dan mengantarkan karyawan PTVI untuk perjalanan dinas di dalam dan sekitar area site.</p>
+    </div>
+  </div>
+
+  <h2>9. Beranda Driver — Antrean Perjalanan</h2>
+  <p>Setelah login, driver melihat dasbor perjalanan pribadi mereka:</p>
+  <ul>
+    <li><strong>Perjalanan aktif</strong> — perjalanan yang sedang berlangsung dengan peta dan kontrol.</li>
+    <li><strong>Perjalanan mendatang</strong> — pemesanan yang telah diterima dan dijadwalkan untuk hari ini.</li>
+    <li><strong>Permintaan tertunda</strong> — pemesanan baru yang menunggu respons Terima/Tolak Anda.</li>
+  </ul>
+  <p>Layar diperbarui secara real-time setiap kali pemesanan baru ditugaskan ke taksi Anda.</p>
+
+  <div class="info-box warn">
+    <div class="info-icon">⚠️</div>
+    <div class="info-content"><strong>Biarkan aplikasi tetap terbuka</strong>Agar pelacakan GPS berfungsi dan peringatan pemesanan instan diterima, biarkan TaxiBook EPS tetap terbuka atau terinstal sebagai PWA di perangkat Anda selama jam kerja.</div>
+  </div>
+
+  <h2>10. Terima atau Tolak Pemesanan</h2>
+  <p>Ketika perjalanan baru ditugaskan ke taksi Anda, Anda menerima notifikasi push dan pemesanan muncul di layar beranda sebagai permintaan tertunda.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Tinjau detail pemesanan</div>
+        <div class="step-desc">Periksa titik jemput, tujuan, waktu yang dijadwalkan, dan jenis perjalanan (DROP atau WAITING).</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Ketuk Terima atau Tolak</div>
+        <div class="step-desc">Jika Anda dapat memenuhi perjalanan, ketuk <strong>Terima</strong>. Penumpang langsung diberitahu. Jika tidak bisa, ketuk <strong>Tolak</strong> — sistem akan mencoba menugaskan ulang ke driver lain yang tersedia.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-icon">💡</div>
+    <div class="info-content"><strong>Penolakan berulang dicatat</strong>Koordinator dapat melihat berapa banyak perjalanan yang Anda tolak hari ini. Penolakan berlebihan dapat memicu tinjauan oleh koordinator.</div>
+  </div>
+
+  <h2>11. Menjalankan Perjalanan</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Ketuk "Mulai Perjalanan"</div>
+        <div class="step-desc">Saat Anda berangkat menjemput penumpang, ketuk Mulai Perjalanan. Status pemesanan berubah menjadi <span class="pill pill-ontrip">Sedang Berjalan</span>. Penumpang kini dapat melihat posisi langsung Anda di peta mereka.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Mengemudi ke tujuan</div>
+        <div class="step-desc">Posisi GPS Anda diperbarui secara otomatis setiap beberapa detik. Biarkan aplikasi tetap terbuka dan layar menyala untuk akurasi pelacakan terbaik.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Untuk perjalanan WAITING — ketuk "Tiba / Menunggu"</div>
+        <div class="step-desc">Saat Anda tiba di tujuan dan penumpang turun, ketuk tombol ini. Status menjadi <span class="pill pill-waiting">Menunggu</span> dan timer dimulai.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Ketuk "Selesaikan Perjalanan"</div>
+        <div class="step-desc">Setelah perjalanan sepenuhnya selesai (penumpang diantar, atau masa tunggu habis), ketuk Selesaikan Perjalanan. Pemesanan mencatat cap waktu selesai aktual dan ditutup.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>Panduan Pengguna v1.1</p>
+    <p>Halaman 7</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- HALAMAN 8 — PANDUAN DRIVER (lanjutan)                 -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner" style="background:#065F46;">
+    <div class="section-icon">📡</div>
+    <div>
+      <h1>Panduan Driver — GPS &amp; Peta</h1>
+      <p>Pelacakan lokasi dan peta perjalanan aktif</p>
+    </div>
+    <div class="role-badge">DRIVER</div>
+  </div>
+
+  <h2>12. Pelacakan GPS</h2>
+  <p>TaxiBook EPS melacak posisi kendaraan Anda secara otomatis saat Anda memiliki perjalanan aktif. Lokasi ini dibagikan kepada penumpang dan peta armada koordinator.</p>
+
+  <div class="screen-box">
+    <div class="screen-title">📱 Persyaratan GPS</div>
+    <ul>
+      <li>Aktifkan <strong>Layanan Lokasi</strong> di perangkat Anda dan izinkan TaxiBook EPS mengakses lokasi Anda.</li>
+      <li>Untuk Android: atur izin lokasi ke <strong>"Izinkan setiap saat"</strong> untuk pelacakan latar belakang.</li>
+      <li>Akurasi GPS terbaik di luar ruangan. Di dalam gedung, akurasi mungkin berkurang.</li>
+      <li>Posisi terakhir Anda disimpan — jika sinyal GPS hilang sebentar, posisi terakhir yang diketahui akan ditampilkan.</li>
+    </ul>
+  </div>
+
+  <h2>Tampilan Peta Driver</h2>
+  <p>Selama perjalanan aktif, layar beranda driver menampilkan peta langsung dengan:</p>
+  <ul>
+    <li><strong>Posisi Anda</strong> — diperbarui setiap beberapa detik</li>
+    <li><strong>Garis rute</strong> — rute mengikuti jalan dari posisi Anda saat ini ke tujuan (ditenagai oleh OpenRouteService)</li>
+    <li><strong>Penanda tujuan</strong> — berlabel jelas dengan alamat</li>
+  </ul>
+
+  <div class="info-box tip">
+    <div class="info-icon">💡</div>
+    <div class="info-content"><strong>Wake Lock</strong>Aplikasi menjaga layar Anda tetap aktif selama perjalanan untuk mencegah GPS berhenti. Perangkat Anda mungkin menggunakan lebih banyak baterai — pastikan tetap terisi atau terhubung saat perjalanan panjang.</div>
+  </div>
+
+  <h2>Notifikasi yang Diterima Driver</h2>
+  <table>
+    <thead><tr><th>Kejadian</th><th>Notifikasi</th></tr></thead>
+    <tbody>
+      <tr><td>Pemesanan baru ditugaskan</td><td>Peringatan dengan nama penumpang, titik jemput, tujuan, dan waktu. Ketuk untuk membuka.</td></tr>
+      <tr><td>Pemesanan ditugaskan ulang</td><td>Pemesanan yang sebelumnya ditugaskan telah dipindahkan ke driver lain.</td></tr>
+      <tr><td>Pengingat 15 menit</td><td>Pengingat 15 menit sebelum waktu mulai perjalanan.</td></tr>
+      <tr><td>Pengingat mulai perjalanan</td><td>Pengingat tepat pada waktu keberangkatan yang dijadwalkan.</td></tr>
+      <tr><td>Peringatan terlambat</td><td>Jika perjalanan sudah jauh melewati waktu mulai dan belum dimulai.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Profil Driver</h2>
+  <p>Akses profil Anda dari tab <strong>Profil</strong> di navigasi bawah. Profil Anda menampilkan:</p>
+  <ul>
+    <li>Nama dan informasi kontak Anda</li>
+    <li>Taksi yang saat ini ditugaskan kepada Anda</li>
+    <li>Status ketersediaan online/offline Anda</li>
+  </ul>
+
+  <h2>Navigasi Bawah — Driver</h2>
+  <table>
+    <thead><tr><th>Tab</th><th>Ikon</th><th>Keterangan</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Perjalanan</strong></td><td>🏠</td><td>Layar beranda utama — lihat perjalanan tertunda, aktif, dan mendatang.</td></tr>
+      <tr><td><strong>Profil</strong></td><td>👤</td><td>Info akun, pengalih ketersediaan, dan keluar.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="info-box warn">
+    <div class="info-icon">⚠️</div>
+    <div class="info-content"><strong>GPS tidak aktif</strong>Sistem menganggap GPS Anda "tidak aktif" jika tidak ada pembaruan lokasi yang dikirim dalam 10 menit terakhir. Koordinator dapat melihat apakah GPS Anda aktif atau tidak aktif di peta armada. Selalu biarkan aplikasi terbuka saat bertugas.</div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>Panduan Pengguna v1.1</p>
+    <p>Halaman 8</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- HALAMAN 9 — PANDUAN KOORDINATOR                       -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner">
+    <div class="section-icon">📋</div>
+    <div>
+      <h1>Panduan Koordinator</h1>
+      <p>Mengelola pemesanan, armada, dan persetujuan</p>
+    </div>
+    <div class="role-badge">KOORDINATOR</div>
+  </div>
+
+  <div class="role-header role-coordinator">
+    <div class="role-dot" style="background:#006064;"></div>
+    <div>
+      <strong>Untuk siapa panduan ini?</strong>
+      <p>Koordinator departemen EPS yang bertanggung jawab mengawasi armada perusahaan, menyetujui permintaan perjalanan, memantau semua driver secara real-time, dan memastikan kelancaran operasional transportasi harian di area PTVI.</p>
+    </div>
+  </div>
+
+  <h2>13. Beranda Koordinator — Manajemen Pemesanan</h2>
+  <p>Layar beranda koordinator adalah dasbor dispatch lengkap dengan tiga tab tampilan di bagian atas:</p>
+
+  <table>
+    <thead><tr><th>Tab</th><th>Keterangan</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Pemesanan</strong></td><td>Daftar semua pemesanan dengan filter status, pemilih rentang tanggal, dan tindakan persetujuan.</td></tr>
+      <tr><td><strong>Kalender</strong></td><td>Jadwal visual bergaya Gantt dari semua perjalanan taksi (tampilan Hari / Minggu / Bulan).</td></tr>
+      <tr><td><strong>Peta</strong></td><td>Peta armada langsung yang tertanam di layar beranda.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Tab Pemesanan — Filter</h3>
+  <div class="pill-row">
+    <span class="pill pill-submitted" style="cursor:default;">Semua</span>
+    <span class="pill pill-driver">Tertunda</span>
+    <span class="pill pill-booked">Terkonfirmasi</span>
+    <span class="pill pill-completed">Selesai</span>
+  </div>
+  <p>Gunakan <strong>pemilih rentang tanggal</strong> untuk memfilter pemesanan berdasarkan tanggal yang dijadwalkan. Pintasan <strong>Hari Ini</strong> mengatur ulang ke tanggal hari ini. Gunakan <strong>Muat lebih banyak</strong> untuk halaman berikutnya dari pemesanan lama.</p>
+
+  <h2>14. Setujui &amp; Tolak Pemesanan</h2>
+  <p>Beberapa pemesanan memerlukan persetujuan koordinator sebelum driver dapat ditugaskan. Ini muncul di bagian sorotan di bagian paling atas tab Pemesanan dengan lencana oranye yang menunjukkan jumlahnya.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Tinjau kartu pemesanan</div>
+        <div class="step-desc">Periksa nama penumpang, titik jemput, tujuan, waktu, dan jenis perjalanan.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Ketuk Setujui atau Tolak</div>
+        <div class="step-desc">Menyetujui meneruskan pemesanan ke penugasan driver. Menolak membatalkan pemesanan — Anda dapat memasukkan alasan secara opsional.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Tugaskan Ulang Taksi (jika diperlukan)</div>
+        <div class="step-desc">Ketuk tombol "🔄 Tugaskan ulang taksi" pada pemesanan yang dikonfirmasi untuk memindahkannya ke driver lain yang tersedia.</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>15. Tampilan Kalender (Gantt)</h2>
+  <p>Beralih ke tab <strong>Kalender</strong> untuk melihat garis waktu visual dari semua perjalanan. Kalender memiliki tiga mode tampilan:</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-title">📅 Tampilan Hari</div>
+      <div class="card-desc">Gantt horizontal. Setiap baris adalah taksi. Setiap blok adalah pemesanan. Gulir kiri/kanan melalui jam 07:00–19:00. Garis merah "Sekarang" menunjukkan waktu saat ini.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🗓️ Tampilan Minggu</div>
+      <div class="card-desc">Satu kolom per hari dalam seminggu. Setiap baris taksi menampilkan pemesanan sebagai blok berkode warna. Berguna untuk melihat hari-hari sibuk.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🗓️ Tampilan Bulan</div>
+      <div class="card-desc">Kalender bulanan tradisional dengan titik berwarna per pemesanan. Ketuk hari untuk masuk ke Tampilan Hari.</div>
+    </div>
+    <div class="card" style="border-color:var(--gold-dark);">
+      <div class="card-title">✓ Perjalanan Selesai</div>
+      <div class="card-desc">Perjalanan selesai muncul sebagai blok abu-abu redup di Gantt yang menunjukkan waktu selesai aktual (Selesai HH:mm). Hanya terlihat di kalender koordinator.</div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>Panduan Pengguna v1.1</p>
+    <p>Halaman 9</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- HALAMAN 10 — KOORDINATOR (lanjutan)                   -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner">
+    <div class="section-icon">🗺️</div>
+    <div>
+      <h1>Panduan Koordinator — Armada &amp; Lokasi</h1>
+      <p>Peta armada langsung, manajemen driver, dan lokasi tersimpan</p>
+    </div>
+    <div class="role-badge">KOORDINATOR</div>
+  </div>
+
+  <h2>16. Tampilan Peta Armada</h2>
+  <p>Tab <strong>Peta</strong> di beranda koordinator, dan halaman <strong>Peta Armada</strong> khusus (dapat diakses dari navigasi bawah), keduanya menampilkan peta overhead langsung dari semua taksi perusahaan.</p>
+
+  <div class="screen-box">
+    <div class="screen-title">🗺️ Yang Anda lihat di Peta Armada</div>
+    <ul>
+      <li><strong>Penanda driver</strong> — setiap taksi ditampilkan sebagai pin berkode warna di posisi GPS mereka saat ini.</li>
+      <li><strong>Garis rute</strong> — untuk driver yang sedang dalam perjalanan, garis rute mengikuti jalan (berwarna sesuai taksi) berjalan dari driver ke tujuan mereka saat ini.</li>
+      <li><strong>Label tujuan</strong> — label pill menampilkan nama taksi di titik tujuan agar rute tidak tertukar.</li>
+      <li><strong>GPS tidak aktif</strong> — driver yang lokasinya tidak diperbarui selama 10+ menit muncul dengan opasitas berkurang.</li>
+    </ul>
+  </div>
+
+  <h3>Peta Armada — Panel Papan Driver</h3>
+  <p>Panel mengambang di bagian bawah peta menampilkan daftar semua driver yang dapat digulir:</p>
+  <ul>
+    <li>Batas berkode warna yang cocok dengan warna taksi</li>
+    <li>Status <strong>● Online</strong> / <strong>○ Offline</strong> (berdasarkan penugasan dan ketersediaan driver)</li>
+    <li>Indikator GPS aktif (ikon satelit hijau)</li>
+    <li>Untuk driver yang sedang dalam perjalanan: rute jemput → tujuan ditampilkan sebagai baris berwarna</li>
+  </ul>
+  <p>Pill header menampilkan hitungan langsung: <strong>X online · Y offline · N GPS aktif</strong>.</p>
+
+  <h2>17. Manajemen Pengemudi</h2>
+  <p>Akses halaman <strong>Driver</strong> dari navigasi bawah untuk melihat semua pengemudi dan taksi yang terdaftar.</p>
+  <ul>
+    <li>Lihat nama setiap driver, taksi yang ditugaskan, dan status ketersediaan saat ini.</li>
+    <li>Lihat perjalanan yang diselesaikan hari ini dan jumlah penolakan (jumlah penolakan yang tinggi disorot merah sebagai peringatan).</li>
+    <li>Alihkan status <strong>tersedia/tidak tersedia</strong> taksi langsung dari layar ini.</li>
+  </ul>
+
+  <div class="info-box warn">
+    <div class="info-icon">⚠️</div>
+    <div class="info-content"><strong>Menandai taksi tidak tersedia</strong>Saat Anda menandai taksi sebagai tidak tersedia, taksi tersebut tidak akan lagi menerima penugasan pemesanan baru. Gunakan ini saat kendaraan sedang dalam perawatan atau driver sedang tidak bertugas.</div>
+  </div>
+
+  <h2>18. Lokasi Tersimpan</h2>
+  <p>Fitur <strong>Lokasi Tersimpan</strong> memungkinkan koordinator mendaftarkan tempat bernama di dalam area PT Vale. Lokasi ini muncul sebagai pilihan saat staff memesan perjalanan, mencegah kesalahan geocoding GPS di dalam area pabrik.</p>
+
+  <h3>Membuka Lokasi Tersimpan</h3>
+  <p>Dari beranda koordinator, ketuk <strong>avatar Anda (sudut kanan atas)</strong> → pilih <strong>"Lokasi Tersimpan"</strong> dari menu dropdown.</p>
+
+  <h3>Tata Letak Halaman</h3>
+  <p>Halaman Lokasi Tersimpan menggunakan <strong>tata letak berdampingan</strong>:</p>
+  <div class="two-col" style="margin:10px 0;">
+    <div class="screen-box" style="margin:0;">
+      <div class="screen-title">🗺️ Kiri — Peta Interaktif</div>
+      <ul>
+        <li>Semua lokasi tersimpan ditampilkan sebagai <strong>penanda bintang ★ oranye</strong> di peta.</li>
+        <li>Ketuk penanda mana saja untuk melihat <strong>popup</strong> berisi nama, alamat, dan koordinat GPS yang tepat.</li>
+        <li>Gunakan <strong>tombol ⊞ fit</strong> (kanan atas peta) untuk memperkecil dan menampilkan semua pin sekaligus.</li>
+        <li>Gerakan cubit untuk zoom dan geser bekerja seperti biasa.</li>
+      </ul>
+    </div>
+    <div class="screen-box" style="margin:0;">
+      <div class="screen-title">📋 Kanan — Daftar Lokasi</div>
+      <ul>
+        <li>Semua lokasi tersimpan terdaftar sebagai kartu, diurutkan berdasarkan nama.</li>
+        <li>Setiap kartu menampilkan <strong>nama</strong>, <strong>alamat</strong>, dan <strong>koordinat GPS</strong> lokasi.</li>
+        <li>Ketuk kartu untuk menerbangkan peta ke penanda lokasi tersebut.</li>
+        <li>Gunakan <strong>"Muat lebih banyak"</strong> di bagian bawah daftar untuk halaman berikutnya saat lokasi banyak.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Menambah Lokasi Baru</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Ketuk "+ Tambah Lokasi"</div>
+        <div class="step-desc">Tombol muncul di bagian atas panel daftar. Pemilih peta layar penuh terbuka.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Tandai lokasi yang tepat</div>
+        <div class="step-desc">Ketuk di mana saja di peta untuk menjatuhkan pin, atau ketik alamat di bilah pencarian untuk melompat ke lokasi. Pin menampilkan koordinat tepat yang akan disimpan.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Masukkan nama</div>
+        <div class="step-desc">Berikan nama yang jelas dan deskriptif — misalnya <em>"Gerbang Utama"</em>, <em>"Klinik Sorowako"</em>, <em>"Warehouse Gate 3"</em>. Staff akan melihat nama ini saat memesan.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Ketuk Simpan</div>
+        <div class="step-desc">Lokasi langsung tersimpan dan muncul di peta dan daftar untuk semua pengguna.</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Mengedit atau Menghapus Lokasi</h3>
+  <p>Setiap kartu di daftar lokasi memiliki <strong>tombol menu ⋮ tiga titik</strong> di sudut kanan atas kartu. Ketuk untuk membuka dropdown dengan dua pilihan:</p>
+  <div class="two-col" style="margin:8px 0;">
+    <div class="info-box tip" style="margin:0;">
+      <div class="info-icon">✏️</div>
+      <div class="info-content"><strong>Edit</strong>Membuka pemilih lokasi agar Anda dapat memindahkan pin dan mengubah nama lokasi. Simpan untuk menerapkan.</div>
+    </div>
+    <div class="info-box warn" style="margin:0;">
+      <div class="info-icon">🗑️</div>
+      <div class="info-content"><strong>Hapus</strong>Menghapus lokasi secara permanen. Lokasi tidak akan lagi muncul sebagai pilihan saat staff memesan perjalanan.</div>
+    </div>
+  </div>
+
+  <div class="info-box note">
+    <div class="info-icon">ℹ️</div>
+    <div class="info-content"><strong>Mengapa Lokasi Tersimpan penting</strong>Di dalam area pabrik PT Vale, pencarian alamat berbasis GPS (geocoding) tidak dapat diandalkan dan dapat memberikan alamat jalan yang salah. Menggunakan lokasi tersimpan yang telah dipin sebelumnya memberikan titik jemput dan tujuan yang akurat dengan koordinat tepat — tidak perlu menebak-nebak.</div>
+  </div>
+
+  <h2>Navigasi Koordinator</h2>
+  <table>
+    <thead><tr><th>Tab</th><th>Ikon</th><th>Keterangan</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Beranda</strong></td><td>⊞</td><td>Dasbor dispatch — pemesanan, kalender, dan peta tertanam.</td></tr>
+      <tr><td><strong>Driver</strong></td><td>👥</td><td>Semua driver dan taksi, status online, statistik perjalanan, dan pengalih ketersediaan.</td></tr>
+      <tr><td><strong>Peta</strong></td><td>🗺️</td><td>Peta armada layar penuh khusus dengan panel papan driver langsung.</td></tr>
+      <tr><td><strong>Profil</strong></td><td>👤</td><td>Info akun, tautan Lokasi Tersimpan, dan keluar.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>Panduan Pengguna v1.1</p>
+    <p>Halaman 10</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- HALAMAN 11 — PAPAN DISPATCH                           -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner" style="background:#1a1c1b;">
+    <div class="section-icon">🖥️</div>
+    <div>
+      <h1>Papan Dispatch</h1>
+      <p>Dasbor real-time layar penuh untuk ruang kendali dan layar besar</p>
+    </div>
+    <div class="role-badge">SEMUA PERAN</div>
+  </div>
+
+  <h2>19. Gambaran Umum Papan Dispatch</h2>
+  <p>Papan Dispatch adalah tampilan layar penuh khusus yang dapat diakses di <code>/board</code>. Dirancang untuk monitor besar di ruang kendali atau area resepsi, memberikan gambaran real-time lengkap dari seluruh armada dan jadwal tanpa perlu berpindah halaman.</p>
+
+  <div class="card-grid">
+    <div class="card" style="border-color:#1a1c1b;">
+      <div class="card-icon">📊</div>
+      <div class="card-title">Bilah Statistik</div>
+      <div class="card-desc">Penghitung langsung di bagian atas: Perjalanan Aktif, Pemesanan Terkonfirmasi, Persetujuan Tertunda, Taksi Tersedia.</div>
+    </div>
+    <div class="card" style="border-color:#1a1c1b;">
+      <div class="card-icon">🚗</div>
+      <div class="card-title">Strip Armada</div>
+      <div class="card-desc">Kartu untuk setiap taksi yang menampilkan: status saat ini (tujuan perjalanan aktif, waktu pemesanan berikutnya, atau Bebas/Tidak Tersedia).</div>
+    </div>
+    <div class="card" style="border-color:#1a1c1b;">
+      <div class="card-icon">⏱️</div>
+      <div class="card-title">Jam Langsung</div>
+      <div class="card-desc">Jam digital besar (HH:MM:SS) dan tanggal lengkap ditampilkan di sudut kanan atas, diperbarui setiap detik.</div>
+    </div>
+    <div class="card" style="border-color:#1a1c1b;">
+      <div class="card-icon">🔄</div>
+      <div class="card-title">Pembaruan Real-time</div>
+      <div class="card-desc">Semua data disegarkan secara otomatis melalui langganan database langsung — tidak perlu penyegaran manual.</div>
+    </div>
+  </div>
+
+  <h2>20. Tampilan Kalender</h2>
+  <p>Empat tampilan dapat dipilih dari bilah tab di bagian atas bagian kalender:</p>
+
+  <table>
+    <thead><tr><th>Tampilan</th><th>Terbaik untuk</th><th>Fitur utama</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Hari</strong></td>
+        <td>Jadwal operasional hari ini</td>
+        <td>Gantt horizontal per taksi, jam 07:00–20:00, garis merah "Sekarang", tooltip hover dengan detail pemesanan</td>
+      </tr>
+      <tr>
+        <td><strong>Minggu</strong></td>
+        <td>Perencanaan mingguan dan penyeimbangan beban</td>
+        <td>Sumbu waktu vertikal, 7 kolom hari, blok pemesanan berdasarkan warna taksi</td>
+      </tr>
+      <tr>
+        <td><strong>Bulan</strong></td>
+        <td>Visibilitas jangka panjang</td>
+        <td>Kalender bulan standar dengan titik pemesanan, klik hari untuk masuk ke tampilan Hari</td>
+      </tr>
+      <tr>
+        <td><strong>Peta</strong></td>
+        <td>Gambaran lokasi armada</td>
+        <td>Peta armada langsung yang tertanam di papan — semua posisi driver dan rute perjalanan aktif</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Perjalanan Selesai di Kalender</h3>
+  <p>Perjalanan selesai muncul di tampilan Gantt Hari dan Minggu sebagai <strong>blok abu-abu redup</strong> dengan tanda centang <strong>✓</strong>. Blok mencakup dari waktu mulai yang dijadwalkan hingga waktu penyelesaian <em>aktual</em>, dan menampilkan <strong>"Selesai HH:mm"</strong> — memberikan koordinator gambaran akurat tentang berapa lama setiap perjalanan sebenarnya berlangsung.</p>
+
+  <div class="screen-box">
+    <div class="screen-title">🗺️ Tooltip Hover — Detail Pemesanan</div>
+    <p style="margin:0;font-size:11px;">Dalam tampilan Hari dan Minggu, mengarahkan kursor ke blok pemesanan mana saja menampilkan popup dengan: nama penumpang, waktu yang dijadwalkan, tujuan, jenis perjalanan, nama taksi, dan status saat ini.</p>
+  </div>
+
+  <h3>Keterangan</h3>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin:10px 0;">
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="display:inline-block;width:20px;height:2px;background:#EF4444;"></span> Sekarang (waktu saat ini)</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="display:inline-block;width:20px;height:10px;border:1.5px dashed #9ca3af;border-radius:2px;"></span> Pemesanan tertunda</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="display:inline-block;width:20px;height:10px;border:1.5px solid #006064;border-radius:2px;background:rgba(0,96,100,0.15);"></span> Pemesanan terkonfirmasi</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="display:inline-block;width:20px;height:10px;border:1.5px solid #CBD5E1;border-radius:2px;background:#F1F5F9;"></span> ✓ Perjalanan selesai</div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>Panduan Pengguna v1.1</p>
+    <p>Halaman 11</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- HALAMAN 12 — NOTIFIKASI & OTOMASI                     -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner" style="background:#4C1D95;">
+    <div class="section-icon">🔔</div>
+    <div>
+      <h1>Notifikasi Push &amp; Otomasi</h1>
+      <p>Cara sistem menginformasikan semua pihak secara otomatis</p>
+    </div>
+  </div>
+
+  <h2>21. Notifikasi Push</h2>
+  <p>TaxiBook EPS mengirim notifikasi push ke semua peran — bahkan ketika aplikasi ditutup — selama aplikasi terinstal sebagai PWA dan notifikasi diaktifkan.</p>
+
+  <div class="info-box note">
+    <div class="info-icon">ℹ️</div>
+    <div class="info-content"><strong>Pengaturan pertama kali</strong>Saat pertama kali membuka TaxiBook EPS, Anda akan diminta untuk mengizinkan notifikasi. Ketuk <strong>Izinkan</strong>. Jika Anda tidak sengaja mengetuk Blokir, buka Pengaturan browser/perangkat Anda → Izin Situs → Notifikasi → aktifkan untuk URL TaxiBook EPS.</div>
+  </div>
+
+  <h3>Referensi Notifikasi Lengkap</h3>
+  <table>
+    <thead><tr><th>Kejadian</th><th>Dikirim ke</th><th>Pesan</th></tr></thead>
+    <tbody>
+      <tr><td>Pemesanan terkirim</td><td>Koordinator</td><td>Pemesanan baru dari [nama Staff] memerlukan perhatian.</td></tr>
+      <tr><td>Pemesanan disetujui</td><td>Staff</td><td>Pemesanan Anda telah disetujui.</td></tr>
+      <tr><td>Pemesanan ditolak</td><td>Staff</td><td>Pemesanan Anda ditolak. [Alasan jika diberikan]</td></tr>
+      <tr><td>Driver ditugaskan</td><td>Driver</td><td>Perjalanan baru ditugaskan: [Penumpang] → [Tujuan] pukul [Waktu].</td></tr>
+      <tr><td>Driver menerima</td><td>Staff</td><td>[Nama driver] di [Taksi] telah menerima pemesanan Anda.</td></tr>
+      <tr><td>Driver menolak</td><td>Staff, Koordinator</td><td>Driver menolak perjalanan. Penugasan ulang sedang berlangsung.</td></tr>
+      <tr><td>Pengingat 15 menit</td><td>Staff, Driver</td><td>Perjalanan Anda dimulai dalam 15 menit.</td></tr>
+      <tr><td>Pengingat mulai</td><td>Driver</td><td>Saatnya memulai perjalanan ke [Tujuan].</td></tr>
+      <tr><td>Peringatan terlambat</td><td>Driver, Koordinator</td><td>Perjalanan [ID] sudah terlambat dan belum dimulai.</td></tr>
+      <tr><td>Perjalanan selesai</td><td>Staff</td><td>Perjalanan Anda telah selesai. Terima kasih.</td></tr>
+      <tr><td>Diselesaikan otomatis</td><td>Staff, Koordinator</td><td>Perjalanan diselesaikan otomatis oleh sistem setelah waktu selesai yang dijadwalkan.</td></tr>
+      <tr><td>Taksi ditugaskan ulang</td><td>Staff, Driver</td><td>Pemesanan Anda telah ditugaskan ulang ke taksi yang berbeda.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>22. Auto-Complete &amp; Pengingat Otomatis</h2>
+  <p>Sistem menjalankan pekerjaan otomatis untuk menangani perjalanan dan pengingat tanpa intervensi manual:</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-title">⏰ Auto-Complete</div>
+      <div class="card-desc">Jika driver lupa menandai perjalanan sebagai selesai, sistem secara otomatis menutupnya setelah waktu selesai yang diharapkan berlalu. Notifikasi dikirim ke kedua pihak.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🔔 Pengingat 15 Menit</div>
+      <div class="card-desc">Dikirim ke staff dan driver 15 menit sebelum waktu keberangkatan yang dijadwalkan, agar semua orang siap.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🚨 Pengingat Mulai</div>
+      <div class="card-desc">Dikirim ke driver tepat pada waktu keberangkatan yang dijadwalkan jika perjalanan belum dimulai.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">⚠️ Peringatan Terlambat</div>
+      <div class="card-desc">Jika perjalanan sudah jauh melewati waktu mulainya dan belum dimulai, koordinator diperingatkan agar dapat mengintervensi.</div>
+    </div>
+  </div>
+
+  <div class="info-box tip">
+    <div class="info-icon">💡</div>
+    <div class="info-content"><strong>Koordinator: Jalankan Cron Secara Manual</strong>Dari beranda koordinator, menu overflow menyertakan opsi "Run Cron" untuk memicu siklus otomasi segera — berguna untuk pengujian atau memaksa pengingat di luar jadwal normal.</div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>Panduan Pengguna v1.1</p>
+    <p>Halaman 12</p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- HALAMAN 13 — GLOSARIUM                                -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-banner">
+    <div class="section-icon">📖</div>
+    <div>
+      <h1>Glosarium</h1>
+      <p>Istilah-istilah kunci yang digunakan dalam TaxiBook EPS</p>
+    </div>
+  </div>
+
+  <h2>23. Istilah &amp; Definisi</h2>
+
+  <table>
+    <thead><tr><th>Istilah</th><th>Definisi</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Pemesanan (Booking)</strong></td><td>Satu permintaan perjalanan taksi yang dibuat oleh staff, berisi titik jemput, tujuan, tanggal/waktu, dan jenis perjalanan.</td></tr>
+      <tr><td><strong>Kode Pemesanan</strong></td><td>Pengenal unik yang ditetapkan untuk setiap pemesanan guna keperluan pelacakan dan referensi.</td></tr>
+      <tr><td><strong>DROP</strong></td><td>Jenis perjalanan satu arah di mana driver mengantar penumpang dan langsung mengakhiri pemesanan.</td></tr>
+      <tr><td><strong>WAITING</strong></td><td>Jenis perjalanan di mana driver menunggu di tujuan untuk penumpang sebelum kembali. Durasi ditentukan dalam menit.</td></tr>
+      <tr><td><strong>EPS</strong></td><td>Employee Passenger Services — program manajemen armada internal di PT Vale Indonesia.</td></tr>
+      <tr><td><strong>Peta Armada</strong></td><td>Peta langsung yang menampilkan posisi GPS semua taksi perusahaan dan rute mereka saat ini.</td></tr>
+      <tr><td><strong>Kalender Gantt</strong></td><td>Tampilan garis waktu visual di mana setiap baris adalah taksi dan setiap blok adalah pemesanan, disusun sepanjang sumbu waktu.</td></tr>
+      <tr><td><strong>GPS Aktif</strong></td><td>Driver yang lokasinya telah diperbarui dalam 10 menit terakhir. Ditampilkan dengan ikon satelit hijau di peta armada.</td></tr>
+      <tr><td><strong>GPS Tidak Aktif</strong></td><td>Driver yang lokasinya tidak diperbarui lebih dari 10 menit — posisi terakhir yang diketahui ditampilkan dengan opasitas berkurang.</td></tr>
+      <tr><td><strong>OpenRouteService</strong></td><td>API pemetaan yang digunakan untuk menghitung rute mengikuti jalan antara dua koordinat GPS. Rute mengikuti jalan nyata, bukan garis lurus.</td></tr>
+      <tr><td><strong>PWA</strong></td><td>Progressive Web App — aplikasi web yang dapat diinstal di perangkat mobile seperti aplikasi native, tanpa melalui toko aplikasi.</td></tr>
+      <tr><td><strong>Notifikasi Push</strong></td><td>Peringatan yang dikirimkan ke perangkat Anda bahkan ketika aplikasi TaxiBook EPS tidak terbuka, ditenagai oleh layanan push browser.</td></tr>
+      <tr><td><strong>Penugasan Ulang</strong></td><td>Memindahkan pemesanan yang ada dari satu taksi/driver ke yang lain. Hanya koordinator yang dapat menugaskan ulang perjalanan.</td></tr>
+      <tr><td><strong>Lokasi Tersimpan</strong></td><td>Koordinat GPS bernama yang didaftarkan oleh koordinator untuk lokasi umum di area site PT Vale, dapat dipilih saat pemesanan untuk menghindari kesalahan geocoding.</td></tr>
+      <tr><td><strong>Wake Lock</strong></td><td>Fitur browser yang mencegah layar perangkat mati selama perjalanan aktif, memastikan pelacakan GPS berkelanjutan.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="divider"></div>
+
+  <div style="background:var(--teal-dark);color:#fff;border-radius:12px;padding:20px 22px;display:flex;gap:18px;align-items:center;">
+    <svg width="48" height="48" viewBox="0 0 54 54" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;">
+      <rect width="54" height="54" rx="10" fill="rgba(255,255,255,0.12)"/>
+      <polygon points="6,10 12,10 27,44 42,10 48,10 27,47" fill="white" opacity="0.95"/>
+      <polygon points="42,10 48,10 41,22 37,22" fill="#ECB833"/>
+    </svg>
+    <div>
+      <p style="font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;">TaxiBook EPS — PT Vale Indonesia</p>
+      <p style="font-size:11px;color:rgba(255,255,255,0.6);margin:0;">Untuk dukungan atau melaporkan masalah, hubungi administrator sistem PT Vale Anda. Dokumen ini hanya untuk penggunaan internal.</p>
+      <p style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:8px;">Versi 1.1 &nbsp;·&nbsp; Mei 2026 &nbsp;·&nbsp; Rahasia</p>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <p>TaxiBook EPS — PT Vale Indonesia</p>
+    <p>Panduan Pengguna v1.1</p>
+    <p>Halaman 13</p>
+  </div>
+</div>
+
+</body>
+</html>
