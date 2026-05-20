@@ -83,26 +83,10 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{
-            width: '56px', height: '56px',
-            background: '#006064',
-            borderRadius: '16px',
-            margin: '0 auto 12px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <svg width="28" height="28" viewBox="0 0 24 24"
-              fill="none" stroke="white" strokeWidth="2">
-              <path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/>
-              <rect x="9" y="11" width="14" height="10" rx="2"/>
-              <circle cx="16" cy="16" r="1" fill="white"/>
-            </svg>
-          </div>
-          <h1 style={{ fontSize: '24px', fontWeight: '700', margin: '0 0 4px' }}>
-            TaxiBook
+          <img src="/vale-logo.svg" alt="PT Vale" style={{ height: '48px', margin: '0 auto 14px', display: 'block' }} />
+          <h1 style={{ fontSize: '20px', fontWeight: '600', margin: 0, color: '#006064' }}>
+            TaxiBook EPS
           </h1>
-          <p style={{ fontSize: '13px', color: '#3f4949', margin: 0 }}>
-            Company fleet management
-          </p>
         </div>
 
         {/* Form */}

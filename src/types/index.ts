@@ -45,6 +45,17 @@ export interface User {
   updated_at: string
 }
 
+export interface RegisteredLocation {
+  id: string
+  name: string
+  address: string | null
+  lat: number
+  lng: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Taxi {
   id: string
   name: string
@@ -53,6 +64,9 @@ export interface Taxi {
   color: string
   is_active: boolean
   created_at: string
+  latitude: number | null
+  longitude: number | null
+  location_updated_at: string | null
 }
 
 export interface Booking {
@@ -73,6 +87,10 @@ export interface Booking {
   created_by: string | null
   created_at: string
   updated_at: string
+  pickup_lat: number | null
+  pickup_lng: number | null
+  destination_lat: number | null
+  destination_lng: number | null
 }
 
 export interface BookingDetail extends Booking {

@@ -1,21 +1,27 @@
 {
-  "name": "TaxiBook",
+  "name": "TaxiBook EPS — PT Vale",
   "short_name": "TaxiBook",
-  "description": "Company fleet booking system",
+  "description": "Company fleet booking system — PT Vale Indonesia",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F4F3EF",
-  "theme_color": "#0F0F0F",
+  "background_color": "#006064",
+  "theme_color": "#006064",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/vale-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa_icon_192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/pwa_icon_512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

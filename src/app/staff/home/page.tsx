@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import {
   format, startOfWeek, addDays, addMonths,
@@ -11,6 +12,8 @@ import {
 import { id as idLocale } from 'date-fns/locale'
 import type { BookingDetail, User } from '@/types'
 import { STATUS_COLORS, STATUS_LABELS } from '@/types'
+
+const TrackingMap = dynamic(() => import('@/components/map/TrackingMap'), { ssr: false })
 
 type ViewMode = 'day' | 'week' | 'month'
 
@@ -162,10 +165,10 @@ export default function StaffHomePage() {
         position: 'sticky', top: 0, zIndex: 40,
       }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0 20px', height: 64 }}>
-          <div style={{ display:'flex', alignItems:'center', gap: 10 }}>
-            <div style={{ width:38, height:38, borderRadius:'50%', background:'#006064', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🚗</div>
+          <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
+            <img src="/vale-logo.svg" alt="Vale" style={{ height: 30, display: 'block' }} />
             <div>
-              <p style={{ fontSize:16, fontWeight:800, color:'#006064', margin:0, fontFamily:"'Plus Jakarta Sans',sans-serif", letterSpacing:'-0.3px', lineHeight:1 }}>TaxiBook</p>
+              <p style={{ fontSize:13, fontWeight:700, color:'#006064', margin:0, fontFamily:"'Plus Jakarta Sans',sans-serif", letterSpacing:'0.3px', lineHeight:1 }}>TaxiBook EPS</p>
               <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:2 }}>
                 <span style={{ width:6, height:6, borderRadius:'50%', background:'#344500', display:'inline-block' }} />
                 <span style={{ fontSize:10, color:'#6f7979', fontWeight:500 }}>Staff</span>
@@ -889,6 +892,21 @@ function StaffBookingSheet({ booking, onClose, onCancelled }: {
             {booking.trip_type === 'DROP' ? 'Drop' : `Wait ${booking.wait_minutes}min`}
           </span>
         </div>
+
+        {/* Driver tracking map — shown when driver is confirmed/active */}
+        {['booked', 'on_trip', 'waiting_trip'].includes(booking.status) && booking.taxi_id && (
+          <TrackingMap
+            taxiId={booking.taxi_id}
+            taxiColor={booking.taxi_color || '#006064'}
+            pickup={booking.pickup}
+            destination={booking.destination}
+            status={booking.status}
+            pickupLat={booking.pickup_lat}
+            pickupLng={booking.pickup_lng}
+            destLat={booking.destination_lat}
+            destLng={booking.destination_lng}
+          />
+        )}
 
         {/* Details */}
         <div style={{ background: '#F5F5F2', borderRadius: 16, padding: '12px 14px', marginBottom: '16px' }}>

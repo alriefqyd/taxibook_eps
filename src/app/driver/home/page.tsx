@@ -3,11 +3,15 @@ import React from 'react'
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import type { User } from '@/types'
 import GanttCalendar from '@/components/GanttCalendar'
+import { useGpsReporting } from '@/hooks/useGpsReporting'
+
+const ActiveTripMap = dynamic(() => import('@/components/map/ActiveTripMap'), { ssr: false })
 
 const FONT = 'Inter, sans-serif'
 
@@ -25,6 +29,10 @@ interface DriverBooking {
   taxi_id:        string | null
   taxi_name:      string | null
   taxi_color:     string | null
+  pickup_lat:     number | null
+  pickup_lng:     number | null
+  destination_lat: number | null
+  destination_lng: number | null
 }
 
 type Tab = 'trips' | 'active' | 'calendar'
@@ -54,6 +62,8 @@ export default function DriverHomePage() {
   const uidRef = React.useRef('')
   const [toggling,   setToggling]   = useState(false)
 
+  // Broadcast GPS to Supabase whenever driver has a taxi assigned
+  useGpsReporting(myTaxi?.id ?? null)
 
   async function toggleAvailability() {
     if (!myTaxi || toggling) return
@@ -208,9 +218,7 @@ export default function DriverHomePage() {
       <header style={{ background: '#F5F5F2', borderBottom: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 1px 4px rgba(0,96,100,0.06)', position: 'sticky', top: 0, zIndex: 40 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', height: 64 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ background: '#006064', borderRadius: 8, padding: '4px 10px', display: 'flex', alignItems: 'center' }}>
-              <span style={{ fontSize: 15, fontWeight: 900, color: '#ffffff', letterSpacing: '2px', fontFamily: 'Arial Black, sans-serif' }}>VALE</span>
-            </div>
+            <img src="/vale-logo.svg" alt="Vale" style={{ height: 30, display: 'block' }} />
             <div>
               <p style={{ fontSize: 13, fontWeight: 700, color: '#006064', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '0.3px', lineHeight: 1 }}>TaxiBook EPS</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
@@ -312,11 +320,23 @@ export default function DriverHomePage() {
       {tab === 'active' && (
         <div style={{ padding: '16px 16px 100px' }}>
           {activeTrip ? (
-            <ActiveTripCard
-              trip={activeTrip}
-              processing={processing}
-              onComplete={complete}
-            />
+            <>
+              <ActiveTripCard
+                trip={activeTrip}
+                processing={processing}
+                onComplete={complete}
+              />
+              <ActiveTripMap
+                pickup={activeTrip.pickup}
+                destination={activeTrip.destination}
+                status={activeTrip.status}
+                taxiColor={activeTrip.taxi_color || '#006064'}
+                pickupLat={activeTrip.pickup_lat}
+                pickupLng={activeTrip.pickup_lng}
+                destLat={activeTrip.destination_lat}
+                destLng={activeTrip.destination_lng}
+              />
+            </>
           ) : nextTrip ? (
             <div>
               <div style={{ background: 'rgba(0,96,100,0.1)', border: '1px solid #93C5FD', borderRadius: 16, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>

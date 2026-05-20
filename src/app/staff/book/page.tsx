@@ -2,7 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
+import type { Coords } from '@/lib/geocode'
+
+const LocationPickerMap = dynamic(() => import('@/components/map/LocationPickerMap'), { ssr: false })
 
 type Step = 1 | 2 | 3
 type TripType = 'DROP' | 'WAITING'
@@ -50,6 +54,9 @@ export default function BookPage() {
   const [checkingNow, setCheckingNow] = useState(false)
   const [error,       setError]       = useState('')
   const [noTaxiMsg,   setNoTaxiMsg]   = useState('')
+  const [pickerField, setPickerField] = useState<'pickup' | 'destination' | null>(null)
+  const [pickupCoords,  setPickupCoords]  = useState<Coords | null>(null)
+  const [destCoords,    setDestCoords]    = useState<Coords | null>(null)
   const [form,        setForm]        = useState<FormData>({
     mode:         'now',
     pickup:       'Engineering Office',
@@ -174,12 +181,18 @@ export default function BookPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
         body: JSON.stringify({
-          pickup: form.pickup, destination: form.destination,
-          trip_type: form.trip_type,
-          wait_minutes: form.trip_type === 'WAITING' ? form.wait_minutes : 0,
-          notes: form.notes || null,
-          scheduled_at: scheduledDate.toISOString(),
-          status, auto_complete_at: autoCompleteAt.toISOString(),
+          pickup:          form.pickup,
+          destination:     form.destination,
+          trip_type:       form.trip_type,
+          wait_minutes:    form.trip_type === 'WAITING' ? form.wait_minutes : 0,
+          notes:           form.notes || null,
+          scheduled_at:    scheduledDate.toISOString(),
+          status,
+          auto_complete_at: autoCompleteAt.toISOString(),
+          pickup_lat:      pickupCoords?.lat ?? null,
+          pickup_lng:      pickupCoords?.lng ?? null,
+          destination_lat: destCoords?.lat   ?? null,
+          destination_lng: destCoords?.lng   ?? null,
         }),
       })
 
@@ -192,6 +205,7 @@ export default function BookPage() {
       const code = data.booking.booking_code
       const assigned = data.assigned
         ? `&taxi=${encodeURIComponent(data.taxi_name)}&driver=${encodeURIComponent(data.driver_name)}` : ''
+
       router.push(`/staff/success?code=${code}${assigned}`)
     } catch (e: any) {
       setError('Error: ' + e.message); setLoading(false)
@@ -202,6 +216,24 @@ export default function BookPage() {
 
   return (
     <div style={{ fontFamily: "var(--font-inter), 'Inter', sans-serif", minHeight: '100vh', background: C.surface, WebkitFontSmoothing: 'antialiased' }}>
+
+      {/* Location picker modal */}
+      {pickerField && (
+        <LocationPickerMap
+          title={pickerField === 'pickup' ? 'Select pickup location' : 'Select destination'}
+          onClose={() => setPickerField(null)}
+          onConfirm={(address, coords) => {
+            if (pickerField === 'pickup') {
+              update('pickup', address)
+              setPickupCoords(coords)
+            } else {
+              update('destination', address)
+              setDestCoords(coords)
+            }
+            setPickerField(null)
+          }}
+        />
+      )}
 
       {/* ── Header ── */}
       <div style={{ background: C.white, borderBottom: `1px solid ${C.border}`, padding: '12px 20px 0' }}>
@@ -283,16 +315,30 @@ export default function BookPage() {
             {/* Route fields */}
             <FG label="Pickup location">
               <input type="text" value={form.pickup}
-                onChange={e => update('pickup', e.target.value)}
+                onChange={e => { update('pickup', e.target.value); setPickupCoords(null) }}
                 placeholder="e.g. Engineering Office"
                 style={inputSt} />
+              <button
+                type="button"
+                onClick={() => setPickerField('pickup')}
+                style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: C.black, fontFamily: FONT }}
+              >
+                📍 {pickupCoords ? 'Change on map' : 'Pick on map'}
+              </button>
             </FG>
 
             <FG label="Destination">
               <input type="text" value={form.destination}
-                onChange={e => update('destination', e.target.value)}
+                onChange={e => { update('destination', e.target.value); setDestCoords(null) }}
                 placeholder="e.g. Larona, Karebbe, Sorowako..."
                 style={inputSt} />
+              <button
+                type="button"
+                onClick={() => setPickerField('destination')}
+                style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: C.black, fontFamily: FONT }}
+              >
+                📍 {destCoords ? 'Change on map' : 'Pick on map'}
+              </button>
             </FG>
 
             <FG label="Notes (optional)">

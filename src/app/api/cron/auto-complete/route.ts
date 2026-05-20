@@ -3,6 +3,15 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { notify } from '@/lib/notify'
 import { sendPushToUser } from '@/lib/push'
 
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R    = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a    = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 // Vercel cron runs every 5 minutes
 // vercel.json: { "crons": [{ "path": "/api/cron/auto-complete", "schedule": "*/5 * * * *" }] }
 
@@ -59,7 +68,7 @@ export async function GET(request: NextRequest) {
         }
       }
       if (notifications.length) await notify(notifications)
-      results.reminded_15min++
+      results.auto_completed++
     }
 
     // ── 3. START TIME REMINDER (T±2min) ────────────────────
@@ -115,26 +124,38 @@ export async function GET(request: NextRequest) {
     }
 
     // ── 4. OVERDUE REPEAT (every 5 min until started) ──────
-    // Bookings past scheduled time, still booked (not started)
-    // Max 30 min overdue (after that auto-complete handles it)
     const overdueStart = new Date(now.getTime() - 30 * 60 * 1000)
 
     const { data: overdueNotStarted } = await admin
       .from('bookings')
-      .select('id, passenger_id, destination, scheduled_at, taxi_id, taxis!taxi_id(driver_id, name)')
+      .select('id, passenger_id, destination, scheduled_at, pickup_lat, pickup_lng, taxi_id, taxis!taxi_id(driver_id, name, latitude, longitude, location_updated_at)')
       .eq('status', 'booked')
       .lt('scheduled_at', now.toISOString())
       .gte('scheduled_at', overdueStart.toISOString())
-
-    console.log(`Overdue bookings found: ${(overdueNotStarted || []).length}`)
 
     for (const b of (overdueNotStarted || []) as any[]) {
       const minutesLate = Math.round(
         (now.getTime() - new Date(b.scheduled_at).getTime()) / 60000
       )
-      console.log(`Overdue booking ${b.id}: ${minutesLate} min late, driver: ${b.taxis?.driver_id}`)
 
-      // Only notify if at least 5 min has passed since last overdue notif
+      // ── GPS proximity check ──────────────────────────────
+      const taxi        = b.taxis
+      const gpsAgeMin   = taxi?.location_updated_at
+        ? (now.getTime() - new Date(taxi.location_updated_at).getTime()) / 60000
+        : Infinity
+      const gpsIsFresh  = gpsAgeMin < 3   // updated within last 3 minutes
+
+      let distanceKm: number | null = null
+      if (gpsIsFresh && taxi?.latitude && taxi?.longitude && b.pickup_lat && b.pickup_lng) {
+        distanceKm = haversineKm(taxi.latitude, taxi.longitude, b.pickup_lat, b.pickup_lng)
+      }
+
+      // ≤ 500m → almost at pickup, no need to alert driver at all
+      const driverAtPickup = distanceKm !== null && distanceKm <= 0.5
+      // ≤ 3km + fresh GPS → clearly en route, skip driver nag
+      const driverEnRoute  = distanceKm !== null && distanceKm <= 3.0
+
+      // ── Throttle: skip if last overdue notif was < 5 min ago ──
       const { data: lastNotif } = await admin
         .from('notifications')
         .select('created_at')
@@ -145,74 +166,82 @@ export async function GET(request: NextRequest) {
         .maybeSingle()
 
       if (lastNotif) {
-        const lastSent   = new Date(lastNotif.created_at)
-        const minsSince  = (now.getTime() - lastSent.getTime()) / 60000
-        console.log(`Last notif was ${minsSince.toFixed(1)} min ago`)
-        if (minsSince < 4.5) { console.log('Skipping — too soon'); continue }
+        const minsSince = (now.getTime() - new Date(lastNotif.created_at).getTime()) / 60000
+        if (minsSince < 4.5) continue
       }
 
       const notifs: any[] = []
 
-      // Notify driver every 5 min
-      if (b.taxis?.driver_id) {
+      // ── Driver alert — always fire, tone depends on proximity ──
+      if (taxi?.driver_id) {
+        let driverTitle: string
+        let driverBody: string
+
+        if (driverAtPickup) {
+          driverTitle = `You're almost at pickup`
+          driverBody  = `You're ~${Math.round(distanceKm! * 1000)}m from the passenger. Tap "Start trip" once they're in the car.`
+        } else if (driverEnRoute) {
+          driverTitle = `Reminder: passenger is waiting`
+          driverBody  = `You're on your way (~${distanceKm!.toFixed(1)}km from pickup). Don't forget to tap "Start trip" when picked up.`
+        } else {
+          driverTitle = `⚠️ Trip ${minutesLate} min overdue`
+          driverBody  = `Passenger is waiting for pickup to ${b.destination}. Please head there now and tap "Start trip" when picked up.`
+        }
+
         notifs.push({
-          user_id:    b.taxis.driver_id,
+          user_id:    taxi.driver_id,
           booking_id: b.id,
-          title:      `⚠️ Trip ${minutesLate} min overdue`,
-          body:       `Please start trip to ${b.destination}. Passenger is waiting. Tap "Start trip" now.`,
+          title:      driverTitle,
+          body:       driverBody,
           type:       'reminder_overdue',
         })
       }
 
-      // Notify coordinator after 10 min overdue
-      if (minutesLate >= 10) {
-        const { data: coordinators } = await admin
-          .from('users').select('id').eq('role', 'coordinator').eq('is_active', true)
+      // ── Passenger alert after 5 min overdue ─────────────
+      if (minutesLate >= 5) {
+        const { data: lastPassengerNotif } = await admin
+          .from('notifications')
+          .select('created_at')
+          .eq('booking_id', b.id)
+          .eq('type', 'reminder_overdue')
+          .eq('user_id', b.passenger_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
 
-        if (coordinators?.length) {
-          // Only notify coordinator once every 10 min
-          const { data: lastCoordNotif } = await admin
-            .from('notifications')
-            .select('created_at')
-            .eq('booking_id', b.id)
-            .eq('type', 'reminder_overdue')
-            .in('user_id', coordinators.map((c: any) => c.id))
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
+        const shouldNotifyPassenger = !lastPassengerNotif ||
+          (now.getTime() - new Date(lastPassengerNotif.created_at).getTime()) / 60000 >= 9.5
 
-          const shouldNotifyCoord = !lastCoordNotif ||
-            (now.getTime() - new Date(lastCoordNotif.created_at).getTime()) / 60000 >= 9.5
-
-          if (shouldNotifyCoord) {
-            const { data: passenger } = await admin
-              .from('users').select('name').eq('id', b.passenger_id).single()
-
-            coordinators.forEach((c: any) => notifs.push({
-              user_id:    c.id,
-              booking_id: b.id,
-              title:      `⚠️ Trip not started — ${minutesLate} min late`,
-              body:       `${passenger?.name} → ${b.destination} hasn't started. Driver: ${b.taxis?.name}.`,
-              type:       'reminder_overdue',
-            }))
-            results.notified_coord++
+        if (shouldNotifyPassenger) {
+          let passengerBody: string
+          if (driverAtPickup) {
+            passengerBody = `Your driver is almost there — ~${Math.round(distanceKm! * 1000)}m from pickup. Please be ready.`
+          } else if (driverEnRoute) {
+            passengerBody = `Your driver is on the way (~${distanceKm!.toFixed(1)}km from pickup, ${minutesLate} min late). Please wait.`
+          } else if (gpsIsFresh && distanceKm !== null) {
+            passengerBody = `Your trip is ${minutesLate} min late. Driver is ${distanceKm.toFixed(1)}km away.`
+          } else {
+            passengerBody = `Your trip to ${b.destination} is ${minutesLate} min late. Please contact the coordinator if needed.`
           }
+
+          notifs.push({
+            user_id:    b.passenger_id,
+            booking_id: b.id,
+            title:      `Your driver is ${minutesLate} min late`,
+            body:       passengerBody,
+            type:       'reminder_overdue',
+          })
+          results.notified_coord++
         }
       }
 
       if (notifs.length) {
-        // Check push subscriptions exist
         for (const notif of notifs) {
-          const url = notif.user_id === b.taxis?.driver_id ? '/driver/home' : '/coordinator/home'
-          const { data: subs } = await admin.from('push_subscriptions').select('id').eq('user_id', notif.user_id)
-          console.log(`User ${notif.user_id} has ${subs?.length || 0} push subscriptions`)
+          const url = notif.user_id === taxi?.driver_id ? '/driver/home' : '/staff/home'
           await sendPushToUser(notif.user_id, notif.title, notif.body, url, notif.type)
-          console.log(`Push sent to ${notif.user_id}: ${notif.title}`)
         }
         await admin.from('notifications').insert(notifs)
         results.reminded_overdue++
-      } else {
-        console.log(`No notifs built for booking ${b.id} (driver_id: ${b.taxis?.driver_id})`)
       }
     }
 

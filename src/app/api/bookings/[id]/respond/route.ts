@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notify } from '@/lib/notify'
+import { sendPushToUser } from '@/lib/push'
 
 export async function POST(
   request: NextRequest,
@@ -50,6 +51,7 @@ export async function POST(
       const { data: driver } = await admin
         .from('users').select('name').eq('id', user.id).single()
 
+      // Notify passenger the trip is confirmed
       await notify({
         user_id:    booking.passenger_id,
         booking_id: bookingId,
@@ -57,6 +59,25 @@ export async function POST(
         body:       `Your trip to ${booking.destination} is confirmed — ${booking.taxis?.name} · ${driver?.name}`,
         type:       'booking_confirmed',
       })
+      await sendPushToUser(booking.passenger_id, 'Trip confirmed!',
+        `Your trip to ${booking.destination} is confirmed — ${booking.taxis?.name} · ${driver?.name}`,
+        '/staff/home')
+
+      // For instant bookings, immediately push driver to go pick up the passenger
+      const minsUntilPickup = (new Date(booking.scheduled_at).getTime() - Date.now()) / 60000
+      if (minsUntilPickup <= 5) {
+        const { data: passenger } = await admin
+          .from('users').select('name').eq('id', booking.passenger_id).single()
+        const pickupMsg = `Go pick up ${passenger?.name} now → ${booking.destination}. Tap "Start trip" once they're in the car.`
+        await notify({
+          user_id:    user.id,
+          booking_id: bookingId,
+          title:      '🚗 Head to pickup now',
+          body:       pickupMsg,
+          type:       'booking_confirmed',
+        })
+        await sendPushToUser(user.id, '🚗 Head to pickup now', pickupMsg, '/driver/home')
+      }
 
       return NextResponse.json({ success: true, status: 'booked' })
     }

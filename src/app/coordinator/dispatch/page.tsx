@@ -2,9 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { format, isSameDay } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
+
+const DriverFleetMap = dynamic(() => import('@/components/map/DriverFleetMap'), { ssr: false })
 
 const FONT = "var(--font-inter), 'Inter', sans-serif"
 
@@ -49,6 +52,7 @@ export default function DispatchPage() {
   const [dateFilter,  setDateFilter]  = useState(new Date().toISOString().slice(0, 10))
   const [reassigning, setReassigning] = useState<string | null>(null)
   const [selected,    setSelected]    = useState<Booking | null>(null)
+  const [showMap,     setShowMap]     = useState(false)
   const [newTaxiId,   setNewTaxiId]   = useState('')
   const [saving,      setSaving]      = useState(false)
   const [availability, setAvailability] = useState<Record<string, boolean>>({})
@@ -257,6 +261,29 @@ export default function DispatchPage() {
             )
           })}
         </div>
+      </div>
+
+      {/* ── Fleet map toggle ── */}
+      <div style={{ padding: '10px 16px 0' }}>
+        <button
+          onClick={() => setShowMap(v => !v)}
+          style={{
+            width: '100%', padding: '10px', fontSize: 13, fontWeight: 600,
+            border: `1.5px solid ${showMap ? '#006064' : 'rgba(0,0,0,0.1)'}`,
+            borderRadius: 12, cursor: 'pointer',
+            background: showMap ? '#006064' : '#ffffff',
+            color: showMap ? '#ffffff' : '#3f4949',
+            fontFamily: "var(--font-inter), 'Inter', sans-serif",
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          🗺 {showMap ? 'Hide fleet map' : 'Show fleet map'}
+        </button>
+        {showMap && (
+          <div style={{ marginTop: 10 }}>
+            <DriverFleetMap />
+          </div>
+        )}
       </div>
 
       {/* ── Bookings list ── */}

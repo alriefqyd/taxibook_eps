@@ -12,6 +12,7 @@ import type { BookingDetail, User } from '@/types'
 import { STATUS_LABELS, STATUS_COLORS } from '@/types'
 import GanttCalendar from '@/components/GanttCalendar'
 
+
 interface TaxiRow {
   id: string
   name: string
@@ -32,7 +33,7 @@ export default function CoordinatorHomePage() {
   const [bookings,   setBookings]   = useState<BookingDetail[]>([])
   const [taxis,      setTaxis]      = useState<TaxiRow[]>([])
   const [loading,    setLoading]    = useState(true)
-  const [showCalendar, setShowCalendar] = useState(false)
+  const [view,        setView]        = useState<'list' | 'calendar'>('list')
   const [filter,     setFilter]     = useState<'all' | 'pending' | 'booked' | 'completed'>('all')
   const [rejectId,   setRejectId]   = useState<string | null>(null)
   const [rejectNote, setRejectNote] = useState('')
@@ -226,17 +227,10 @@ export default function CoordinatorHomePage() {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', height: 64 }}>
           {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ background: '#006064', borderRadius: 8, padding: '4px 10px', display: 'flex', alignItems: 'center' }}>
-              <span style={{ fontSize: 15, fontWeight: 900, color: '#ffffff', letterSpacing: '2px', fontFamily: 'Arial Black, sans-serif' }}>VALE</span>
-            </div>
-            <div>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#006064', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '0.3px', lineHeight: 1 }}>TaxiBook EPS</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#344500', display: 'inline-block' }} />
-                <span style={{ fontSize: 10, color: '#6f7979', fontWeight: 500 }}>Coordinator</span>
-              </div>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img src="/vale-logo.svg" alt="PT Vale" style={{ height: 32, display: 'block' }} />
+            <div style={{ width: 1, height: 20, background: 'rgba(0,0,0,0.1)' }} />
+            <p style={{ fontSize: 13, fontWeight: 700, color: '#006064', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '0.3px' }}>TaxiBook EPS</p>
           </div>
           {/* Right: bell + avatar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -255,6 +249,14 @@ export default function CoordinatorHomePage() {
                       <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 2px', color: '#1a1c1b' }}>{user?.name}</p>
                       <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>Coordinator</p>
                     </div>
+                    <button onClick={() => { setMenuOpen(false); window.open('/board', '_blank') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>Dispatch Board</p>
+                    </button>
+                    <button onClick={() => { setMenuOpen(false); router.push('/coordinator/locations') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#D97706' }}>Saved Locations</p>
+                    </button>
                     <button onClick={() => { setMenuOpen(false); router.push('/coordinator/profile') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                       <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>View profile</p>
@@ -275,8 +277,24 @@ export default function CoordinatorHomePage() {
 
       <div style={{ padding: '16px' }}>
 
+        {/* ── View tabs ── */}
+        <div style={{ display: 'flex', background: '#ECEAE4', borderRadius: 9999, padding: 3, gap: 2, marginBottom: 14 }}>
+          {([
+            { key: 'list',     label: 'Bookings' },
+            { key: 'calendar', label: 'Calendar' },
+          ] as const).map(v => (
+            <button key={v.key} onClick={() => setView(v.key)} style={{
+              flex: 1, padding: '7px 4px', fontSize: 12, fontWeight: 600, border: 'none',
+              borderRadius: 9999, cursor: 'pointer', fontFamily: 'inherit',
+              background: view === v.key ? '#ffffff' : 'transparent',
+              color: view === v.key ? '#006064' : '#9ca3af',
+              boxShadow: view === v.key ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+            }}>{v.label}</button>
+          ))}
+        </div>
+
         {/* ── BOOKINGS TAB ── */}
-        {!showCalendar && (
+        {view === 'list' && (
           <>
             {/* Pending approval — pinned at top */}
             {pendingApproval.length > 0 && (
@@ -378,11 +396,13 @@ export default function CoordinatorHomePage() {
         )}
 
         {/* ── CALENDAR TAB ── */}
-        {showCalendar && (
+        {view === 'calendar' && (
           <div style={{ margin: '0 -16px' }}>
-            <GanttCalendar bookings={bookings} taxis={taxis} />
+            <GanttCalendar bookings={bookings} taxis={taxis} showCompleted />
           </div>
         )}
+
+
 
         {/* ── FLEET TAB ── */}
         {false && (

@@ -38,11 +38,13 @@ export default function DriverTripAlert({ userId }: Props) {
 
     const now = new Date()
 
-    // 1. Overdue — booked but not started past scheduled time
+    // 1. Overdue — booked but not started, with 10 min grace period
+    // Grace period avoids false alarms while driver is en route to pickup
+    const overdueThreshold = new Date(now.getTime() - 10 * 60 * 1000)
     const { data: overdue } = await supabase
       .from('booking_details').select('*')
       .eq('taxi_id', taxi.id).eq('status', 'booked')
-      .lte('scheduled_at', now.toISOString())
+      .lte('scheduled_at', overdueThreshold.toISOString())
       .order('scheduled_at', { ascending: true })
 
     // 2. Pending driver approval — needs accept/decline
