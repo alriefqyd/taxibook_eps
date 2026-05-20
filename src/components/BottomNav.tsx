@@ -2,8 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
 
 const PRIMARY = '#006064'
 
@@ -31,48 +29,25 @@ type NavItem = { href: string; label: string; iconKey: string }
 
 const NAV: Record<string, NavItem[]> = {
   staff: [
-    { href: '/staff/home',          label: 'Home',    iconKey: 'home'    },
-    { href: '/staff/book',          label: 'Book',    iconKey: 'taxi'    },
-    { href: '/staff/notifications', label: 'Alerts',  iconKey: 'bell'    },
-    { href: '/staff/profile',       label: 'Profile', iconKey: 'person'  },
+    { href: '/staff/home',    label: 'Home',    iconKey: 'home'   },
+    { href: '/staff/book',    label: 'Book',    iconKey: 'taxi'   },
+    { href: '/staff/profile', label: 'Profile', iconKey: 'person' },
   ],
   coordinator: [
-    { href: '/coordinator/home',          label: 'Home',    iconKey: 'dashboard' },
-    { href: '/coordinator/drivers',       label: 'Drivers', iconKey: 'group'     },
-    { href: '/coordinator/map',           label: 'Map',     iconKey: 'map'       },
-    { href: '/coordinator/notifications', label: 'Alerts',  iconKey: 'bell'      },
-    { href: '/coordinator/profile',       label: 'Profile', iconKey: 'person'    },
+    { href: '/coordinator/home',    label: 'Home',    iconKey: 'dashboard' },
+    { href: '/coordinator/drivers', label: 'Drivers', iconKey: 'group'     },
+    { href: '/coordinator/map',     label: 'Map',     iconKey: 'map'       },
+    { href: '/coordinator/profile', label: 'Profile', iconKey: 'person'    },
   ],
   driver: [
-    { href: '/driver/home',          label: 'Trips',   iconKey: 'home'   },
-    { href: '/driver/notifications', label: 'Alerts',  iconKey: 'bell'   },
-    { href: '/driver/profile',       label: 'Profile', iconKey: 'person' },
+    { href: '/driver/home',    label: 'Trips',   iconKey: 'home'   },
+    { href: '/driver/profile', label: 'Profile', iconKey: 'person' },
   ],
 }
 
 export function BottomNav({ role }: { role: 'staff' | 'coordinator' | 'driver' }) {
-  const pathname  = usePathname()
-  const supabase  = createClient()
-  const channelId = useRef(`nav-badge-${Math.random().toString(36).slice(2)}`)
-  const [unread, setUnread] = useState(0)
+  const pathname = usePathname()
   const items = NAV[role] || []
-
-  useEffect(() => {
-    let mounted = true
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !mounted) return
-      const { count } = await supabase
-        .from('notifications').select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id).eq('is_read', false)
-      if (mounted) setUnread(count || 0)
-    }
-    load()
-    const ch = supabase.channel(channelId.current)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, load)
-      .subscribe()
-    return () => { mounted = false; supabase.removeChannel(ch) }
-  }, [])
 
   return (
     <>
@@ -87,9 +62,8 @@ export function BottomNav({ role }: { role: 'staff' | 'coordinator' | 'driver' }
         fontFamily: "'Plus Jakarta Sans', sans-serif",
       }}>
         {items.map(item => {
-          const active  = pathname.startsWith(item.href)
-          const isAlert = item.label === 'Alerts'
-          const icon    = ICONS[item.iconKey]
+          const active = pathname.startsWith(item.href)
+          const icon   = ICONS[item.iconKey]
           return (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none', flex: 1 }}>
               <div style={{
@@ -104,14 +78,6 @@ export function BottomNav({ role }: { role: 'staff' | 'coordinator' | 'driver' }
                     fill={active ? 'rgba(0,96,100,0.15)' : 'none'}
                     strokeWidth={active ? 2.5 : 1.8}
                   />
-                  {isAlert && unread > 0 && (
-                    <span style={{
-                      position: 'absolute', top: -2, right: -3,
-                      width: 8, height: 8, borderRadius: '50%',
-                      background: '#ba1a1a', border: '2px solid #fff',
-                      display: 'inline-block',
-                    }} />
-                  )}
                 </div>
                 <span style={{
                   fontSize: 11, fontWeight: active ? 700 : 500,

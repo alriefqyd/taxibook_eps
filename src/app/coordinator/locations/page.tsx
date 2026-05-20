@@ -8,6 +8,7 @@ import type { RegisteredLocation } from '@/types'
 import type { Coords } from '@/lib/geocode'
 
 const LocationPickerMap = dynamic(() => import('@/components/map/LocationPickerMap'), { ssr: false })
+const SavedLocationsMap  = dynamic(() => import('@/components/map/SavedLocationsMap'),  { ssr: false })
 
 interface PendingPin {
   address: string
@@ -40,6 +41,16 @@ export default function RegisteredLocationsPage() {
   // Delete flow
   const [deleteId,      setDeleteId]      = useState<string | null>(null)
   const [deleteName,    setDeleteName]    = useState('')
+
+  // Map highlight
+  const [highlightId,   setHighlightId]   = useState<string | null>(null)
+
+  // Card ⋮ menu
+  const [menuOpenId,    setMenuOpenId]    = useState<string | null>(null)
+
+  // Pagination
+  const PAGE_SIZE = 6
+  const [visibleCount, setVisibleCount]   = useState(PAGE_SIZE)
 
   useEffect(() => {
     async function init() {
@@ -130,8 +141,11 @@ export default function RegisteredLocationsPage() {
 
   // ── Render ───────────────────────────────────────────────────
 
+  const visible = locations.slice(0, visibleCount)
+  const hasMore = visibleCount < locations.length
+
   if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ height: 'calc(100dvh - 68px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(0,96,100,0.15)', borderTop: `3px solid ${PRIMARY}`, animation: 'spin 0.8s linear infinite' }} />
     </div>
@@ -139,99 +153,234 @@ export default function RegisteredLocationsPage() {
 
   return (
     <>
-      <div style={{ minHeight: '100dvh', background: '#F5F5F2', fontFamily: FONT }}>
+      <div style={{ height: 'calc(100dvh - 68px)', display: 'flex', flexDirection: 'column', background: '#F5F5F2', fontFamily: FONT, WebkitFontSmoothing: 'antialiased' as any }}>
 
         {/* Header */}
         <header style={{
-          background: PRIMARY, color: '#fff', height: 60,
-          padding: '0 16px', position: 'sticky', top: 0, zIndex: 40,
-          display: 'flex', alignItems: 'center', gap: 12,
+          background: '#fff', flexShrink: 0,
+          padding: '16px 20px 14px',
+          borderBottom: '1px solid rgba(0,0,0,0.08)',
+          zIndex: 40,
         }}>
-          <button
-            onClick={() => router.back()}
-            style={{
-              width: 36, height: 36, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.15)', border: 'none',
-              cursor: 'pointer', fontSize: 18, color: '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >←</button>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Saved Locations</p>
-            <p style={{ fontSize: 11, margin: 0, opacity: 0.7 }}>
-              {locations.length} place{locations.length !== 1 ? 's' : ''} registered
-            </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                onClick={() => router.back()}
+                style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  background: '#F5F5F2', border: '1px solid rgba(0,0,0,0.08)',
+                  cursor: 'pointer', fontSize: 15,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >←</button>
+              <div>
+                <h1 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 2px', letterSpacing: '-0.3px', color: '#1a1c1b' }}>Saved Locations</h1>
+                <p style={{ fontSize: 12, color: '#8A9BB0', margin: 0 }}>
+                  {locations.length} place{locations.length !== 1 ? 's' : ''} registered
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setAddPickerOpen(true)}
+              style={{
+                padding: '8px 16px',
+                background: PRIMARY, border: 'none', borderRadius: 20,
+                color: '#fff', fontSize: 13, fontWeight: 700,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                fontFamily: FONT,
+              }}
+            >+ Add</button>
           </div>
-          <button
-            onClick={() => setAddPickerOpen(true)}
-            style={{
-              padding: '8px 16px', background: 'rgba(255,255,255,0.2)',
-              border: 'none', borderRadius: 20, color: '#fff',
-              fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}
-          >
-            + Add
-          </button>
         </header>
 
-        {/* Location list */}
-        <div style={{ padding: 16, maxWidth: 640, margin: '0 auto' }}>
-          {locations.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px', color: '#9ca3af' }}>
-              <div style={{ fontSize: 48, marginBottom: 14 }}>📍</div>
-              <p style={{ fontSize: 15, fontWeight: 600, color: '#6b7280', margin: '0 0 6px' }}>No saved locations yet</p>
-              <p style={{ fontSize: 13, margin: 0, lineHeight: 1.5 }}>
-                Tap <strong>+ Add</strong> to register offices, gates, or any specific spot inside the plant site.
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {locations.map(loc => (
-                <div key={loc.id} style={{
-                  background: '#fff', borderRadius: 16, padding: '14px 16px',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                  display: 'flex', alignItems: 'flex-start', gap: 12,
+        {/* Body: map left + list right */}
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+          {/* Left — map */}
+          <div style={{ flex: 1, position: 'relative' }}>
+            <SavedLocationsMap
+              locations={locations}
+              onMarkerClick={loc => {
+                setHighlightId(loc.id)
+                document.getElementById(`loc-${loc.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                setTimeout(() => setHighlightId(null), 2000)
+              }}
+            />
+            {locations.length === 0 && (
+              <div style={{
+                position: 'absolute', inset: 0, zIndex: 10,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(245,245,242,0.75)', gap: 6,
+              }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', margin: 0 }}>No pins yet</p>
+                <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>Add a location to see it here</p>
+              </div>
+            )}
+          </div>
+
+          {/* Right — list panel */}
+          <div style={{
+            width: 300, flexShrink: 0,
+            borderLeft: '1px solid rgba(0,0,0,0.08)',
+            overflow: 'hidden',
+            display: 'flex', flexDirection: 'column',
+          }}>
+            {locations.length === 0 ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 20px', textAlign: 'center' }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📍</div>
+                <p style={{ fontSize: 14, fontWeight: 600, color: '#6b7280', margin: '0 0 6px' }}>No saved locations yet</p>
+                <p style={{ fontSize: 12, color: '#9ca3af', margin: 0, lineHeight: 1.5 }}>
+                  Tap <strong>+ Add</strong> to register offices, gates, or spots inside the plant site.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Panel header */}
+                <div style={{
+                  padding: '12px 16px 8px',
+                  borderBottom: '1px solid rgba(0,0,0,0.06)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 }}>
-                  <div style={{
-                    width: 38, height: 38, borderRadius: '50%',
-                    background: 'rgba(217,119,6,0.1)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 18, flexShrink: 0, color: '#D97706',
-                  }}>★</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1c1b', margin: '0 0 3px' }}>{loc.name}</p>
-                    {loc.address && (
-                      <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 4px', lineHeight: 1.4 }}>{loc.address}</p>
-                    )}
-                    <p style={{ fontSize: 10, color: '#d1d5db', margin: 0, fontFamily: 'monospace' }}>
-                      {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button
-                      onClick={() => openEdit(loc)}
-                      style={{
-                        padding: '6px 12px', borderRadius: 10,
-                        background: 'rgba(0,96,100,0.08)', border: 'none',
-                        cursor: 'pointer', fontSize: 12, fontWeight: 600, color: PRIMARY,
-                        fontFamily: FONT,
-                      }}
-                    >Edit</button>
-                    <button
-                      onClick={() => openDelete(loc)}
-                      style={{
-                        padding: '6px 12px', borderRadius: 10,
-                        background: 'rgba(186,26,26,0.08)', border: 'none',
-                        cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#ba1a1a',
-                        fontFamily: FONT,
-                      }}
-                    >Delete</button>
-                  </div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>
+                    Locations
+                  </p>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', background: 'rgba(0,0,0,0.05)', borderRadius: 20, padding: '2px 8px' }}>
+                    {locations.length}
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
+
+                <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {visible.map(loc => (
+                      <div
+                        key={loc.id}
+                        id={`loc-${loc.id}`}
+                        style={{
+                          background: highlightId === loc.id ? 'rgba(0,96,100,0.04)' : '#fff',
+                          borderRadius: 12,
+                          border: `1px solid ${highlightId === loc.id ? 'rgba(0,96,100,0.25)' : 'rgba(0,0,0,0.06)'}`,
+                          padding: '11px 12px',
+                          transition: 'border-color 0.3s, background 0.3s',
+                          position: 'relative',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => {
+                          setHighlightId(loc.id)
+                          setTimeout(() => setHighlightId(null), 2000)
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+                          {/* Star badge */}
+                          <div style={{
+                            width: 28, height: 28, borderRadius: 8,
+                            background: 'rgba(217,119,6,0.1)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 13, flexShrink: 0, color: '#D97706',
+                          }}>★</div>
+
+                          {/* Info */}
+                          <div style={{ flex: 1, minWidth: 0, paddingRight: 24 }}>
+                            <p style={{ fontSize: 13, fontWeight: 700, color: '#111827', margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {loc.name}
+                            </p>
+                            {loc.address && (
+                              <p style={{ fontSize: 11, color: '#6b7280', margin: '0 0 3px', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>
+                                {loc.address}
+                              </p>
+                            )}
+                            <p style={{ fontSize: 10, color: '#c9d0d8', margin: 0, fontFamily: 'monospace', letterSpacing: '0.02em' }}>
+                              {loc.lat.toFixed(5)}, {loc.lng.toFixed(5)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* ⋮ menu trigger */}
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            setMenuOpenId(menuOpenId === loc.id ? null : loc.id)
+                          }}
+                          style={{
+                            position: 'absolute', top: 10, right: 10,
+                            width: 24, height: 24, borderRadius: 6,
+                            background: menuOpenId === loc.id ? 'rgba(0,0,0,0.06)' : 'transparent',
+                            border: 'none', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 16, color: '#9ca3af', fontWeight: 700, lineHeight: 1,
+                            transition: 'background 0.15s',
+                          }}
+                        >⋮</button>
+
+                        {/* Dropdown menu */}
+                        {menuOpenId === loc.id && (
+                          <>
+                            <div
+                              onClick={e => { e.stopPropagation(); setMenuOpenId(null) }}
+                              style={{ position: 'fixed', inset: 0, zIndex: 200 }}
+                            />
+                            <div style={{
+                              position: 'absolute', top: 36, right: 8, zIndex: 201,
+                              background: '#fff', borderRadius: 10,
+                              boxShadow: '0 4px 20px rgba(0,0,0,0.14)',
+                              border: '1px solid rgba(0,0,0,0.08)',
+                              overflow: 'hidden', minWidth: 140,
+                            }}>
+                              <button
+                                onClick={e => { e.stopPropagation(); setMenuOpenId(null); openEdit(loc) }}
+                                style={{
+                                  width: '100%', padding: '10px 14px',
+                                  background: 'transparent', border: 'none',
+                                  cursor: 'pointer', textAlign: 'left',
+                                  display: 'flex', alignItems: 'center', gap: 9,
+                                  fontSize: 13, fontWeight: 600, color: '#111827',
+                                  borderBottom: '1px solid rgba(0,0,0,0.06)',
+                                  fontFamily: FONT,
+                                }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                Edit
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); setMenuOpenId(null); openDelete(loc) }}
+                                style={{
+                                  width: '100%', padding: '10px 14px',
+                                  background: 'transparent', border: 'none',
+                                  cursor: 'pointer', textAlign: 'left',
+                                  display: 'flex', alignItems: 'center', gap: 9,
+                                  fontSize: 13, fontWeight: 600, color: '#ba1a1a',
+                                  fontFamily: FONT,
+                                }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ba1a1a" strokeWidth="2.2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                                Delete
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Load more */}
+                  {hasMore && (
+                    <button
+                      onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                      style={{
+                        width: '100%', marginTop: 8, padding: '10px',
+                        background: 'transparent',
+                        border: '1px dashed rgba(0,96,100,0.25)',
+                        borderRadius: 10, fontSize: 12, fontWeight: 600,
+                        color: PRIMARY, cursor: 'pointer', fontFamily: FONT,
+                      }}
+                    >
+                      Load more · {locations.length - visibleCount} remaining
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
