@@ -22,14 +22,28 @@ export default function ProfilePage({ role }: Props) {
   const router   = useRouter()
   const supabase = createClient()
 
-  const [user,         setUser]         = useState<any>(null)
-  const [taxi,         setTaxi]         = useState<any>(null)
-  const [stats,        setStats]        = useState<Stats>({ total: 0, thisMonth: 0, thisWeek: 0 })
-  const [loading,      setLoading]      = useState(true)
-  const [loggingOut,   setLoggingOut]   = useState(false)
-  const [showConfirm,  setShowConfirm]  = useState(false)
-  const [pushResult,   setPushResult]   = useState<string | null>(null)
-  const [testingPush,  setTestingPush]  = useState(false)
+  const [user,           setUser]           = useState<any>(null)
+  const [taxi,           setTaxi]           = useState<any>(null)
+  const [stats,          setStats]          = useState<Stats>({ total: 0, thisMonth: 0, thisWeek: 0 })
+  const [loading,        setLoading]        = useState(true)
+  const [loggingOut,     setLoggingOut]     = useState(false)
+  const [showConfirm,    setShowConfirm]    = useState(false)
+  const [pushResult,     setPushResult]     = useState<string | null>(null)
+  const [testingPush,    setTestingPush]    = useState(false)
+  const [notifPerm,      setNotifPerm]      = useState<NotificationPermission | 'unsupported'>('default')
+  const [enablingNotif,  setEnablingNotif]  = useState(false)
+  const [isPWA,          setIsPWA]          = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsPWA(
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true
+      )
+      if ('Notification' in window) setNotifPerm(Notification.permission)
+      else setNotifPerm('unsupported')
+    }
+  }, [])
 
   useEffect(() => {
     async function init() {
@@ -131,6 +145,69 @@ export default function ProfilePage({ role }: Props) {
       setPushResult('❌ Error: ' + err.message)
     }
     setTestingPush(false)
+  }
+
+  async function enableNotifications() {
+    setEnablingNotif(true)
+    setPushResult(null)
+    try {
+      const permission = await Notification.requestPermission()
+      setNotifPerm(permission)
+
+      if (permission !== 'granted') {
+        if (permission === 'denied')
+          setPushResult('❌ Blocked. Enable notifications in your browser/phone settings, then reload.')
+        setEnablingNotif(false)
+        return
+      }
+
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        setPushResult('❌ Push not supported on this browser.')
+        setEnablingNotif(false)
+        return
+      }
+
+      // navigator.serviceWorker.ready hangs forever when no SW is registered
+      // (dev mode has PWA disabled). Race with a 6s timeout so it fails fast.
+      const reg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<null>((_, reject) =>
+          setTimeout(() => reject(new Error('Service worker not ready — try reloading the app')), 6000)
+        ),
+      ]) as ServiceWorkerRegistration
+
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      if (!vapidKey) { setPushResult('❌ Push not configured.'); setEnablingNotif(false); return }
+
+      let sub = await reg.pushManager.getSubscription()
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly:      true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as BufferSource,
+        })
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setPushResult('❌ Session expired — please log in again.'); setEnablingNotif(false); return }
+
+      const res = await fetch('/api/push/subscribe', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body:    JSON.stringify({ subscription: sub }),
+      })
+
+      if (res.ok) {
+        setPushResult('✅ Notifications enabled! You\'ll receive trip alerts on this device.')
+      } else {
+        const d = await res.json()
+        setPushResult(`❌ Failed to save subscription: ${d.error || 'unknown error'}`)
+      }
+
+    } catch (err: any) {
+      console.error('[Push] Enable error:', err)
+      setPushResult('❌ ' + (err.message || 'Something went wrong'))
+    }
+    setEnablingNotif(false)
   }
 
   function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -246,25 +323,82 @@ export default function ProfilePage({ role }: Props) {
           ))}
         </div>
 
-        {/* Push notification test */}
-        <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>Push Notifications</p>
-        <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, padding: '14px 16px', marginBottom: 20 }}>
-          <p style={{ fontSize: 13, color: '#6f7979', margin: '0 0 10px' }}>
-            Test if push notifications are working on this device.
-          </p>
-          <button
-            onClick={testPush}
-            disabled={testingPush}
-            style={{ width: '100%', padding: '10px', background: testingPush ? 'rgba(0,0,0,0.08)' : '#006064', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif", marginBottom: pushResult ? 10 : 0 }}
-          >
-            {testingPush ? 'Sending...' : '🔔 Send test notification'}
-          </button>
-          {pushResult && (
-            <div style={{ background: pushResult.startsWith('✅') ? '#D8F3DC' : '#FEE2E2', borderRadius: 10, padding: '8px 12px' }}>
-              <p style={{ fontSize: 12, fontWeight: 600, color: pushResult.startsWith('✅') ? '#2D6A4F' : '#991B1B', margin: 0 }}>{pushResult}</p>
+        {/* Push Notifications */}
+        {notifPerm !== 'unsupported' && (
+          <>
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>Push Notifications</p>
+            <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, padding: '14px 16px', marginBottom: 20 }}>
+
+              {/* Not yet asked — show enable button */}
+              {notifPerm === 'default' && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <span style={{ fontSize: 22 }}>🔔</span>
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>Enable notifications</p>
+                      <p style={{ fontSize: 12, color: '#6f7979', margin: '2px 0 0' }}>
+                        Get alerts for trip updates, driver assignments, and reminders.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={enableNotifications}
+                    disabled={enablingNotif}
+                    style={{ width: '100%', padding: '11px', background: enablingNotif ? 'rgba(0,0,0,0.08)' : '#006064', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: enablingNotif ? 'not-allowed' : 'pointer', fontFamily: FONT, marginBottom: pushResult ? 10 : 0 }}
+                  >
+                    {enablingNotif ? 'Enabling…' : 'Enable notifications'}
+                  </button>
+                  {pushResult && (
+                    <div style={{ background: pushResult.startsWith('✅') ? '#D8F3DC' : '#FEE2E2', borderRadius: 10, padding: '8px 12px' }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: pushResult.startsWith('✅') ? '#2D6A4F' : '#991B1B', margin: 0 }}>{pushResult}</p>
+                    </div>
+                  )}
+                  {!pushResult && !isPWA && (
+                    <p style={{ fontSize: 11, color: '#9ca3af', margin: '8px 0 0', textAlign: 'center' }}>
+                      Tip: install the app to your homescreen for reliable background alerts.
+                    </p>
+                  )}
+                </>
+              )}
+
+              {/* Granted */}
+              {notifPerm === 'granted' && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '8px 12px', background: '#D8F3DC', borderRadius: 10 }}>
+                    <span style={{ fontSize: 15 }}>✅</span>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: '#2D6A4F', margin: 0 }}>Notifications enabled</p>
+                  </div>
+                  <button
+                    onClick={testPush}
+                    disabled={testingPush}
+                    style={{ width: '100%', padding: '10px', background: testingPush ? 'rgba(0,0,0,0.08)' : '#006064', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, marginBottom: pushResult ? 10 : 0 }}
+                  >
+                    {testingPush ? 'Sending…' : 'Send test notification'}
+                  </button>
+                  {pushResult && (
+                    <div style={{ background: pushResult.startsWith('✅') ? '#D8F3DC' : '#FEE2E2', borderRadius: 10, padding: '8px 12px' }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: pushResult.startsWith('✅') ? '#2D6A4F' : '#991B1B', margin: 0 }}>{pushResult}</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Blocked */}
+              {notifPerm === 'denied' && (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>🚫</span>
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 3px' }}>Notifications blocked</p>
+                    <p style={{ fontSize: 12, color: '#6f7979', margin: 0, lineHeight: 1.5 }}>
+                      Open your browser or phone settings, find this site, and allow notifications. Then re-open the app.
+                    </p>
+                  </div>
+                </div>
+              )}
+
             </div>
-          )}
-        </div>
+          </>
+        )}
 
         {/* Logout */}
         {!showConfirm ? (
