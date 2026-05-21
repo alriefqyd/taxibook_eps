@@ -71,43 +71,136 @@ export async function GET(request: NextRequest) {
       results.auto_completed++
     }
 
-    // ── 3. START TIME REMINDER (T±2min) ────────────────────
-    // Bookings that should start NOW (within 2 min window), still booked
-    const startWindowStart = new Date(now.getTime() - 2 * 60 * 1000)
-    const startWindowEnd   = new Date(now.getTime() + 2 * 60 * 1000)
+    // ── 2. 15-MIN PRE-TRIP REMINDER ────────────────────────────────
+    // Fires once per booking when scheduled_at is 13–17 min away.
+    // Includes driver distance + rough ETA if GPS is fresh.
 
-    const { data: startingNow } = await admin
+    const remind15Start = new Date(now.getTime() + 13 * 60 * 1000)
+    const remind15End   = new Date(now.getTime() + 17 * 60 * 1000)
+
+    const { data: upcoming15 } = await admin
       .from('bookings')
-      .select('id, passenger_id, destination, scheduled_at, taxi_id, taxis!taxi_id(driver_id, name)')
+      .select('id, passenger_id, destination, scheduled_at, pickup_lat, pickup_lng, taxi_id, taxis!taxi_id(driver_id, name, latitude, longitude, location_updated_at)')
       .eq('status', 'booked')
-      .gte('scheduled_at', startWindowStart.toISOString())
-      .lte('scheduled_at', startWindowEnd.toISOString())
+      .gte('scheduled_at', remind15Start.toISOString())
+      .lte('scheduled_at', remind15End.toISOString())
 
-    for (const b of (startingNow || []) as any[]) {
-      // Check if start reminder already sent
+    for (const b of (upcoming15 || []) as any[]) {
+      // Skip if already sent
+      const { count } = await admin
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('booking_id', b.id)
+        .eq('type', 'reminder_15min')
+      if ((count || 0) > 0) continue
+
+      const taxi       = b.taxis
+      const gpsAgeMin  = taxi?.location_updated_at
+        ? (now.getTime() - new Date(taxi.location_updated_at).getTime()) / 60000
+        : Infinity
+      const gpsIsFresh = gpsAgeMin < 3
+
+      let locationLine = ''
+      if (gpsIsFresh && taxi?.latitude && taxi?.longitude && b.pickup_lat && b.pickup_lng) {
+        const distanceKm = haversineKm(taxi.latitude, taxi.longitude, b.pickup_lat, b.pickup_lng)
+        const etaMin     = Math.round((distanceKm / 30) * 60) // ~30 km/h estimate
+        locationLine     = ` Driver is ~${distanceKm < 1
+          ? `${Math.round(distanceKm * 1000)}m`
+          : `${distanceKm.toFixed(1)}km`} away, ETA ~${etaMin} min.`
+      }
+
+      const notifs15: any[] = [
+        {
+          user_id:    b.passenger_id,
+          booking_id: b.id,
+          title:      '⏰ Your trip is in 15 minutes',
+          body:       `Trip to ${b.destination} starts soon. Please head to the pickup point.${locationLine}`,
+          type:       'reminder_15min',
+        },
+      ]
+
+      if (taxi?.driver_id) {
+        const { data: passenger } = await admin
+          .from('users').select('name').eq('id', b.passenger_id).single()
+        notifs15.push({
+          user_id:    taxi.driver_id,
+          booking_id: b.id,
+          title:      '⏰ Pickup in 15 minutes',
+          body:       `Pick up ${passenger?.name} → ${b.destination} in 15 min. Head to the pickup point now.`,
+          type:       'reminder_15min',
+        })
+      }
+
+      await notify(notifs15)
+      results.reminded_15min++
+    }
+
+    // ── 3. ARRIVING NOTIFICATION — GPS-primary, time-fallback ─────
+    // Primary:  driver GPS ≤ 500 m from pickup → fires immediately
+    // Fallback: no fresh GPS → fires at scheduled_at ± 2 min (old behaviour)
+    // Fires once per booking (deduped on reminder_start type)
+
+    const arrivingWindowStart = new Date(now.getTime() - 30 * 60 * 1000)
+    const arrivingWindowEnd   = new Date(now.getTime() + 30 * 60 * 1000)
+
+    const { data: arrivingBookings } = await admin
+      .from('bookings')
+      .select('id, passenger_id, destination, scheduled_at, pickup_lat, pickup_lng, taxi_id, taxis!taxi_id(driver_id, name, latitude, longitude, location_updated_at)')
+      .eq('status', 'booked')
+      .gte('scheduled_at', arrivingWindowStart.toISOString())
+      .lte('scheduled_at', arrivingWindowEnd.toISOString())
+
+    for (const b of (arrivingBookings || []) as any[]) {
+      // Skip if already sent
       const { count } = await admin
         .from('notifications')
         .select('id', { count: 'exact', head: true })
         .eq('booking_id', b.id)
         .eq('type', 'reminder_start')
-
       if ((count || 0) > 0) continue
+
+      const taxi       = b.taxis
+      const gpsAgeMin  = taxi?.location_updated_at
+        ? (now.getTime() - new Date(taxi.location_updated_at).getTime()) / 60000
+        : Infinity
+      const gpsIsFresh = gpsAgeMin < 3
+
+      let shouldNotify = false
+      let distanceM: number | null = null
+
+      if (gpsIsFresh && taxi?.latitude && taxi?.longitude && b.pickup_lat && b.pickup_lng) {
+        const distanceKm = haversineKm(taxi.latitude, taxi.longitude, b.pickup_lat, b.pickup_lng)
+        if (distanceKm <= 0.5) {
+          shouldNotify = true
+          distanceM    = Math.round(distanceKm * 1000)
+        }
+      } else {
+        // GPS unavailable — fall back to scheduled time ± 2 min
+        const diffMs = Math.abs(now.getTime() - new Date(b.scheduled_at).getTime())
+        if (diffMs <= 2 * 60 * 1000) shouldNotify = true
+      }
+
+      if (!shouldNotify) continue
+
+      const passengerBody = distanceM !== null
+        ? `Your driver is ~${distanceM}m away from the pickup point. Please be ready.`
+        : `Your trip to ${b.destination} is starting. Please be ready at the pickup point.`
 
       const notifs: any[] = [
         {
           user_id:    b.passenger_id,
           booking_id: b.id,
-          title:      '🚗 Your taxi is arriving now',
-          body:       `Your trip to ${b.destination} is starting. Please be ready at pickup point.`,
+          title:      '🚗 Your driver is arriving now',
+          body:       passengerBody,
           type:       'reminder_start',
         },
       ]
 
-      if (b.taxis?.driver_id) {
+      if (taxi?.driver_id) {
         const { data: passenger } = await admin
           .from('users').select('name').eq('id', b.passenger_id).single()
         notifs.push({
-          user_id:    b.taxis.driver_id,
+          user_id:    taxi.driver_id,
           booking_id: b.id,
           title:      '🚗 Time to pick up passenger',
           body:       `Pick up ${passenger?.name} now → ${b.destination}. Tap "Start trip" when picked up.`,
