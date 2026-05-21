@@ -74,8 +74,8 @@ export async function GET(request: NextRequest) {
     // Fires once per booking when scheduled_at is 13–17 min away.
     // Includes driver distance + rough ETA if GPS is fresh.
 
-    const remind15Start = new Date(now.getTime() + 13 * 60 * 1000)
-    const remind15End   = new Date(now.getTime() + 17 * 60 * 1000)
+    const remind15Start = new Date(now.getTime() + 12 * 60 * 1000)
+    const remind15End   = new Date(now.getTime() + 18 * 60 * 1000)
 
     const { data: upcoming15 } = await admin
       .from('bookings')
