@@ -45,16 +45,30 @@ export default function ProfilePage({ role }: Props) {
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
       if (!vapidKey) return 'VAPID key not configured'
 
-      // serviceWorker.ready hangs forever if no SW is registered (e.g. dev mode).
+      // Unregister any stale non-pwa service workers that may block activation
+      const allRegs = await navigator.serviceWorker.getRegistrations()
+      for (const r of allRegs) {
+        const swUrl = r.active?.scriptURL || r.installing?.scriptURL || r.waiting?.scriptURL || ''
+        if (swUrl && !swUrl.endsWith('/sw.js')) {
+          await r.unregister()
+        }
+      }
+
+      // Ensure /sw.js is registered (next-pwa does this automatically, but guard against cold starts)
+      const swReg = await navigator.serviceWorker.getRegistration('/')
+      if (!swReg) {
+        try { await navigator.serviceWorker.register('/sw.js', { scope: '/' }) } catch { /* ignore */ }
+      }
+
       const reg: ServiceWorkerRegistration = await Promise.race([
         navigator.serviceWorker.ready,
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Service worker not ready — reload the app and try again')), 8000)
+          setTimeout(() => reject(new Error('Service worker not ready — please reload the page and try again')), 20000)
         ),
       ])
 
-      const existing = await reg.pushManager.getSubscription()
-      if (existing) await existing.unsubscribe()
+      const staleSub = await reg.pushManager.getSubscription()
+      if (staleSub) await staleSub.unsubscribe()
 
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly:      true,

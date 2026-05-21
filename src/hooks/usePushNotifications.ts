@@ -19,17 +19,33 @@ export function usePushNotifications() {
         const permission = await Notification.requestPermission()
         if (permission !== 'granted') return
 
+        // Unregister stale non-pwa workers that may block activation
+        const allRegs = await navigator.serviceWorker.getRegistrations()
+        for (const r of allRegs) {
+          const swUrl = r.active?.scriptURL || r.installing?.scriptURL || r.waiting?.scriptURL || ''
+          if (swUrl && !swUrl.endsWith('/sw.js')) {
+            await r.unregister()
+            console.log('[Push] Unregistered stale SW:', swUrl)
+          }
+        }
+
+        // Ensure /sw.js is registered in case next-pwa hasn't run yet
+        const swReg = await navigator.serviceWorker.getRegistration('/')
+        if (!swReg) {
+          try { await navigator.serviceWorker.register('/sw.js', { scope: '/' }) } catch { /* ignore */ }
+        }
+
         const reg = await Promise.race([
           navigator.serviceWorker.ready,
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Service worker not ready')), 8000)
+            setTimeout(() => reject(new Error('Service worker not ready')), 20000)
           ),
         ])
         console.log('[Push] SW ready:', reg.scope)
 
         // Always unsubscribe the stale sub first so we get a fresh, valid endpoint
-        const existing = await reg.pushManager.getSubscription()
-        if (existing) await existing.unsubscribe()
+        const staleSub = await reg.pushManager.getSubscription()
+        if (staleSub) await staleSub.unsubscribe()
 
         const sub = await reg.pushManager.subscribe({
           userVisibleOnly:      true,
