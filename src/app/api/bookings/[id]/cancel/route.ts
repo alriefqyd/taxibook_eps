@@ -75,13 +75,14 @@ export async function POST(
       .from('users').select('id').eq('role', 'coordinator').eq('is_active', true)
 
     if (coordinators?.length) {
-      await admin.from('notifications').insert(
+      await notify(
         coordinators.map((c: any) => ({
           user_id:    c.id,
           booking_id: bookingId,
           title:      'Booking cancelled by staff',
           body:       `${profile?.name} cancelled trip to ${booking.destination}${reason ? `: ${reason}` : ''}.${driverName ? ` ${taxiName} (${driverName}) is now free.` : ''}`,
           type:       'booking_rejected',
+          url:        '/coordinator/home',
         }))
       )
     }

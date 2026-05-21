@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notify } from '@/lib/notify'
-import { sendPushToUser } from '@/lib/push'
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R    = 6371
@@ -116,6 +115,7 @@ export async function GET(request: NextRequest) {
           title:      '⏰ Your trip is in 15 minutes',
           body:       `Trip to ${b.destination} starts soon. Please head to the pickup point.${locationLine}`,
           type:       'reminder_15min',
+          url:        '/staff/home',
         },
       ]
 
@@ -128,6 +128,7 @@ export async function GET(request: NextRequest) {
           title:      '⏰ Pickup in 15 minutes',
           body:       `Pick up ${passenger?.name} → ${b.destination} in 15 min. Head to the pickup point now.`,
           type:       'reminder_15min',
+          url:        '/driver/home',
         })
       }
 
@@ -193,6 +194,7 @@ export async function GET(request: NextRequest) {
           title:      '🚗 Your driver is arriving now',
           body:       passengerBody,
           type:       'reminder_start',
+          url:        '/staff/home',
         },
       ]
 
@@ -205,6 +207,7 @@ export async function GET(request: NextRequest) {
           title:      '🚗 Time to pick up passenger',
           body:       `Pick up ${passenger?.name} now → ${b.destination}. Tap "Start trip" when picked up.`,
           type:       'reminder_start',
+          url:        '/driver/home',
         })
       }
 
@@ -283,6 +286,7 @@ export async function GET(request: NextRequest) {
           title:      driverTitle,
           body:       driverBody,
           type:       'reminder_overdue',
+          url:        '/driver/home',
         })
       }
 
@@ -319,17 +323,14 @@ export async function GET(request: NextRequest) {
             title:      `Your driver is ${minutesLate} min late`,
             body:       passengerBody,
             type:       'reminder_overdue',
+            url:        '/staff/home',
           })
           results.notified_coord++
         }
       }
 
       if (notifs.length) {
-        for (const notif of notifs) {
-          const url = notif.user_id === taxi?.driver_id ? '/driver/home' : '/staff/home'
-          await sendPushToUser(notif.user_id, notif.title, notif.body, url, notif.type)
-        }
-        await admin.from('notifications').insert(notifs)
+        await notify(notifs)
         results.reminded_overdue++
       }
     }
