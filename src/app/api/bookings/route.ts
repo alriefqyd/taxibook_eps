@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notify } from '@/lib/notify'
+import { getRouteDurationSeconds } from '@/lib/routing'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
     const {
       pickup, destination, trip_type,
       wait_minutes = 0, notes, scheduled_at,
-      status, auto_complete_at,
+      status,
       pickup_lat = null, pickup_lng = null,
       destination_lat = null, destination_lng = null,
       passenger_id: requestedPassengerId = null,
@@ -31,6 +32,21 @@ export async function POST(request: NextRequest) {
     const passengerId = (caller?.role === 'coordinator' && requestedPassengerId)
       ? requestedPassengerId
       : user.id
+
+    // ── Compute auto_complete_at from actual route duration (OSRM) ──
+    const MARGIN_S  = 10 * 60   // 10 min margin
+    const FALLBACK_S = 2 * 3600  // 2h fallback when route unavailable
+    const waitSec   = trip_type === 'WAITING' ? (wait_minutes || 0) * 60 : 0
+
+    let routeSec = FALLBACK_S
+    if (pickup_lat && pickup_lng && destination_lat && destination_lng) {
+      const osrm = await getRouteDurationSeconds(pickup_lat, pickup_lng, destination_lat, destination_lng)
+      if (osrm != null) routeSec = osrm
+    }
+
+    const auto_complete_at = new Date(
+      new Date(scheduled_at).getTime() + (routeSec + MARGIN_S + waitSec) * 1000
+    ).toISOString()
 
     // ── Insert booking ──
     const { data: inserted, error: insertError } = await admin

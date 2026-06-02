@@ -1,5 +1,21 @@
 import type { Coords } from './geocode'
 
+// Free OSRM-based duration (no API key needed) — for server-side auto_complete_at calculation
+export async function getRouteDurationSeconds(
+  pickupLat: number, pickupLng: number,
+  destLat: number, destLng: number
+): Promise<number | null> {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${pickupLng},${pickupLat};${destLng},${destLat}?overview=false`
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.routes?.[0]?.duration ?? null
+  } catch {
+    return null
+  }
+}
+
 export interface RouteResult {
   coordinates: [number, number][] // [lat, lng] pairs for Leaflet Polyline
   distanceMeters: number

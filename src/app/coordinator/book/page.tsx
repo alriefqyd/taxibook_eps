@@ -59,7 +59,7 @@ export default function CoordinatorBookPage() {
   const [staffUsers,    setStaffUsers]    = useState<StaffUser[]>([])
   const [form,          setForm]          = useState<FormData>({
     mode:         'schedule',
-    pickup:       'Engineering Office',
+    pickup:       '',
     destination:  '',
     notes:        '',
     scheduled_at: defaultDateTime(),
@@ -93,7 +93,8 @@ export default function CoordinatorBookPage() {
     setError('')
     if (step === 1) {
       if (!form.passenger_id) { setError('Please select a passenger'); return }
-      if (!form.destination.trim()) { setError('Please enter a destination'); return }
+      if (!pickupCoords) { setError('Please pick a pickup location on the map'); return }
+      if (!destCoords)   { setError('Please pick a destination on the map'); return }
       if (!form.scheduled_at) { setError('Please select date and time'); return }
     }
     setStep(prev => (prev + 1) as Step)
@@ -109,10 +110,8 @@ export default function CoordinatorBookPage() {
         ? new Date(Date.now() + 2 * 60000)
         : new Date(form.scheduled_at)
 
-      const needsApproval  = form.trip_type === 'WAITING' && form.wait_minutes > 60
-      const bookingStatus  = needsApproval ? 'pending_coordinator_approval' : 'submitted'
-      const waitMs         = form.trip_type === 'WAITING' ? form.wait_minutes * 60000 : 0
-      const autoCompleteAt = new Date(scheduledDate.getTime() + waitMs + 2 * 3600000)
+      const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 60
+      const bookingStatus = needsApproval ? 'pending_coordinator_approval' : 'submitted'
 
       const res = await fetch('/api/bookings', {
         method: 'POST',
@@ -125,11 +124,10 @@ export default function CoordinatorBookPage() {
           notes:           form.notes || null,
           scheduled_at:    scheduledDate.toISOString(),
           status:          bookingStatus,
-          auto_complete_at: autoCompleteAt.toISOString(),
-          pickup_lat:      pickupCoords?.lat ?? null,
-          pickup_lng:      pickupCoords?.lng ?? null,
-          destination_lat: destCoords?.lat   ?? null,
-          destination_lng: destCoords?.lng   ?? null,
+          pickup_lat:      pickupCoords!.lat,
+          pickup_lng:      pickupCoords!.lng,
+          destination_lat: destCoords!.lat,
+          destination_lng: destCoords!.lng,
           passenger_id:    form.passenger_id,
         }),
       })
@@ -154,7 +152,7 @@ export default function CoordinatorBookPage() {
       {pickerField && (
         <LocationPickerMap
           title={pickerField === 'pickup' ? 'Select pickup location' : 'Select destination'}
-          autoGps={false}
+          autoGps={pickerField === 'pickup'}
           onClose={() => setPickerField(null)}
           onConfirm={(address, coords) => {
             if (pickerField === 'pickup') { update('pickup', address); setPickupCoords(coords) }
@@ -219,16 +217,44 @@ export default function CoordinatorBookPage() {
             )}
 
             <FG label="Pickup location">
-              <input type="text" value={form.pickup} onChange={e => { update('pickup', e.target.value); setPickupCoords(null) }} placeholder="e.g. Engineering Office" style={inputSt} />
-              <button type="button" onClick={() => setPickerField('pickup')} style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: C.black, fontFamily: FONT }}>
-                📍 {pickupCoords ? 'Change on map' : 'Pick on map'}
+              <button
+                type="button"
+                onClick={() => setPickerField('pickup')}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: C.white, border: `1.5px solid ${pickupCoords ? C.black : C.border}`, borderRadius: 16, padding: '12px 14px', cursor: 'pointer', fontFamily: FONT, textAlign: 'left' }}
+              >
+                <span style={{ fontSize: 18, flexShrink: 0 }}>📍</span>
+                <div style={{ flex: 1 }}>
+                  {pickupCoords ? (
+                    <>
+                      <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pickup</p>
+                      <p style={{ fontSize: 13, color: C.textPrimary, margin: 0, fontWeight: 600 }}>{form.pickup}</p>
+                    </>
+                  ) : (
+                    <p style={{ fontSize: 14, color: C.textTert, margin: 0 }}>Tap to pick on map...</p>
+                  )}
+                </div>
+                {pickupCoords && <span style={{ fontSize: 11, color: C.textTert, flexShrink: 0 }}>Change</span>}
               </button>
             </FG>
 
             <FG label="Destination">
-              <input type="text" value={form.destination} onChange={e => { update('destination', e.target.value); setDestCoords(null) }} placeholder="e.g. Larona, Karebbe, Sorowako..." style={inputSt} />
-              <button type="button" onClick={() => setPickerField('destination')} style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: C.black, fontFamily: FONT }}>
-                📍 {destCoords ? 'Change on map' : 'Pick on map'}
+              <button
+                type="button"
+                onClick={() => setPickerField('destination')}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: C.white, border: `1.5px solid ${destCoords ? C.black : C.border}`, borderRadius: 16, padding: '12px 14px', cursor: 'pointer', fontFamily: FONT, textAlign: 'left' }}
+              >
+                <span style={{ fontSize: 18, flexShrink: 0 }}>🏁</span>
+                <div style={{ flex: 1 }}>
+                  {destCoords ? (
+                    <>
+                      <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Destination</p>
+                      <p style={{ fontSize: 13, color: C.textPrimary, margin: 0, fontWeight: 600 }}>{form.destination}</p>
+                    </>
+                  ) : (
+                    <p style={{ fontSize: 14, color: C.textTert, margin: 0 }}>Tap to pick on map...</p>
+                  )}
+                </div>
+                {destCoords && <span style={{ fontSize: 11, color: C.textTert, flexShrink: 0 }}>Change</span>}
               </button>
             </FG>
 
