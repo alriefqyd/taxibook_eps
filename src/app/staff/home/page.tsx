@@ -12,6 +12,7 @@ import {
 import { id as idLocale } from 'date-fns/locale'
 import type { BookingDetail, User } from '@/types'
 import { STATUS_COLORS, STATUS_LABELS } from '@/types'
+import OnboardingTour from '@/components/OnboardingTour'
 
 const TrackingMap = dynamic(() => import('@/components/map/TrackingMap'), { ssr: false })
 
@@ -271,6 +272,7 @@ export default function StaffHomePage() {
           </div>
         </div>
       </header>
+      <OnboardingTour role="staff" />
 
       {/* ── Greeting + Stats ── */}
       <div style={{ background:'#ffffff', borderBottom:'1px solid rgba(0,0,0,0.06)', padding:'20px 20px 0' }}>

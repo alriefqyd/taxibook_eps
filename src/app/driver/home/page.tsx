@@ -10,6 +10,7 @@ import { id as idLocale } from 'date-fns/locale'
 import type { User } from '@/types'
 import GanttCalendar from '@/components/GanttCalendar'
 import { useGpsReporting } from '@/hooks/useGpsReporting'
+import OnboardingTour from '@/components/OnboardingTour'
 
 const ActiveTripMap = dynamic(() => import('@/components/map/ActiveTripMap'), { ssr: false })
 
@@ -265,6 +266,7 @@ export default function DriverHomePage() {
           </div>
         </div>
       </header>
+      <OnboardingTour role="driver" />
 
       {/* ── Driver hero card ── */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '20px 20px 0' }}>

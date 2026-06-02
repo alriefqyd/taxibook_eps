@@ -11,6 +11,7 @@ import { id as idLocale } from 'date-fns/locale'
 import type { BookingDetail, User } from '@/types'
 import { STATUS_LABELS, STATUS_COLORS } from '@/types'
 import GanttCalendar from '@/components/GanttCalendar'
+import OnboardingTour from '@/components/OnboardingTour'
 
 
 interface TaxiRow {
@@ -272,8 +273,7 @@ export default function CoordinatorHomePage() {
           </div>
         </div>
       </header>
-
-
+      <OnboardingTour role="coordinator" />
 
       <div style={{ padding: '16px' }}>
         {/* New booking CTA */}
