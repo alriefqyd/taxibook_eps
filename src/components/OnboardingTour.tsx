@@ -11,6 +11,14 @@ type TourStep = {
 
 const TOUR_STORAGE_KEY = 'taxibook-onboarding-tour-v1'
 
+function isAppInstalled() {
+  if (typeof window === 'undefined') return false
+  if (typeof navigator !== 'undefined' && 'standalone' in navigator) {
+    return (navigator as any).standalone === true
+  }
+  return window.matchMedia('(display-mode: standalone)').matches
+}
+
 function getRoleStep(role: Role): TourStep {
   if (role === 'coordinator') {
     return {
@@ -52,6 +60,7 @@ export default function OnboardingTour({ role }: { role: Role }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (isAppInstalled()) return
     const seen = window.localStorage.getItem(TOUR_STORAGE_KEY)
     if (!seen) {
       setOpen(true)
@@ -69,33 +78,10 @@ export default function OnboardingTour({ role }: { role: Role }) {
   const prev = () => setStepIndex(i => Math.max(0, i - 1))
   const next = () => setStepIndex(i => Math.min(steps.length - 1, i + 1))
 
+  if (!open) return null
+
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        style={{
-          position: 'fixed',
-          bottom: 20,
-          right: 20,
-          zIndex: 1000,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '10px 14px',
-          borderRadius: 9999,
-          background: '#006064',
-          color: '#ffffff',
-          border: 'none',
-          boxShadow: '0 12px 28px rgba(0,0,0,0.18)',
-          cursor: 'pointer',
-          fontSize: 13,
-          fontWeight: 700,
-        }}
-      >
-        <span style={{ fontSize: 16, lineHeight: 1 }}>?</span>
-        Tour
-      </button>
-
       {open && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.48)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ width: 'min(660px,100%)', background: '#fff', borderRadius: 24, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.25)' }}>
