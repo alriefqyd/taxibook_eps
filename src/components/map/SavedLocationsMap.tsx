@@ -4,8 +4,9 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { RegisteredLocation } from '@/types'
+import { DEFAULT_TILE_ATTRIBUTION, DEFAULT_TILE_URL } from './tileConfig'
 
-const TILE_URL = `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY ?? ''}`
+const TILE_URL = DEFAULT_TILE_URL
 const SOROWAKO: [number, number] = [-2.5397, 121.3588]
 const FONT = "var(--font-inter), 'Inter', sans-serif"
 
@@ -69,7 +70,7 @@ export default function SavedLocationsMap({ locations, onMarkerClick }: Props) {
         zoomControl={false}
         scrollWheelZoom
       >
-        <TileLayer url={TILE_URL} attribution="© MapTiler © OpenStreetMap contributors" />
+        <TileLayer url={TILE_URL} attribution={DEFAULT_TILE_ATTRIBUTION} />
         <FitBounds locations={locations} />
         <MapCapture onMap={setMapInst} />
 

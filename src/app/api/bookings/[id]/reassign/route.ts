@@ -48,10 +48,10 @@ export async function POST(
     const newDriverId  = newTaxi.driver_id
     const newDriverName = (newTaxi.users as any)?.name || 'Driver'
 
-    // Update booking
+    // Update booking — no driver approval needed
     await admin.from('bookings').update({
       taxi_id: new_taxi_id,
-      status:  'pending_driver_approval',
+      status:  'booked',
     }).eq('id', bookingId)
 
     // Notify old driver if different
@@ -82,13 +82,16 @@ export async function POST(
       hour: '2-digit', minute: '2-digit'
     })
 
-    await notify({
-      user_id:    newDriverId,
-      booking_id: bookingId,
-      title:      'New trip assigned (reassigned)',
-      body:       `${passenger?.name} → ${booking.destination} at ${time}`,
-      type:       'driver_reassigned',
-    })
+    if (newDriverId) {
+      await notify({
+        user_id:    newDriverId,
+        booking_id: bookingId,
+        title:      'Trip assigned to you',
+        body:       `You have been assigned to pick up ${passenger?.name} → ${booking.destination} at ${time}. Please be ready on time.`,
+        type:       'driver_reassigned',
+        url:        '/driver/home',
+      })
+    }
 
     return NextResponse.json({ success: true })
 

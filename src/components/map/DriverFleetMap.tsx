@@ -5,8 +5,9 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useDriverLocations } from '@/hooks/useDriverLocations'
 import { getRoute } from '@/lib/routing'
+import { DEFAULT_TILE_ATTRIBUTION, DEFAULT_TILE_URL } from './tileConfig'
 
-const TILE_URL = `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY ?? ''}`
+const TILE_URL = DEFAULT_TILE_URL
 const DEFAULT_CENTER: [number, number] = [-2.5397, 121.3588]
 const GPS_STALE_MS = 10 * 60 * 1000
 
@@ -121,7 +122,7 @@ export default function DriverFleetMap({ style }: Props) {
   return (
     <div ref={containerRef} style={{ position: 'relative', overflow: 'hidden', height: '100%', background: '#e8e0d8', ...style }}>
       <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl>
-        <TileLayer url={TILE_URL} attribution="© MapTiler © OpenStreetMap contributors" />
+        <TileLayer url={TILE_URL} attribution={DEFAULT_TILE_ATTRIBUTION} />
         {fitPositions.length > 0 && <FitBounds positions={fitPositions} />}
 
         {positioned.map(d => {
@@ -137,7 +138,7 @@ export default function DriverFleetMap({ style }: Props) {
               )}
 
               {bk && hasDest && (
-                <Marker position={[bk.destination_lat!, bk.destination_lng!]} icon={destinationIcon(d.color, d.name)}>
+                <Marker position={[bk.destination_lat!, bk.destination_lng!]} icon={destinationIcon(d.color, d.driver_name || d.name)}>
                   <Popup>
                     <div style={{ fontFamily: 'Inter, sans-serif' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
@@ -152,7 +153,7 @@ export default function DriverFleetMap({ style }: Props) {
                 </Marker>
               )}
 
-              <Marker position={[d.latitude!, d.longitude!]} icon={driverIcon(d.color, stale, d.name)}>
+              <Marker position={[d.latitude!, d.longitude!]} icon={driverIcon(d.color, stale, d.driver_name || d.name)}>
                 <Popup>
                   <div style={{ fontFamily: 'Inter, sans-serif', minWidth: 155 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>

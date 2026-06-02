@@ -97,7 +97,7 @@ export default function BookPage() {
         const { data: inProgress } = await supabase
           .from('bookings').select('auto_complete_at')
           .eq('taxi_id', taxi.id)
-          .in('status', ['booked','on_trip','waiting_trip','pending_driver_approval'])
+          .in('status', ['booked','on_trip','waiting_trip'])
           .lte('scheduled_at', now.toISOString())
           .gte('auto_complete_at', now.toISOString())
           .limit(1).maybeSingle()

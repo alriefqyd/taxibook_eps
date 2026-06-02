@@ -40,11 +40,12 @@ export async function POST(
       )
     }
 
-    // Update status
-    const newStatus = booking.trip_type === 'WAITING' ? 'waiting_trip' : 'on_trip'
+    // Update status and set auto_complete_at to 2 hours from now
+    const newStatus      = booking.trip_type === 'WAITING' ? 'waiting_trip' : 'on_trip'
+    const autoCompleteAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
 
     await admin.from('bookings')
-      .update({ status: newStatus })
+      .update({ status: newStatus, auto_complete_at: autoCompleteAt })
       .eq('id', bookingId)
 
     // Get driver name

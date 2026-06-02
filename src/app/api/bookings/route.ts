@@ -19,17 +19,24 @@ export async function POST(request: NextRequest) {
       status, auto_complete_at,
       pickup_lat = null, pickup_lng = null,
       destination_lat = null, destination_lng = null,
+      passenger_id: requestedPassengerId = null,
     } = await request.json()
 
     if (!pickup || !destination || !trip_type || !scheduled_at) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // Coordinators can book on behalf of a passenger
+    const { data: caller } = await admin.from('users').select('role').eq('id', user.id).single()
+    const passengerId = (caller?.role === 'coordinator' && requestedPassengerId)
+      ? requestedPassengerId
+      : user.id
+
     // ── Insert booking ──
     const { data: inserted, error: insertError } = await admin
       .from('bookings')
       .insert({
-        passenger_id:     user.id,
+        passenger_id:     passengerId,
         pickup,
         destination,
         trip_type,
@@ -71,7 +78,7 @@ export async function POST(request: NextRequest) {
       if (result.taxi) {
         // Notify driver
         const { data: passenger } = await admin
-          .from('users').select('name').eq('id', user.id).single()
+          .from('users').select('name').eq('id', passengerId).single()
 
         const time = new Date(scheduled_at).toLocaleTimeString('id-ID', {
           hour: '2-digit', minute: '2-digit'
@@ -80,13 +87,13 @@ export async function POST(request: NextRequest) {
         await notify({
           user_id:    result.taxi.driver_id,
           booking_id: booking.id,
-          title:      'New trip assigned',
-          body:       `${passenger?.name} → ${destination} at ${time}`,
+          title:      'Trip assigned to you',
+          body:       `You have been assigned to pick up ${passenger?.name} → ${destination} at ${time}. Please be ready on time.`,
           type:       'driver_assigned',
         })
 
         return NextResponse.json({
-          booking:     { ...booking, taxi_id: result.taxi.id, status: 'pending_driver_approval' },
+          booking:     { ...booking, taxi_id: result.taxi.id, status: 'booked' },
           assigned:    true,
           taxi_name:   result.taxi.name,
           driver_name: result.taxi.driver_name,
@@ -94,7 +101,7 @@ export async function POST(request: NextRequest) {
       }
 
       // No driver available — notify coordinator
-      await notifyCoordinators(admin, booking, user.id, destination,
+      await notifyCoordinators(admin, booking, passengerId, destination,
         'New booking — no driver available',
         `Please assign manually.`
       )
@@ -106,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Pending approval — notify coordinator ──
-    await notifyCoordinators(admin, booking, user.id, destination,
+    await notifyCoordinators(admin, booking, passengerId, destination,
       'Booking needs your approval',
       `Waiting ${wait_minutes} min — over 60 min limit.`
     )
@@ -163,7 +170,7 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string) {
           .from('bookings')
           .select('auto_complete_at')
           .eq('taxi_id', taxi.id)
-          .in('status', ['booked', 'on_trip', 'waiting_trip', 'pending_driver_approval'])
+          .in('status', ['booked', 'on_trip', 'waiting_trip'])
           .gt('auto_complete_at', scheduledTime.toISOString())
           .limit(1)
           .maybeSingle()
@@ -210,10 +217,10 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string) {
 
   const best = available[0].taxi
 
-  // Assign
+  // Assign directly — no driver confirmation step
   await admin
     .from('bookings')
-    .update({ taxi_id: best.id, status: 'pending_driver_approval' })
+    .update({ taxi_id: best.id, status: 'booked' })
     .eq('id', bookingId)
 
   return {

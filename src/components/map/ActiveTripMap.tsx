@@ -5,8 +5,9 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { geocodeAddress } from '@/lib/geocode'
 import { getRoute } from '@/lib/routing'
+import { DEFAULT_TILE_ATTRIBUTION, DEFAULT_TILE_URL } from './tileConfig'
 
-const TILE_URL = `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY ?? ''}`
+const TILE_URL = DEFAULT_TILE_URL
 const DEFAULT_CENTER: [number, number] = [-2.5397, 121.3588] // PTVI Sorowako
 
 function driverIcon(color: string) {
@@ -113,7 +114,7 @@ export default function ActiveTripMap({ pickup, destination, status, taxiColor, 
       )}
 
       <MapContainer center={driverPos ?? DEFAULT_CENTER} zoom={driverPos ? 13 : 5} style={{ height: 280, width: '100%' }} zoomControl>
-        <TileLayer url={TILE_URL} attribution="© MapTiler © OpenStreetMap contributors" />
+        <TileLayer url={TILE_URL} attribution={DEFAULT_TILE_ATTRIBUTION} />
         {bounds.length > 0 && <FitBounds positions={bounds} />}
         {driverPos && (
           <Marker position={driverPos} icon={driverIcon(taxiColor || '#006064')}>

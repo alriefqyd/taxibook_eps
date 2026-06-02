@@ -209,7 +209,7 @@ export default function CoordinatorHomePage() {
   // Exclude pending_coordinator_approval from main list — shown separately above
   const mainBookings = bookings.filter(b => b.status !== 'pending_coordinator_approval')
   const filtered = filter === 'all'       ? mainBookings
-    : filter === 'pending'  ? mainBookings.filter(b => ['submitted','pending_driver_approval'].includes(b.status))
+    : filter === 'pending'  ? mainBookings.filter(b => b.status === 'submitted')
     : filter === 'booked'   ? mainBookings.filter(b => ['booked','on_trip','waiting_trip'].includes(b.status))
     : mainBookings.filter(b => b.status === 'completed')
 
@@ -276,6 +276,13 @@ export default function CoordinatorHomePage() {
 
 
       <div style={{ padding: '16px' }}>
+        {/* New booking CTA */}
+        <button
+          onClick={() => router.push('/coordinator/book')}
+          style={{ width: '100%', padding: '14px', background: '#feb300', color: '#3d2c00', border: 'none', borderRadius: 9999, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16 }}
+        >
+          <span style={{ fontSize: 18 }}>+</span> New booking
+        </button>
 
         {/* ── View tabs ── */}
         <div style={{ display: 'flex', background: '#ECEAE4', borderRadius: 9999, padding: 3, gap: 2, marginBottom: 14 }}>

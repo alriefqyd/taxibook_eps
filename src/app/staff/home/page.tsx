@@ -27,9 +27,10 @@ export default function StaffHomePage() {
   const router   = useRouter()
   const supabase = createClient()
 
-  const [user,     setUser]     = useState<User | null>(null)
-  const [bookings, setBookings] = useState<BookingDetail[]>([])
-  const [taxis,    setTaxis]    = useState<any[]>([])
+  const [user,        setUser]        = useState<User | null>(null)
+  const [bookings,    setBookings]    = useState<BookingDetail[]>([])
+  const [allBookings, setAllBookings] = useState<BookingDetail[]>([])
+  const [taxis,       setTaxis]       = useState<any[]>([])
   const [loading,  setLoading]  = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [dateFrom, setDateFrom] = useState('')
@@ -49,7 +50,8 @@ export default function StaffHomePage() {
   const PULL_THRESHOLD = 60
 
   async function loadData(userId: string) {
-    const [{ data: bks }, { data: txs }] = await Promise.all([
+    const [{ data: bks }, { data: allBks }, { data: txs }] = await Promise.all([
+      // Current user's bookings — for "My bookings" list
       supabase
         .from('booking_details')
         .select('*')
@@ -57,6 +59,13 @@ export default function StaffHomePage() {
         .not('status', 'in', '("cancelled")')
         .order('scheduled_at', { ascending: false })
         .range(0, 9),
+      // All users' bookings — for the schedule/Gantt view
+      supabase
+        .from('booking_details')
+        .select('*')
+        .not('status', 'in', '("cancelled","completed","rejected")')
+        .order('scheduled_at', { ascending: true })
+        .limit(200),
       supabase
         .from('taxis')
         .select('*, users!driver_id(name)')
@@ -65,6 +74,7 @@ export default function StaffHomePage() {
     ])
     const bkList = bks || []
     setBookings(bkList)
+    setAllBookings(allBks || [])
     setHasMoreBk(bkList.length === 10)
     setBkPage(0)
     setTaxis((txs || []).map((t: any) => ({
@@ -151,8 +161,9 @@ export default function StaffHomePage() {
   )
 
   const today        = new Date()
-  const ACTIVE_STATUSES = ['booked','on_trip','waiting_trip']
-  const activeBookings  = bookings.filter(b => ACTIVE_STATUSES.includes(b.status))
+  const ACTIVE_STATUSES    = ['booked','on_trip','waiting_trip']
+  const activeBookings     = bookings.filter(b => ACTIVE_STATUSES.includes(b.status))
+  const allActiveBookings  = allBookings.filter(b => ACTIVE_STATUSES.includes(b.status))
   const myBookings      = bookings.filter(b => {
     if (!dateFrom && !dateTo) return true
     const d = new Date(b.scheduled_at)
@@ -162,7 +173,7 @@ export default function StaffHomePage() {
   })
   // Stats show today's fleet activity
   const todayBookings  = activeBookings.filter(b => isSameDay(new Date(b.scheduled_at), today))
-  const pendingCount   = activeBookings.filter(b => b.status === 'pending_driver_approval').length
+  const pendingCount   = activeBookings.filter(b => b.status === 'pending_coordinator_approval').length
 
   function navigate(dir: number) {
     setCursor(prev => {
@@ -327,9 +338,9 @@ export default function StaffHomePage() {
       </div>
 
       {/* ── Views ── */}
-      {view === 'day'   && <DayGantt   bookings={activeBookings} taxis={taxis} cursor={cursor} scrollRef={dayScrollRef} />}
-      {view === 'week'  && <WeekView   bookings={activeBookings} cursor={cursor} />}
-      {view === 'month' && <MonthView  bookings={bookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} />}
+      {view === 'day'   && <DayGantt   bookings={allActiveBookings} taxis={taxis} cursor={cursor} scrollRef={dayScrollRef} />}
+      {view === 'week'  && <WeekView   bookings={allActiveBookings} cursor={cursor} />}
+      {view === 'month' && <MonthView  bookings={allBookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} />}
 
       {/* ── My bookings list ── */}
       <div style={{ padding: '16px 16px 100px' }}>
@@ -360,11 +371,12 @@ export default function StaffHomePage() {
           <>
           {myBookings.map(b => {
             const sc = (STATUS_COLORS as any)[b.status]
+            const isPast = b.status === 'completed' || b.status === 'cancelled' || new Date(b.scheduled_at) < new Date()
             return (
               <div
                 key={b.id}
                 onClick={() => setSelectedBk(b)}
-                style={{ background: '#ffffff', borderRadius: 16, padding: '16px', marginBottom: 10, boxShadow: '0 2px 8px rgba(0,96,100,0.06)', border: '1px solid rgba(0,0,0,0.05)', borderLeft: '3px solid #006064', cursor: 'pointer' }}
+                style={{ background: isPast ? '#F9FAFB' : '#ffffff', borderRadius: 16, padding: '16px', marginBottom: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.05)', borderLeft: `3px solid ${isPast ? '#D1D5DB' : '#006064'}`, cursor: 'pointer', opacity: isPast ? 0.72 : 1 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
                   <div style={{ flex: 1, minWidth: 0, marginRight: '8px' }}>
@@ -446,9 +458,9 @@ function DayGantt({ bookings, taxis, cursor, scrollRef }: {
   scrollRef: React.RefObject<HTMLDivElement>
 }) {
   const today    = new Date()
-  const dayBks   = bookings.filter(b => isSameDay(new Date(b.scheduled_at), cursor))
-  const hours    = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => i + HOUR_START)
-  const totalW   = hours.length * HOUR_W
+  const dayBks = bookings.filter(b => isSameDay(new Date(b.scheduled_at), cursor))
+  const hours  = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => i + HOUR_START)
+  const totalW = hours.length * HOUR_W
 
   return (
     <div style={{ paddingBottom: 20 }}>
@@ -470,7 +482,7 @@ function DayGantt({ bookings, taxis, cursor, scrollRef }: {
             ))}
           </div>
 
-          {/* Rows */}
+          {/* All taxi rows */}
           {taxis.map((taxi, idx) => (
             <GanttRow
               key={taxi.id}

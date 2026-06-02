@@ -16,9 +16,6 @@ function isGpsActive(ts: string | null): boolean {
   return Date.now() - new Date(ts).getTime() < GPS_STALE_MS
 }
 
-function trunc(s: string, n = 22) {
-  return s.length > n ? s.slice(0, n) + '…' : s
-}
 
 function GpsIcon({ active }: { active: boolean }) {
   return (
@@ -121,10 +118,10 @@ export default function CoordinatorMapPage() {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, marginBottom: 1 }}>
                     <span style={{ width: 5, height: 5, borderRadius: '50%', background: isOnline ? d.color : '#D1D5DB', flexShrink: 0 }} />
-                    <span style={{ fontSize: 9, fontWeight: 700, color: '#006064', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#006064', wordBreak: 'break-word', lineHeight: 1.3 }}>{d.driver_name || d.name}</span>
                   </div>
                   <p style={{ fontSize: 8, color: '#6f7979', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {trunc(d.driver_name || '—', 10)}
+                    {d.name}
                   </p>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
                     <GpsIcon active={hasGps} />

@@ -7,8 +7,9 @@ import { reverseGeocode, geocodeAddress } from '@/lib/geocode'
 import type { Coords } from '@/lib/geocode'
 import { createClient } from '@/lib/supabase/client'
 import type { RegisteredLocation } from '@/types'
+import { DEFAULT_TILE_ATTRIBUTION, DEFAULT_TILE_URL } from './tileConfig'
 
-const TILE_URL  = `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY ?? ''}`
+const TILE_URL  = DEFAULT_TILE_URL
 const SOROWAKO: [number, number] = [-2.5397, 121.3588]
 
 function pinIcon() {
@@ -215,7 +216,7 @@ export default function LocationPickerMap({ title, onConfirm, onClose, autoGps }
           style={{ height: '100%', width: '100%' }}
           zoomControl
         >
-          <TileLayer url={TILE_URL} attribution="© MapTiler © OpenStreetMap contributors" />
+          <TileLayer url={TILE_URL} attribution={DEFAULT_TILE_ATTRIBUTION} />
           <ClickHandler onPick={handlePick} />
           <FlyTo target={flyTarget} />
           {picked && <Marker position={[picked.lat, picked.lng]} icon={pinIcon()} />}

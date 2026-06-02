@@ -42,7 +42,6 @@ export default function DriverHomePage() {
   const supabase = createClient()
 
   const [user,       setUser]       = useState<User | null>(null)
-  const [trips,      setTrips]      = useState<DriverBooking[]>([])
   const [upcoming,   setUpcoming]   = useState<DriverBooking[]>([])
   const [past,       setPast]       = useState<DriverBooking[]>([])
   const [activeTrip,  setActiveTrip]  = useState<DriverBooking | null>(null)
@@ -294,7 +293,7 @@ export default function DriverHomePage() {
         <div style={{ display: 'flex' }}>
           {([
             { key: 'trips',    label: 'My Trips' },
-            { key: 'active',   label: activeTrip ? '🚗 Active' : 'Active', dot: !!activeTrip },
+            { key: 'active',   label: 'Active', dot: !!activeTrip },
             { key: 'calendar', label: 'Calendar' },
           ] as { key: Tab; label: string; dot?: boolean }[]).map(({ key, label, dot }) => {
             const active = tab === key

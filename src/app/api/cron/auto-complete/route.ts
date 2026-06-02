@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     const { data: overdueBookings } = await admin
       .from('bookings')
       .select('id, passenger_id, destination, taxi_id, taxis!taxi_id(driver_id)')
-      .in('status', ['booked', 'on_trip', 'waiting_trip', 'pending_driver_approval'])
+      .in('status', ['booked', 'on_trip', 'waiting_trip'])
       .lt('auto_complete_at', now.toISOString())
 
     if (overdueBookings?.length) {
@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
       } else {
         // GPS unavailable — fall back to scheduled time ± 2 min
         const diffMs = Math.abs(now.getTime() - new Date(b.scheduled_at).getTime())
-        if (diffMs <= 2 * 60 * 1000) shouldNotify = true
+        if (diffMs <= 3 * 60 * 1000) shouldNotify = true
       }
 
       if (!shouldNotify) continue
