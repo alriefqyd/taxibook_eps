@@ -69,16 +69,19 @@ export default function CoordinatorBookPage() {
   })
 
   useEffect(() => {
-    supabase
-      .from('users')
-      .select('id, name, email, role')
-      .in('role', ['staff', 'coordinator'])
-      .eq('is_active', true)
-      .order('name')
-      .then(({ data }) => {
-        setStaffUsers(data || [])
-        if (data?.length) setForm(f => ({ ...f, passenger_id: data[0].id }))
+    async function loadUsers() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch('/api/users?roles=staff,coordinator', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
       })
+      if (!res.ok) return
+      const json = await res.json()
+      const users = json.users || []
+      setStaffUsers(users)
+      if (users.length) setForm(f => ({ ...f, passenger_id: users[0].id }))
+    }
+    loadUsers()
   }, [])
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
