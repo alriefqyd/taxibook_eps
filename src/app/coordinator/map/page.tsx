@@ -4,10 +4,14 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
-import { useDriverLocations } from '@/hooks/useDriverLocations'
+import { useDriverLocations, type DriverLocation } from '@/hooks/useDriverLocations'
+import { getRoute } from '@/lib/routing'
+import { format } from 'date-fns'
+import { id as idLocale } from 'date-fns/locale'
 import BottomNav from '@/components/BottomNav'
 
-const DriverFleetMap = dynamic(() => import('@/components/map/DriverFleetMap'), { ssr: false })
+const DriverFleetMap   = dynamic(() => import('@/components/map/DriverFleetMap'),   { ssr: false })
+const DriverTripMiniMap = dynamic(() => import('@/components/map/DriverTripMiniMap'), { ssr: false })
 
 const GPS_STALE_MS = 10 * 60 * 1000
 
@@ -15,7 +19,6 @@ function isGpsActive(ts: string | null): boolean {
   if (!ts) return false
   return Date.now() - new Date(ts).getTime() < GPS_STALE_MS
 }
-
 
 function GpsIcon({ active }: { active: boolean }) {
   return (
@@ -25,11 +28,21 @@ function GpsIcon({ active }: { active: boolean }) {
   )
 }
 
+interface BookingExtra {
+  booking_code: string
+  passenger_name: string
+  passenger_phone: string | null
+  scheduled_at: string
+}
+
 export default function CoordinatorMapPage() {
   const router   = useRouter()
   const supabase = createClient()
-  const [ready, setReady] = useState(false)
-  const [panelOpen, setPanelOpen] = useState(true)
+  const [ready,          setReady]          = useState(false)
+  const [panelOpen,      setPanelOpen]      = useState(true)
+  const [selectedDriver, setSelectedDriver] = useState<DriverLocation | null>(null)
+  const [bookingExtra,   setBookingExtra]   = useState<BookingExtra | null>(null)
+  const [miniRoute,      setMiniRoute]      = useState<[number, number][] | undefined>(undefined)
   const drivers = useDriverLocations()
 
   useEffect(() => {
@@ -43,8 +56,39 @@ export default function CoordinatorMapPage() {
     guard()
   }, [])
 
+  async function openDriver(d: DriverLocation) {
+    setSelectedDriver(d)
+    setBookingExtra(null)
+    setMiniRoute(undefined)
+
+    // Fetch passenger info if on trip
+    if (d.active_booking) {
+      const { data } = await supabase
+        .from('booking_details')
+        .select('booking_code, passenger_name, passenger_phone, scheduled_at')
+        .eq('id', d.active_booking.id)
+        .single()
+      if (data) setBookingExtra(data as BookingExtra)
+    }
+
+    // Fetch route for mini-map
+    if (d.latitude && d.longitude && d.active_booking?.destination_lat && d.active_booking?.destination_lng) {
+      const r = await getRoute(
+        { lat: d.latitude, lng: d.longitude },
+        { lat: d.active_booking.destination_lat, lng: d.active_booking.destination_lng },
+      )
+      if (r) setMiniRoute(r.coordinates)
+    }
+  }
+
+  function closeSheet() {
+    setSelectedDriver(null)
+    setBookingExtra(null)
+    setMiniRoute(undefined)
+  }
+
   if (!ready) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F5F2', fontFamily: "var(--font-inter), 'Inter', sans-serif" }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F5F2', fontFamily: "'Inter', sans-serif" }}>
       <p style={{ color: '#9ca3af' }}>Loading map...</p>
     </div>
   )
@@ -53,14 +97,13 @@ export default function CoordinatorMapPage() {
   const offlineCount = drivers.filter(d => !d.is_available || !d.driver_id).length
   const gpsCount     = drivers.filter(d => isGpsActive(d.location_updated_at)).length
 
-  // Sort: on_trip first → online → offline
   const sorted = [...drivers].sort((a, b) => {
     const rank = (d: typeof a) => d.is_on_trip ? 0 : (d.is_available && d.driver_id) ? 1 : 2
     return rank(a) - rank(b)
   })
 
   return (
-    <div style={{ fontFamily: "var(--font-inter), 'Inter', sans-serif", height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ fontFamily: "'Inter', sans-serif", height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       {/* Header */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid rgba(0,0,0,0.08)', padding: '12px 20px', flexShrink: 0 }}>
@@ -83,7 +126,7 @@ export default function CoordinatorMapPage() {
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         <DriverFleetMap style={{ borderRadius: 0 }} />
 
-        {/* Driver board — collapsible floating panel at bottom */}
+        {/* Driver board */}
         <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 1000,
           background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(10px)',
@@ -102,20 +145,25 @@ export default function CoordinatorMapPage() {
             <span style={{ fontSize: 11, color: '#9ca3af' }}>{panelOpen ? '▼' : '▲'}</span>
           </div>
 
-          {/* 5-column compact grid */}
+          {/* 5-column compact grid — tap to open detail */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, padding: '0 12px 10px' }}>
             {sorted.map(d => {
               const isOnline = d.is_available && !!d.driver_id
               const hasGps   = isGpsActive(d.location_updated_at)
               const onTrip   = d.is_on_trip && d.active_booking
               return (
-                <div key={d.id} style={{
-                  borderTop: `3px solid ${isOnline ? d.color : '#D1D5DB'}`,
-                  background: onTrip ? `${d.color}12` : '#F9FAFB',
-                  borderRadius: '0 0 8px 8px',
-                  padding: '5px 4px 4px',
-                  textAlign: 'center',
-                }}>
+                <div
+                  key={d.id}
+                  onClick={() => openDriver(d)}
+                  style={{
+                    borderTop: `3px solid ${isOnline ? d.color : '#D1D5DB'}`,
+                    background: onTrip ? `${d.color}18` : '#F9FAFB',
+                    borderRadius: '0 0 8px 8px',
+                    padding: '5px 4px 4px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, marginBottom: 1 }}>
                     <span style={{ width: 5, height: 5, borderRadius: '50%', background: isOnline ? d.color : '#D1D5DB', flexShrink: 0 }} />
                     <span style={{ fontSize: 9, fontWeight: 700, color: '#006064', wordBreak: 'break-word', lineHeight: 1.3 }}>{d.driver_name || d.name}</span>
@@ -135,7 +183,176 @@ export default function CoordinatorMapPage() {
         </div>
       </div>
 
+      {/* Trip detail sheet */}
+      {selectedDriver && (
+        <TripDetailSheet
+          driver={selectedDriver}
+          bookingExtra={bookingExtra}
+          miniRoute={miniRoute}
+          onClose={closeSheet}
+        />
+      )}
+
       <BottomNav role="coordinator" />
     </div>
+  )
+}
+
+// ── Trip detail sheet ────────────────────────────────────────
+function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
+  driver: DriverLocation
+  bookingExtra: BookingExtra | null
+  miniRoute: [number, number][] | undefined
+  onClose: () => void
+}) {
+  const bk       = d.active_booking
+  const isOnline = d.is_available && !!d.driver_id
+  const hasGps   = isGpsActive(d.location_updated_at)
+  const hasMap   = d.latitude != null && d.longitude != null
+
+  const statusLabel = !isOnline
+    ? { text: 'Offline', bg: '#FEE2E2', color: '#DC2626' }
+    : bk?.status === 'on_trip'
+    ? { text: 'On Trip', bg: `${d.color}20`, color: d.color }
+    : bk?.status === 'waiting_trip'
+    ? { text: 'Waiting', bg: '#FEF3C7', color: '#D97706' }
+    : bk?.status === 'booked'
+    ? { text: 'Booked', bg: '#EDE9FE', color: '#7C3AED' }
+    : { text: 'Available', bg: '#D1FAE5', color: '#059669' }
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1100 }} />
+
+      {/* Sheet */}
+      <div style={{
+        position: 'fixed', bottom: 72, left: 0, right: 0, zIndex: 1101,
+        background: '#fff', borderRadius: '20px 20px 0 0',
+        maxHeight: '80vh', overflowY: 'auto',
+        boxShadow: '0 -4px 24px rgba(0,0,0,0.18)',
+      }}>
+        {/* Handle */}
+        <div style={{ padding: '12px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ width: 36, height: 4, borderRadius: 9999, background: 'rgba(0,0,0,0.12)', margin: '0 auto' }} />
+        </div>
+
+        <div style={{ padding: '12px 16px 24px' }}>
+          {/* Driver header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: d.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🚗</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <p style={{ fontSize: 15, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.driver_name ?? 'No driver'}</p>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: statusLabel.bg, color: statusLabel.color, flexShrink: 0 }}>
+                  {statusLabel.text}
+                </span>
+              </div>
+              <p style={{ fontSize: 12, color: '#6f7979', margin: '2px 0 0' }}>
+                {d.name}{d.plate ? ` · ${d.plate}` : ''}
+                <span style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <GpsIcon active={hasGps} />
+                  <span style={{ fontSize: 10, color: hasGps ? '#059669' : '#9ca3af' }}>
+                    {hasGps
+                      ? `GPS ${d.location_updated_at ? format(new Date(d.location_updated_at), 'HH:mm') : ''}`
+                      : 'GPS stale'}
+                  </span>
+                </span>
+              </p>
+            </div>
+          </div>
+
+          {/* Trip info — only when on a trip */}
+          {bk ? (
+            <>
+              <div style={{ background: `${d.color}0D`, border: `1px solid ${d.color}30`, borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}>
+                {/* Booking code */}
+                {bookingExtra ? (
+                  <p style={{ fontSize: 11, fontWeight: 700, color: d.color, margin: '0 0 8px', letterSpacing: '0.04em' }}>{bookingExtra.booking_code}</p>
+                ) : (
+                  <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 8px' }}>Loading...</p>
+                )}
+
+                {/* Passenger */}
+                <div style={{ marginBottom: 8 }}>
+                  <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 2px' }}>Penumpang</p>
+                  <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{bookingExtra?.passenger_name ?? '—'}</p>
+                  {bookingExtra?.passenger_phone && (
+                    <p style={{ fontSize: 11, color: '#6f7979', margin: 0 }}>{bookingExtra.passenger_phone}</p>
+                  )}
+                </div>
+
+                {/* Scheduled */}
+                {bookingExtra?.scheduled_at && (
+                  <div style={{ marginBottom: 8 }}>
+                    <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 2px' }}>Dijadwalkan</p>
+                    <p style={{ fontSize: 12, fontWeight: 600, margin: 0 }}>{format(new Date(bookingExtra.scheduled_at), 'EEEE, dd MMM · HH:mm', { locale: idLocale })}</p>
+                  </div>
+                )}
+
+                {/* Route */}
+                <div>
+                  <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 4px' }}>Rute</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>🟢</span>
+                      <p style={{ fontSize: 12, fontWeight: 600, margin: 0 }}>{bk.pickup}</p>
+                    </div>
+                    <div style={{ marginLeft: 10, width: 2, height: 10, background: `${d.color}40` }} />
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>📍</span>
+                      <p style={{ fontSize: 12, fontWeight: 700, margin: 0, color: d.color }}>{bk.destination}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mini map */}
+              {hasMap && (
+                <div style={{ height: 200, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.08)', marginBottom: 4 }}>
+                  <DriverTripMiniMap
+                    driverLat={d.latitude!}
+                    driverLng={d.longitude!}
+                    pickupLat={bk.pickup_lat}
+                    pickupLng={bk.pickup_lng}
+                    destLat={bk.destination_lat}
+                    destLng={bk.destination_lng}
+                    color={d.color}
+                    route={miniRoute}
+                  />
+                </div>
+              )}
+
+              {!hasMap && (
+                <div style={{ background: '#F5F5F2', borderRadius: 12, padding: '20px', textAlign: 'center' }}>
+                  <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>Lokasi GPS driver tidak tersedia</p>
+                </div>
+              )}
+            </>
+          ) : (
+            /* No active trip */
+            <div style={{ background: '#F5F5F2', borderRadius: 12, padding: '20px', textAlign: 'center' }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#6f7979', margin: '0 0 4px' }}>
+                {isOnline ? 'Driver tersedia' : 'Driver offline'}
+              </p>
+              <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>Tidak ada perjalanan aktif</p>
+              {hasMap && (
+                <div style={{ height: 160, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.08)', marginTop: 12 }}>
+                  <DriverTripMiniMap
+                    driverLat={d.latitude!}
+                    driverLng={d.longitude!}
+                    color={d.color}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          <button onClick={onClose} style={{ width: '100%', marginTop: 14, padding: '12px', background: '#006064', color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Tutup
+          </button>
+        </div>
+      </div>
+    </>
   )
 }

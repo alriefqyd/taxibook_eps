@@ -340,8 +340,8 @@ export default function StaffHomePage() {
       </div>
 
       {/* ── Views ── */}
-      {view === 'day'   && <DayGantt   bookings={allActiveBookings} taxis={taxis} cursor={cursor} scrollRef={dayScrollRef} />}
-      {view === 'week'  && <WeekView   bookings={allActiveBookings} cursor={cursor} />}
+      {view === 'day'   && <DayGantt   bookings={allActiveBookings} taxis={taxis} cursor={cursor} scrollRef={dayScrollRef} onSelectBooking={setSelectedBk} />}
+      {view === 'week'  && <WeekView   bookings={allActiveBookings} cursor={cursor} onSelectBooking={setSelectedBk} />}
       {view === 'month' && <MonthView  bookings={allBookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} />}
 
       {/* ── My bookings list ── */}
@@ -453,11 +453,12 @@ export default function StaffHomePage() {
 }
 
 // ── DAY GANTT ───────────────────────────────────────────────
-function DayGantt({ bookings, taxis, cursor, scrollRef }: {
+function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
   bookings: BookingDetail[]
   taxis: any[]
   cursor: Date
   scrollRef: React.RefObject<HTMLDivElement>
+  onSelectBooking: (b: BookingDetail) => void
 }) {
   const today    = new Date()
   const dayBks = bookings.filter(b => isSameDay(new Date(b.scheduled_at), cursor))
@@ -501,18 +502,19 @@ function DayGantt({ bookings, taxis, cursor, scrollRef }: {
                 const width   = Math.max(durH * HOUR_W - 4, 44)
                 const isPending = b.status.includes('pending')
                 return (
-                  <div key={b.id} style={{
+                  <div key={b.id} onClick={() => onSelectBooking(b)} style={{
                     position:'absolute', left:left+2, top:5,
                     width, height:ROW_H - 10,
                     background: taxi.color + '22',
                     border:`1.5px ${isPending?'dashed':'solid'} ${taxi.color}`,
                     borderRadius:'7px', padding:'4px 6px', overflow:'hidden', zIndex:5,
+                    cursor: 'pointer',
                   }}>
                     <p style={{ fontSize:'10px', fontWeight:800, color:taxi.color, margin:'0 0 1px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                      {b.destination}
+                      {b.passenger_name}
                     </p>
-                    <p style={{ fontSize:'9px', color:taxi.color, opacity:0.8, margin:0, whiteSpace:'nowrap' }}>
-                      {format(dt,'HH:mm')} · {b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}m`}
+                    <p style={{ fontSize:'9px', color:taxi.color, opacity:0.8, margin:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                      {format(dt,'HH:mm')} · {b.destination}
                     </p>
                   </div>
                 )
@@ -821,7 +823,7 @@ const navBtn: React.CSSProperties = {
 }
 
 // ── WEEK VIEW (original grid) ───────────────────────────────
-function WeekView({ bookings, cursor }: { bookings: BookingDetail[]; cursor: Date }) {
+function WeekView({ bookings, cursor, onSelectBooking }: { bookings: BookingDetail[]; cursor: Date; onSelectBooking: (b: BookingDetail) => void }) {
   const today  = new Date()
   const monday = startOfWeek(cursor, { weekStartsOn: 1 })
   const days   = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
@@ -857,14 +859,15 @@ function WeekView({ bookings, cursor }: { bookings: BookingDetail[]; cursor: Dat
                   const color     = b.taxi_color || '#3f4949'
                   const isPending = b.status.includes('pending')
                   return (
-                    <div key={b.id} style={{
+                    <div key={b.id} onClick={() => onSelectBooking(b)} style={{
                       background: color + '20',
                       border:`1px ${isPending?'dashed':'solid'} ${color}`,
                       borderRadius:3, padding:'2px 4px', marginBottom:2,
                       fontSize:'9px', fontWeight:700, color,
                       overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                      cursor: 'pointer',
                     }}>
-                      {format(new Date(b.scheduled_at),'HH:mm')} {b.destination.split(' ')[0]}
+                      {format(new Date(b.scheduled_at),'HH:mm')} {b.passenger_name}
                     </div>
                   )
                 })}

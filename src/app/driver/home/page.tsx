@@ -321,23 +321,11 @@ export default function DriverHomePage() {
       {tab === 'active' && (
         <div style={{ padding: '16px 16px 100px' }}>
           {activeTrip ? (
-            <>
-              <ActiveTripCard
-                trip={activeTrip}
-                processing={processing}
-                onComplete={complete}
-              />
-              <ActiveTripMap
-                pickup={activeTrip.pickup}
-                destination={activeTrip.destination}
-                status={activeTrip.status}
-                taxiColor={activeTrip.taxi_color || '#006064'}
-                pickupLat={activeTrip.pickup_lat}
-                pickupLng={activeTrip.pickup_lng}
-                destLat={activeTrip.destination_lat}
-                destLng={activeTrip.destination_lng}
-              />
-            </>
+            <ActiveTripCard
+              trip={activeTrip}
+              processing={processing}
+              onComplete={complete}
+            />
           ) : nextTrip ? (
             <div>
               <div style={{ background: 'rgba(0,96,100,0.1)', border: '1px solid #93C5FD', borderRadius: 16, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -524,6 +512,18 @@ function ActiveTripCard({ trip: t, processing, onComplete }: {
             <p style={{ fontSize: 12, color: '#7e5700', margin: 0 }}>📝 {t.notes}</p>
           </div>
         )}
+
+        {/* Map inside card */}
+        <ActiveTripMap
+          pickup={t.pickup}
+          destination={t.destination}
+          status={t.status}
+          taxiColor={t.taxi_color || '#006064'}
+          pickupLat={t.pickup_lat}
+          pickupLng={t.pickup_lng}
+          destLat={t.destination_lat}
+          destLng={t.destination_lng}
+        />
 
         <button
           onClick={() => onComplete(t.id)}

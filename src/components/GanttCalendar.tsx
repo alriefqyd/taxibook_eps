@@ -7,6 +7,7 @@ import {
 } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import type { BookingDetail } from '@/types'
+import { STATUS_LABELS, STATUS_COLORS } from '@/types'
 
 type ViewMode = 'day' | 'week' | 'month'
 
@@ -24,8 +25,9 @@ interface GanttCalendarProps {
 }
 
 export default function GanttCalendar({ bookings, taxis, showCompleted = false }: GanttCalendarProps) {
-  const [view,    setView]   = useState<ViewMode>('day')
-  const [cursor,  setCursor] = useState(new Date())
+  const [view,            setView]            = useState<ViewMode>('day')
+  const [cursor,          setCursor]          = useState(new Date())
+  const [selectedBooking, setSelectedBooking] = useState<BookingDetail | null>(null)
   const dayRef  = useRef<HTMLDivElement>(null)
   const weekRef = useRef<HTMLDivElement>(null)
 
@@ -94,16 +96,22 @@ export default function GanttCalendar({ bookings, taxis, showCompleted = false }
       </div>
 
       {/* ── Views ── */}
-      {view === 'day'   && <DayGantt   bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={dayRef} />}
-      {view === 'week'  && <WeekGantt  bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={weekRef} />}
+      {view === 'day'   && <DayGantt   bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={dayRef}  onSelectBooking={setSelectedBooking} />}
+      {view === 'week'  && <WeekGantt  bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={weekRef} onSelectBooking={setSelectedBooking} />}
       {view === 'month' && <MonthView  bookings={ganttBookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} />}
+
+      {/* ── Booking detail sheet ── */}
+      {selectedBooking && (
+        <BookingSheet booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
+      )}
     </div>
   )
 }
 
 // ── DAY GANTT ───────────────────────────────────────────────
-function DayGantt({ bookings, taxis, cursor, scrollRef }: {
+function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
   bookings: BookingDetail[]; taxis: any[]; cursor: Date; scrollRef: React.RefObject<HTMLDivElement>
+  onSelectBooking: (b: BookingDetail) => void
 }) {
   const today     = new Date()
   const dayBks    = bookings.filter(b => isSameDay(new Date(b.scheduled_at), cursor))
@@ -167,14 +175,14 @@ function DayGantt({ bookings, taxis, cursor, scrollRef }: {
                 }
                 const width = Math.max(durH * HOUR_W - 4, 44)
                 return (
-                  <div key={b.id} style={{ position: 'absolute', left: left + 2, top: 5, width, height: ROW_H - 10, background: isDone ? '#F1F5F9' : taxi.color + '22', border: `1.5px solid ${isDone ? '#CBD5E1' : taxi.color}`, borderRadius: '7px', padding: '4px 6px', overflow: 'hidden', zIndex: 5, opacity: isDone ? 0.85 : 1 }}>
+                  <div key={b.id} onClick={() => onSelectBooking(b)} style={{ position: 'absolute', left: left + 2, top: 5, width, height: ROW_H - 10, background: isDone ? '#F1F5F9' : taxi.color + '22', border: `1.5px solid ${isDone ? '#CBD5E1' : taxi.color}`, borderRadius: '7px', padding: '4px 6px', overflow: 'hidden', zIndex: 5, opacity: isDone ? 0.85 : 1, cursor: 'pointer' }}>
                     <p style={{ fontSize: '10px', fontWeight: 800, color: isDone ? '#64748B' : taxi.color, margin: '0 0 1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {isDone ? '✓ ' : ''}{b.passenger_name ? `${b.passenger_name} → ` : ''}{b.destination}
+                      {isDone ? '✓ ' : ''}{b.passenger_name ?? '—'}
                     </p>
-                    <p style={{ fontSize: '9px', color: isDone ? '#94a3b8' : taxi.color, opacity: isDone ? 1 : 0.8, margin: 0, whiteSpace: 'nowrap' }}>
+                    <p style={{ fontSize: '9px', color: isDone ? '#94a3b8' : taxi.color, opacity: isDone ? 1 : 0.8, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {isDone && b.completed_at
-                        ? `Done ${format(new Date(b.completed_at), 'HH:mm')}`
-                        : `${format(dt, 'HH:mm')} · ${b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}m`}`}
+                        ? `Done ${format(new Date(b.completed_at), 'HH:mm')} · ${b.destination}`
+                        : `${format(dt, 'HH:mm')} · ${b.destination}`}
                     </p>
                   </div>
                 )
@@ -189,8 +197,9 @@ function DayGantt({ bookings, taxis, cursor, scrollRef }: {
 }
 
 // ── WEEK GANTT ──────────────────────────────────────────────
-function WeekGantt({ bookings, taxis, cursor, scrollRef }: {
+function WeekGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
   bookings: BookingDetail[]; taxis: any[]; cursor: Date; scrollRef: React.RefObject<HTMLDivElement>
+  onSelectBooking: (b: BookingDetail) => void
 }) {
   const today  = new Date()
   const monday = startOfWeek(cursor, { weekStartsOn: 1 })
@@ -251,14 +260,12 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef }: {
                   if (dayIdx < 0) return null
                   const isDone = b.status === 'completed'
                   return (
-                    <div key={b.id} style={{ position: 'absolute', left: dayIdx * DAY_W + 2, top: 5, width: DAY_W - 6, height: ROW_H - 10, background: isDone ? '#F1F5F9' : taxi.color + '22', border: `1.5px solid ${isDone ? '#CBD5E1' : taxi.color}`, borderRadius: '7px', padding: '4px 6px', overflow: 'hidden', zIndex: 5, opacity: isDone ? 0.85 : 1 }}>
+                    <div key={b.id} onClick={() => onSelectBooking(b)} style={{ position: 'absolute', left: dayIdx * DAY_W + 2, top: 5, width: DAY_W - 6, height: ROW_H - 10, background: isDone ? '#F1F5F9' : taxi.color + '22', border: `1.5px solid ${isDone ? '#CBD5E1' : taxi.color}`, borderRadius: '7px', padding: '4px 6px', overflow: 'hidden', zIndex: 5, opacity: isDone ? 0.85 : 1, cursor: 'pointer' }}>
                       <p style={{ fontSize: '10px', fontWeight: 800, color: isDone ? '#64748B' : taxi.color, margin: '0 0 1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {isDone ? '✓ ' : ''}{b.destination}
+                        {isDone ? '✓ ' : ''}{b.passenger_name ?? '—'}
                       </p>
-                      <p style={{ fontSize: '9px', color: isDone ? '#94a3b8' : taxi.color, opacity: isDone ? 1 : 0.8, margin: 0 }}>
-                        {isDone && b.completed_at
-                          ? `Done ${format(new Date(b.completed_at), 'HH:mm')}`
-                          : `${format(dt, 'HH:mm')} · ${b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}m`}`}
+                      <p style={{ fontSize: '9px', color: isDone ? '#94a3b8' : taxi.color, opacity: isDone ? 1 : 0.8, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {format(dt, 'HH:mm')} · {b.destination}
                       </p>
                     </div>
                   )
@@ -366,6 +373,97 @@ function GanttLegend() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
         <span style={{ fontSize: '10px', color: '#9ca3af' }}>Tap month day → Day view</span>
       </div>
+    </div>
+  )
+}
+
+// ── Booking detail bottom sheet ─────────────────────────────
+function BookingSheet({ booking: b, onClose }: { booking: BookingDetail; onClose: () => void }) {
+  const sc    = STATUS_COLORS[b.status] ?? { bg: '#f3f4f6', text: '#374151' }
+  const label = STATUS_LABELS[b.status] ?? b.status
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200 }} />
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 201, background: '#fff', borderRadius: '20px 20px 0 0', padding: '20px 20px 32px', maxHeight: '80vh', overflowY: 'auto' }}>
+        {/* Handle */}
+        <div style={{ width: 36, height: 4, borderRadius: 9999, background: 'rgba(0,0,0,0.12)', margin: '0 auto 16px' }} />
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#006064', margin: 0, letterSpacing: '0.04em' }}>{b.booking_code}</p>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9999, background: sc.bg, color: sc.text }}>{label}</span>
+        </div>
+
+        {/* Passenger */}
+        <Row label="Penumpang">
+          <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 1px' }}>{b.passenger_name}</p>
+          {b.passenger_phone && <p style={{ fontSize: 12, color: '#6f7979', margin: 0 }}>{b.passenger_phone}</p>}
+        </Row>
+
+        {/* Driver / Taxi */}
+        <Row label="Driver / Taxi">
+          <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 1px' }}>{b.driver_name ?? 'Belum ditugaskan'}</p>
+          <p style={{ fontSize: 12, color: '#6f7979', margin: 0 }}>
+            {b.taxi_name ?? '—'}{b.taxi_plate ? ` · ${b.taxi_plate}` : ''}
+          </p>
+        </Row>
+
+        {/* Route */}
+        <Row label="Rute">
+          <p style={{ fontSize: 13, margin: 0, lineHeight: 1.6 }}>
+            <span style={{ fontWeight: 600 }}>{b.pickup}</span>
+            <span style={{ color: '#9ca3af', margin: '0 6px' }}>→</span>
+            <span style={{ fontWeight: 600 }}>{b.destination}</span>
+          </p>
+        </Row>
+
+        {/* Time */}
+        <Row label="Waktu">
+          <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 2px' }}>
+            {format(new Date(b.scheduled_at), 'EEEE, dd MMMM yyyy · HH:mm', { locale: idLocale })}
+          </p>
+          {b.completed_at && (
+            <p style={{ fontSize: 12, color: '#059669', margin: 0 }}>
+              Selesai: {format(new Date(b.completed_at), 'HH:mm')}
+            </p>
+          )}
+        </Row>
+
+        {/* Trip type */}
+        <Row label="Jenis">
+          <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 9999, display: 'inline-block', background: b.trip_type === 'DROP' ? '#DBEAFE' : '#EDE9FE', color: b.trip_type === 'DROP' ? '#1E3A5F' : '#4C1D95' }}>
+            {b.trip_type === 'DROP' ? 'Drop' : `Waiting ${b.wait_minutes} menit`}
+          </span>
+        </Row>
+
+        {/* Notes */}
+        {b.notes && (
+          <Row label="Catatan">
+            <p style={{ fontSize: 13, margin: 0, color: '#6f7979' }}>{b.notes}</p>
+          </Row>
+        )}
+
+        {/* Rejection reason */}
+        {b.rejection_reason && (
+          <Row label="Alasan ditolak">
+            <p style={{ fontSize: 13, margin: 0, color: '#DC2626' }}>{b.rejection_reason}</p>
+          </Row>
+        )}
+
+        <button onClick={onClose} style={{ width: '100%', marginTop: 16, padding: '13px', background: '#006064', color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Tutup
+        </button>
+      </div>
+    </>
+  )
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 4px' }}>{label}</p>
+      {children}
     </div>
   )
 }

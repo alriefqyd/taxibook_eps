@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notify } from '@/lib/notify'
+import { getRouteDurationSeconds } from '@/lib/routing'
 
 export async function POST(
   request: NextRequest,
@@ -21,7 +22,7 @@ export async function POST(
     // Get booking
     const { data: booking } = await admin
       .from('bookings')
-      .select('*, taxis!taxi_id(id, name, driver_id)')
+      .select('*, taxis!taxi_id(id, name, driver_id, latitude, longitude)')
       .eq('id', bookingId)
       .single()
 
@@ -40,9 +41,31 @@ export async function POST(
       )
     }
 
-    // Update status and set auto_complete_at to 2 hours from now
-    const newStatus      = booking.trip_type === 'WAITING' ? 'waiting_trip' : 'on_trip'
-    const autoCompleteAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+    const newStatus = booking.trip_type === 'WAITING' ? 'waiting_trip' : 'on_trip'
+
+    // Compute auto_complete_at: OSRM(driver→pickup) + OSRM(pickup→destination) + 15 min margin
+    // Fallback to now + 2 hours if OSRM or driver location unavailable
+    const MARGIN_S   = 15 * 60
+    const FALLBACK_S = 2 * 3600
+
+    const driverLat  = booking.taxis?.latitude
+    const driverLng  = booking.taxis?.longitude
+    const hasCoords  = driverLat && driverLng
+      && booking.pickup_lat && booking.pickup_lng
+      && booking.destination_lat && booking.destination_lng
+
+    let routeSec = FALLBACK_S
+    if (hasCoords) {
+      const [legToPickup, legToDest] = await Promise.all([
+        getRouteDurationSeconds(driverLat, driverLng, booking.pickup_lat, booking.pickup_lng),
+        getRouteDurationSeconds(booking.pickup_lat, booking.pickup_lng, booking.destination_lat, booking.destination_lng),
+      ])
+      if (legToPickup != null && legToDest != null) {
+        routeSec = legToPickup + legToDest
+      }
+    }
+
+    const autoCompleteAt = new Date(Date.now() + (routeSec + MARGIN_S) * 1000).toISOString()
 
     await admin.from('bookings')
       .update({ status: newStatus, auto_complete_at: autoCompleteAt })
