@@ -16,17 +16,50 @@ function isGpsActive(ts: string | null) {
   return Date.now() - new Date(ts).getTime() < GPS_STALE_MS
 }
 
-function driverIcon(color: string, stale: boolean, name: string) {
-  const opacity = stale ? '0.5' : '1'
-  const label = name.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+// Returns minutes since last GPS update
+function minsAgo(ts: string | null): number | null {
+  if (!ts) return null
+  return Math.floor((Date.now() - new Date(ts).getTime()) / 60000)
+}
+
+function relativeTime(ts: string | null): string {
+  const m = minsAgo(ts)
+  if (m === null) return 'never'
+  if (m < 1)  return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  return `${h}h ${m % 60}m ago`
+}
+
+// Staleness color: green → amber → red → gray
+function stalenessColor(ts: string | null): string {
+  const m = minsAgo(ts)
+  if (m === null)  return '#9ca3af' // never
+  if (m < 5)       return '#059669' // green
+  if (m < 15)      return '#D97706' // amber
+  if (m < 60)      return '#DC2626' // red
+  return '#6b7280'                  // gray (very stale)
+}
+
+function driverIcon(color: string, name: string, locationUpdatedAt: string | null) {
+  const label    = name.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const timeStr  = relativeTime(locationUpdatedAt).replace(/&/g, '&amp;')
+  const sColor   = stalenessColor(locationUpdatedAt)
+  const m        = minsAgo(locationUpdatedAt)
+  const opacity  = m === null || m >= 60 ? '0.55' : '1'
+  const border   = sColor
+
   return L.divIcon({
     html: `<div style="opacity:${opacity};display:flex;flex-direction:column;align-items:center;gap:2px">
-      <div style="background:${color};color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3)">${label}</div>
-      <div style="width:26px;height:26px;background:${color};border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:12px">🚗</div>
+      <div style="background:${color};color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3);display:flex;flex-direction:column;align-items:center;gap:1px">
+        <span>${label}</span>
+        <span style="font-size:8px;font-weight:600;opacity:0.9">${timeStr}</span>
+      </div>
+      <div style="width:26px;height:26px;background:${color};border:3px solid ${border};border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:12px">🚗</div>
     </div>`,
     className: '',
-    iconSize: [80, 46],
-    iconAnchor: [40, 33],
+    iconSize: [90, 54],
+    iconAnchor: [45, 38],
   })
 }
 
@@ -153,7 +186,7 @@ export default function DriverFleetMap({ style }: Props) {
                 </Marker>
               )}
 
-              <Marker position={[d.latitude!, d.longitude!]} icon={driverIcon(d.color, stale, d.driver_name || d.name)}>
+              <Marker position={[d.latitude!, d.longitude!]} icon={driverIcon(d.color, d.driver_name || d.name, d.location_updated_at)}>
                 <Popup>
                   <div style={{ fontFamily: 'Inter, sans-serif', minWidth: 155 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
@@ -184,9 +217,12 @@ export default function DriverFleetMap({ style }: Props) {
                       </div>
                     )}
                     {d.location_updated_at && (
-                      <p style={{ margin: '5px 0 0', fontSize: 9, color: '#9ca3af' }}>
-                        GPS {new Date(d.location_updated_at).toLocaleTimeString()}
+                      <p style={{ margin: '5px 0 0', fontSize: 9, fontWeight: 600, color: stalenessColor(d.location_updated_at) }}>
+                        GPS update: {relativeTime(d.location_updated_at)} ({new Date(d.location_updated_at).toLocaleTimeString()})
                       </p>
+                    )}
+                    {!d.location_updated_at && (
+                      <p style={{ margin: '5px 0 0', fontSize: 9, color: '#9ca3af' }}>GPS: never updated</p>
                     )}
                   </div>
                 </Popup>

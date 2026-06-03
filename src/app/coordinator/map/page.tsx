@@ -20,6 +20,29 @@ function isGpsActive(ts: string | null): boolean {
   return Date.now() - new Date(ts).getTime() < GPS_STALE_MS
 }
 
+function minsAgo(ts: string | null): number | null {
+  if (!ts) return null
+  return Math.floor((Date.now() - new Date(ts).getTime()) / 60000)
+}
+
+function relativeTime(ts: string | null): string {
+  const m = minsAgo(ts)
+  if (m === null) return 'never'
+  if (m < 1)  return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  return `${h}h ${m % 60}m ago`
+}
+
+function stalenessColor(ts: string | null): string {
+  const m = minsAgo(ts)
+  if (m === null)  return '#9ca3af'
+  if (m < 5)       return '#059669'
+  if (m < 15)      return '#D97706'
+  if (m < 60)      return '#DC2626'
+  return '#6b7280'
+}
+
 function GpsIcon({ active }: { active: boolean }) {
   return (
     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke={active ? '#059669' : '#9ca3af'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -171,8 +194,10 @@ export default function CoordinatorMapPage() {
                   <p style={{ fontSize: 8, color: '#6f7979', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {d.name}
                   </p>
+                  <p style={{ fontSize: 7, fontWeight: 700, color: stalenessColor(d.location_updated_at), margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {relativeTime(d.location_updated_at)}
+                  </p>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                    <GpsIcon active={hasGps} />
                     {onTrip && <span style={{ fontSize: 7, fontWeight: 700, color: d.color }}>trip</span>}
                     {!isOnline && !onTrip && <span style={{ fontSize: 7, color: '#9ca3af' }}>off</span>}
                   </div>
@@ -250,14 +275,15 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
               </div>
               <p style={{ fontSize: 12, color: '#6f7979', margin: '2px 0 0' }}>
                 {d.name}{d.plate ? ` · ${d.plate}` : ''}
-                <span style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                  <GpsIcon active={hasGps} />
-                  <span style={{ fontSize: 10, color: hasGps ? '#059669' : '#9ca3af' }}>
-                    {hasGps
-                      ? `GPS ${d.location_updated_at ? format(new Date(d.location_updated_at), 'HH:mm') : ''}`
-                      : 'GPS stale'}
+              </p>
+              <p style={{ fontSize: 11, fontWeight: 600, margin: '3px 0 0', display: 'flex', alignItems: 'center', gap: 4, color: stalenessColor(d.location_updated_at) }}>
+                <GpsIcon active={hasGps} />
+                {relativeTime(d.location_updated_at)}
+                {d.location_updated_at && (
+                  <span style={{ fontWeight: 400, color: '#9ca3af' }}>
+                    ({format(new Date(d.location_updated_at), 'HH:mm:ss')})
                   </span>
-                </span>
+                )}
               </p>
             </div>
           </div>
