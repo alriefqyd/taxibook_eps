@@ -17,6 +17,8 @@ const HOUR_S   = 7
 const HOUR_E   = 20
 const H_PX     = 64   // px per hour
 const HOURS    = Array.from({ length: HOUR_E - HOUR_S }, (_, i) => i + HOUR_S)
+const TIME_ZONE = 'Asia/Singapore'
+const TIME_ZONE_LABEL = 'SGT / WITA'
 
 type View = 'day' | 'week' | 'month' | 'map'
 
@@ -82,6 +84,20 @@ export default function BoardPage() {
     return format(cursor, 'MMMM yyyy', { locale: idLocale })
   }
 
+  function formatTimeInZone(date: Date) {
+    return new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      timeZone: TIME_ZONE,
+    }).format(date)
+  }
+
+  function formatDateInZone(date: Date) {
+    return new Intl.DateTimeFormat('en-GB', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+      timeZone: TIME_ZONE,
+    }).format(date)
+  }
+
   async function toggleFullscreen() {
     if (!isFullscreen) {
       const elem = document.documentElement
@@ -144,10 +160,10 @@ export default function BoardPage() {
         <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: 16 }}>
           <div>
             <p style={{ fontSize: 22, fontWeight: 700, margin: '0 0 1px', letterSpacing: '-0.5px', fontFamily: 'monospace' }}>
-              {format(clock, 'HH:mm:ss')}
+              {formatTimeInZone(clock)}
             </p>
             <p style={{ fontSize: 11, color: '#9CA3AF', margin: 0 }}>
-              {format(clock, 'EEEE, d MMMM yyyy', { locale: idLocale })}
+              {formatDateInZone(clock)} · {TIME_ZONE_LABEL}
             </p>
           </div>
           <button 
