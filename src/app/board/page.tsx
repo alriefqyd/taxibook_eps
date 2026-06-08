@@ -31,6 +31,7 @@ export default function BoardPage() {
   const [cursor,    setCursor]    = useState(new Date())
   const [clock,     setClock]     = useState(new Date())
   const [tooltip,   setTooltip]   = useState<any>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   const loadData = useCallback(async () => {
     const [{ data: bks }, { data: txs }] = await Promise.all([
@@ -81,6 +82,21 @@ export default function BoardPage() {
     return format(cursor, 'MMMM yyyy', { locale: idLocale })
   }
 
+  async function toggleFullscreen() {
+    if (!isFullscreen) {
+      const elem = document.documentElement
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen()
+        setIsFullscreen(true)
+      }
+    } else {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+        setIsFullscreen(false)
+      }
+    }
+  }
+
   const today = new Date()
   const activeCount   = bookings.filter((b: any) => ['on_trip','waiting_trip'].includes(b.status)).length
   const bookedCount   = bookings.filter((b: any) => b.status === 'booked').length
@@ -125,13 +141,22 @@ export default function BoardPage() {
         </div>
 
         {/* Clock */}
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: 22, fontWeight: 700, margin: '0 0 1px', letterSpacing: '-0.5px', fontFamily: 'monospace' }}>
-            {format(clock, 'HH:mm:ss')}
-          </p>
-          <p style={{ fontSize: 11, color: '#9CA3AF', margin: 0 }}>
-            {format(clock, 'EEEE, d MMMM yyyy', { locale: idLocale })}
-          </p>
+        <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div>
+            <p style={{ fontSize: 22, fontWeight: 700, margin: '0 0 1px', letterSpacing: '-0.5px', fontFamily: 'monospace' }}>
+              {format(clock, 'HH:mm:ss')}
+            </p>
+            <p style={{ fontSize: 11, color: '#9CA3AF', margin: 0 }}>
+              {format(clock, 'EEEE, d MMMM yyyy', { locale: idLocale })}
+            </p>
+          </div>
+          <button 
+            onClick={toggleFullscreen} 
+            style={{ width: 36, height: 36, borderRadius: '50%', background: isFullscreen ? '#006064' : '#F5F5F2', border: '1px solid #D4E8EA', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', color: isFullscreen ? '#fff' : '#000', flexShrink: 0 }}
+            title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+          >
+            ⛶
+          </button>
         </div>
       </div>
 
