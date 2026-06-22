@@ -12,6 +12,7 @@ const ICONS: Record<string, { outline: string; filled: string }> = {
   person:       { outline: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', filled: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
   dashboard:    { outline: 'M3 3h7v7H3z M3 14h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z', filled: 'M3 3h7v7H3z M3 14h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z' },
   group:        { outline: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M23 21v-2a4 4 0 0 0-3-3.87 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M16 3.13a4 4 0 0 1 0 7.75', filled: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
+  users:        { outline: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M19 8v6 M22 11h-6', filled: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
   map:          { outline: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z M8 2v16 M16 6v16', filled: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z' },
 }
 
@@ -36,6 +37,7 @@ const NAV: Record<string, NavItem[]> = {
   coordinator: [
     { href: '/coordinator/home',    label: 'Home',    iconKey: 'dashboard' },
     { href: '/coordinator/drivers', label: 'Drivers', iconKey: 'group'     },
+    { href: '/coordinator/users',   label: 'Users',   iconKey: 'users'     },
     { href: '/coordinator/map',     label: 'Map',     iconKey: 'map'       },
     { href: '/coordinator/profile', label: 'Profile', iconKey: 'person'    },
   ],
