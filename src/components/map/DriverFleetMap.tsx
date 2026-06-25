@@ -124,14 +124,14 @@ export default function DriverFleetMap({ style }: Props) {
   }
 
   const tripKey = drivers
-    .filter(d => d.is_on_trip && d.latitude != null && d.longitude != null)
+    .filter(d => d.active_booking && ['on_trip', 'waiting_trip'].includes(d.active_booking.status) && d.latitude != null && d.longitude != null)
     .map(d => `${d.id}:${d.latitude!.toFixed(3)},${d.longitude!.toFixed(3)},${d.active_booking?.destination_lat?.toFixed(3)}`)
     .join('|')
 
   useEffect(() => {
     if (!tripKey) return
     drivers.forEach(d => {
-      if (!d.is_on_trip || !d.active_booking) return
+      if (!d.active_booking || !['on_trip', 'waiting_trip'].includes(d.active_booking.status)) return
       const bk = d.active_booking
       if (d.latitude == null || d.longitude == null) return
       if (bk.destination_lat == null || bk.destination_lng == null) return
@@ -159,18 +159,19 @@ export default function DriverFleetMap({ style }: Props) {
         {fitPositions.length > 0 && <FitBounds positions={fitPositions} />}
 
         {positioned.map(d => {
-          const stale   = !isGpsActive(d.location_updated_at)
-          const bk      = d.active_booking
-          const hasDest = bk?.destination_lat != null && bk?.destination_lng != null
-          const route   = routes[d.id]
+          const stale    = !isGpsActive(d.location_updated_at)
+          const bk       = d.active_booking
+          const tripActive = bk != null && ['on_trip', 'waiting_trip'].includes(bk.status)
+          const hasDest  = bk?.destination_lat != null && bk?.destination_lng != null
+          const route    = routes[d.id]
 
           return (
             <Fragment key={d.id}>
-              {bk && route && route.length > 1 && (
+              {tripActive && route && route.length > 1 && (
                 <Polyline positions={route} pathOptions={{ color: d.color, weight: 4, opacity: 0.85 }} />
               )}
 
-              {bk && hasDest && (
+              {tripActive && hasDest && (
                 <Marker position={[bk.destination_lat!, bk.destination_lng!]} icon={destinationIcon(d.color, d.driver_name || d.name)}>
                   <Popup>
                     <div style={{ fontFamily: 'Inter, sans-serif' }}>

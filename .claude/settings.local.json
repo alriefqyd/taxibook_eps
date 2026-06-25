@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(bash d:/project/taxibook-app/create_user.sh)",
+      "Bash(curl -s -X POST https://usbnhupmmvbgsphopnig.supabase.co/auth/v1/admin/users -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzYm5odXBtbXZiZ3NwaG9wbmlnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjE0MTc1OCwiZXhwIjoyMDkxNzE3NzU4fQ.IyPYYPt_isNdBQzXuvlhZh1Hjb6Tlz3-RaJskeuXTOk' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzYm5odXBtbXZiZ3NwaG9wbmlnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjE0MTc1OCwiZXhwIjoyMDkxNzE3NzU4fQ.IyPYYPt_isNdBQzXuvlhZh1Hjb6Tlz3-RaJskeuXTOk' -H 'Content-Type: application/json' -d '{\"email\":\"test.debug@vale.com\",\"password\":\"TEST@123\",\"email_confirm\":true,\"user_metadata\":{\"name\":\"Test Debug\"}}')",
+      "Bash(curl -s 'https://usbnhupmmvbgsphopnig.supabase.co/rest/v1/users?select=email&limit=5' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzYm5odXBtbXZiZ3NwaG9wbmlnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjE0MTc1OCwiZXhwIjoyMDkxNzE3NzU4fQ.IyPYYPt_isNdBQzXuvlhZh1Hjb6Tlz3-RaJskeuXTOk' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzYm5odXBtbXZiZ3NwaG9wbmlnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjE0MTc1OCwiZXhwIjoyMDkxNzE3NzU4fQ.IyPYYPt_isNdBQzXuvlhZh1Hjb6Tlz3-RaJskeuXTOk')",
+      "Bash(bash d:/project/taxibook-app/fix_public_users.sh)",
+      "Bash(python -c ' *)",
+      "Bash(bash d:/project/taxibook-app/create_user_cpc.sh)"
     ]
   }
 }

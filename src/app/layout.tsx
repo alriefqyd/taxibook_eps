@@ -21,6 +21,8 @@ export const metadata: Metadata = {
   themeColor:  '#006064',
 }
 
+import AuthProvider from '@/components/AuthProvider'
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${plusJakarta.variable} ${inter.variable}`}>
@@ -32,7 +34,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
       </head>
       <body style={{ fontFamily: "var(--font-inter), sans-serif", background: '#F5F5F2', margin: 0, padding: 0 }}>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   )

@@ -110,6 +110,23 @@ export default function CoordinatorBookPage() {
         ? new Date(Date.now() + 2 * 60000)
         : new Date(form.scheduled_at)
 
+      // Conflict check: same passenger, overlapping window
+      const windowStart = new Date(scheduledDate.getTime() - 30 * 60 * 1000)
+      const windowEnd   = new Date(scheduledDate.getTime() + 2 * 60 * 60 * 1000)
+      const { data: conflicts } = await supabase.from('bookings')
+        .select('booking_code, scheduled_at, destination')
+        .eq('passenger_id', form.passenger_id)
+        .not('status', 'in', '("rejected","cancelled","completed")')
+        .gte('scheduled_at', windowStart.toISOString())
+        .lte('scheduled_at', windowEnd.toISOString())
+
+      if (conflicts?.length) {
+        const c = conflicts[0]
+        const t = new Date(c.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+        setError(`Conflict: ${selectedPassenger?.name || 'Passenger'} already has a booking at ${t} to ${c.destination}.`)
+        setLoading(false); return
+      }
+
       const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 60
       const bookingStatus = needsApproval ? 'pending_coordinator_approval' : 'submitted'
 
