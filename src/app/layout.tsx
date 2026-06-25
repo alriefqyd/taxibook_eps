@@ -22,6 +22,7 @@ export const metadata: Metadata = {
 }
 
 import AuthProvider from '@/components/AuthProvider'
+import AppInitializer from '@/components/AppInitializer'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body style={{ fontFamily: "var(--font-inter), sans-serif", background: '#F5F5F2', margin: 0, padding: 0 }}>
         <AuthProvider>
+          <AppInitializer />
           {children}
         </AuthProvider>
       </body>

@@ -340,8 +340,8 @@ export default function StaffHomePage() {
       </div>
 
       {/* ── Views ── */}
-      {view === 'day'   && <DayGantt   bookings={allActiveBookings} taxis={taxis} cursor={cursor} scrollRef={dayScrollRef} onSelectBooking={setSelectedBk} />}
-      {view === 'week'  && <WeekView   bookings={allActiveBookings} cursor={cursor} onSelectBooking={setSelectedBk} />}
+      {view === 'day'   && <DayGantt   bookings={allActiveBookings} taxis={taxis} cursor={cursor} scrollRef={dayScrollRef} onSelectBooking={setSelectedBk} currentUserId={user?.id} />}
+      {view === 'week'  && <WeekView   bookings={allActiveBookings} cursor={cursor} onSelectBooking={setSelectedBk} currentUserId={user?.id} />}
       {view === 'month' && <MonthView  bookings={allBookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} />}
 
       {/* ── My bookings list ── */}
@@ -444,6 +444,7 @@ export default function StaffHomePage() {
       {selectedBk && (
         <StaffBookingSheet
           booking={selectedBk}
+          currentUserId={user?.id}
           onClose={() => setSelectedBk(null)}
           onCancelled={() => { if (user) loadData(user.id) }}
         />
@@ -453,12 +454,13 @@ export default function StaffHomePage() {
 }
 
 // ── DAY GANTT ───────────────────────────────────────────────
-function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
+function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, currentUserId }: {
   bookings: BookingDetail[]
   taxis: any[]
   cursor: Date
   scrollRef: React.RefObject<HTMLDivElement>
   onSelectBooking: (b: BookingDetail) => void
+  currentUserId?: string
 }) {
   const today    = new Date()
   const dayBks = bookings.filter(b => isSameDay(new Date(b.scheduled_at), cursor))
@@ -493,23 +495,29 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
               idx={idx}
               bookings={dayBks.filter(b => b.taxi_id === taxi.id)}
               renderBlock={(b) => {
-                const dt      = new Date(b.scheduled_at)
-                const startH  = dt.getHours() + dt.getMinutes() / 60
-                const left    = (startH - HOUR_START) * HOUR_W
-                const durH    = b.trip_type === 'WAITING'
+                const dt        = new Date(b.scheduled_at)
+                const startH    = dt.getHours() + dt.getMinutes() / 60
+                const left      = (startH - HOUR_START) * HOUR_W
+                const durH      = b.trip_type === 'WAITING'
                   ? Math.min(b.wait_minutes / 60 + 2, HOUR_END - startH)
                   : Math.min(2, HOUR_END - startH)
-                const width   = Math.max(durH * HOUR_W - 4, 44)
+                const width     = Math.max(durH * HOUR_W - 4, 44)
                 const isPending = b.status.includes('pending')
+                const isOwner   = currentUserId && b.passenger_id === currentUserId
                 return (
-                  <div key={b.id} onClick={() => onSelectBooking(b)} style={{
-                    position:'absolute', left:left+2, top:5,
-                    width, height:ROW_H - 10,
-                    background: taxi.color + '22',
-                    border:`1.5px ${isPending?'dashed':'solid'} ${taxi.color}`,
-                    borderRadius:'7px', padding:'4px 6px', overflow:'hidden', zIndex:5,
-                    cursor: 'pointer',
-                  }}>
+                  <div
+                    key={b.id}
+                    onClick={isOwner ? () => onSelectBooking(b) : undefined}
+                    style={{
+                      position:'absolute', left:left+2, top:5,
+                      width, height:ROW_H - 10,
+                      background: taxi.color + '22',
+                      border:`1.5px ${isPending?'dashed':'solid'} ${taxi.color}`,
+                      borderRadius:'7px', padding:'4px 6px', overflow:'hidden', zIndex:5,
+                      cursor: isOwner ? 'pointer' : 'default',
+                      opacity: isOwner ? 1 : 0.6,
+                    }}
+                  >
                     <p style={{ fontSize:'10px', fontWeight:800, color:taxi.color, margin:'0 0 1px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                       {b.passenger_name}
                     </p>
@@ -823,7 +831,7 @@ const navBtn: React.CSSProperties = {
 }
 
 // ── WEEK VIEW (original grid) ───────────────────────────────
-function WeekView({ bookings, cursor, onSelectBooking }: { bookings: BookingDetail[]; cursor: Date; onSelectBooking: (b: BookingDetail) => void }) {
+function WeekView({ bookings, cursor, onSelectBooking, currentUserId }: { bookings: BookingDetail[]; cursor: Date; onSelectBooking: (b: BookingDetail) => void; currentUserId?: string }) {
   const today  = new Date()
   const monday = startOfWeek(cursor, { weekStartsOn: 1 })
   const days   = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
@@ -858,15 +866,21 @@ function WeekView({ bookings, cursor, onSelectBooking }: { bookings: BookingDeta
                 {dayBks.map(b => {
                   const color     = b.taxi_color || '#3f4949'
                   const isPending = b.status.includes('pending')
+                  const isOwner   = currentUserId && b.passenger_id === currentUserId
                   return (
-                    <div key={b.id} onClick={() => onSelectBooking(b)} style={{
-                      background: color + '20',
-                      border:`1px ${isPending?'dashed':'solid'} ${color}`,
-                      borderRadius:3, padding:'2px 4px', marginBottom:2,
-                      fontSize:'9px', fontWeight:700, color,
-                      overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
-                      cursor: 'pointer',
-                    }}>
+                    <div
+                      key={b.id}
+                      onClick={isOwner ? () => onSelectBooking(b) : undefined}
+                      style={{
+                        background: color + '20',
+                        border:`1px ${isPending?'dashed':'solid'} ${color}`,
+                        borderRadius:3, padding:'2px 4px', marginBottom:2,
+                        fontSize:'9px', fontWeight:700, color,
+                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                        cursor: isOwner ? 'pointer' : 'default',
+                        opacity: isOwner ? 1 : 0.6,
+                      }}
+                    >
                       {format(new Date(b.scheduled_at),'HH:mm')} {b.passenger_name}
                     </div>
                   )
@@ -894,8 +908,9 @@ function WeekView({ bookings, cursor, onSelectBooking }: { bookings: BookingDeta
 
 // ── Staff booking detail + cancel sheet ────────────────────
 // Add this to the bottom of the file and wire it into the header
-function StaffBookingSheet({ booking, onClose, onCancelled }: {
+function StaffBookingSheet({ booking, currentUserId, onClose, onCancelled }: {
   booking: any
+  currentUserId?: string
   onClose: () => void
   onCancelled: () => void
 }) {
@@ -931,7 +946,8 @@ function StaffBookingSheet({ booking, onClose, onCancelled }: {
     onClose()
   }
 
-  const canCancel = ['submitted','pending_coordinator_approval','pending_driver_approval','booked']
+  const isOwner   = !!currentUserId && booking.passenger_id === currentUserId
+  const canCancel = isOwner && ['submitted','pending_coordinator_approval','pending_driver_approval','booked']
     .includes(booking.status)
 
   return (

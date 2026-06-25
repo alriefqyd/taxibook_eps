@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export function usePushNotifications() {
-  const supabase = createClient()
+  const subscribedRef = useRef(false)
 
   useEffect(() => {
     async function subscribe() {
@@ -17,7 +17,10 @@ export function usePushNotifications() {
         if (!vapidKey) return
 
         const permission = await Notification.requestPermission()
-        if (permission !== 'granted') return
+        if (permission !== 'granted') {
+          console.log('[Push] Notification permission denied')
+          return
+        }
 
         // Unregister stale non-pwa workers that may block activation
         const allRegs = await navigator.serviceWorker.getRegistrations()
@@ -53,10 +56,27 @@ export function usePushNotifications() {
         })
         console.log('[Push] Subscribed:', sub.endpoint.slice(0, 60))
 
-        // Save to DB
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) return
+        // Wait for session to be available (critical for PWAs)
+        const supabase = createClient()
+        let session = null
+        let attempts = 0
+        while (!session && attempts < 10) {
+          const { data } = await supabase.auth.getSession()
+          session = data.session
+          if (!session) {
+            console.log('[Push] Waiting for session...', attempts + 1)
+            await new Promise(resolve => setTimeout(resolve, 500))
+          }
+          attempts++
+        }
 
+        if (!session) {
+          console.warn('[Push] No session available for subscription')
+          // Don't fail - continue anyway, the subscription endpoint is still useful
+          return
+        }
+
+        // Save to DB
         const res = await fetch('/api/push/subscribe', {
           method:  'POST',
           headers: {
@@ -66,16 +86,20 @@ export function usePushNotifications() {
           body: JSON.stringify({ subscription: sub }),
         })
         console.log('[Push] Saved to DB:', res.status)
+        subscribedRef.current = true
 
       } catch (err) {
         console.error('[Push] Error:', err)
       }
     }
 
-    if (document.readyState === 'complete') {
-      setTimeout(subscribe, 2000)
-    } else {
-      window.addEventListener('load', () => setTimeout(subscribe, 2000), { once: true })
+    // Subscribe when page fully loads
+    if (!subscribedRef.current) {
+      if (document.readyState === 'complete') {
+        subscribe()
+      } else {
+        window.addEventListener('load', subscribe, { once: true })
+      }
     }
   }, [])
 }
