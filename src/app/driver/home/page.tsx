@@ -451,8 +451,9 @@ export default function DriverHomePage() {
       {/* ── CALENDAR TAB ── */}
       {tab === 'calendar' && myTaxi && (
         <GanttCalendar
-          bookings={[...upcoming, ...(activeTrip ? [activeTrip] : [])] as any}
+          bookings={[...upcoming, ...(activeTrip ? [activeTrip] : []), ...past] as any}
           taxis={[myTaxi]}
+          showCompleted
         />
       )}
 

@@ -46,6 +46,7 @@ export async function POST(
       .update({
         status:       'completed',
         completed_at: new Date().toISOString(),
+        completed_by: isDriver ? 'driver' : 'coordinator',
       })
       .eq('id', bookingId)
 

@@ -26,7 +26,6 @@ export const B = "'Inter', sans-serif"
 export const STATUS: Record<string, { bg: string; color: string; label: string }> = {
   submitted:                    { bg:'#eeeeeb',               color:'#3f4949',  label:'Submitted'   },
   pending_coordinator_approval: { bg:'#ffdeac',               color:'#7e5700',  label:'Needs Approval'},
-  pending_driver_approval:      { bg:'rgba(0,96,100,0.12)',   color:'#006064',  label:'Pending Driver'},
   booked:                       { bg:'rgba(0,96,100,0.12)',   color:'#006064',  label:'Confirmed'   },
   waiting_trip:                 { bg:'rgba(0,96,100,0.12)',   color:'#006064',  label:'Waiting'     },
   on_trip:                      { bg:'#d8f3dc',               color:'#344500',  label:'On Trip'     },

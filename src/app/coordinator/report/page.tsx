@@ -128,7 +128,7 @@ export default function CoordinatorReportPage() {
   const total     = filtered.length
   const completed = filtered.filter(r => r.status === 'completed').length
   const cancelled = filtered.filter(r => ['cancelled', 'rejected'].includes(r.status)).length
-  const active    = filtered.filter(r => ['booked', 'on_trip', 'waiting_trip', 'submitted', 'pending_coordinator_approval', 'pending_driver_approval'].includes(r.status)).length
+  const active    = filtered.filter(r => ['booked', 'on_trip', 'waiting_trip', 'submitted', 'pending_coordinator_approval'].includes(r.status)).length
 
   const completedRows = filtered.filter(r => r.status === 'completed' && r.completed_at)
   const avgMin = completedRows.length > 0

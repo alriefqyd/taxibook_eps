@@ -39,7 +39,7 @@ interface Taxi {
   is_active:   boolean
 }
 
-type FilterStatus = 'all' | 'unassigned' | 'pending' | 'booked' | 'active'
+type FilterStatus = 'all' | 'unassigned' | 'booked' | 'active'
 
 export default function DispatchPage() {
   const router   = useRouter()
@@ -101,7 +101,7 @@ export default function DispatchPage() {
         .select('id')
         .eq('taxi_id', taxi.id)
         .neq('id', booking.id)
-        .in('status', ['booked','on_trip','waiting_trip','pending_driver_approval'])
+        .in('status', ['booked','on_trip','waiting_trip','booked'])
         .gt('auto_complete_at', scheduledTime.toISOString())
         .lte('scheduled_at', new Date(scheduledTime.getTime() + 2 * 3600000).toISOString())
         .limit(1).maybeSingle()
@@ -159,7 +159,6 @@ export default function DispatchPage() {
 
   const filtered = dateFiltered.filter(b => {
     if (filter === 'unassigned') return !b.taxi_id || b.status === 'submitted' || b.status === 'pending_coordinator_approval'
-    if (filter === 'pending')    return b.status === 'pending_driver_approval'
     if (filter === 'booked')     return b.status === 'booked'
     if (filter === 'active')     return ['on_trip','waiting_trip'].includes(b.status)
     return true
@@ -168,7 +167,6 @@ export default function DispatchPage() {
   const counts = {
     all:        dateFiltered.length,
     unassigned: dateFiltered.filter(b => !b.taxi_id || ['submitted','pending_coordinator_approval'].includes(b.status)).length,
-    pending:    dateFiltered.filter(b => b.status === 'pending_driver_approval').length,
     booked:     dateFiltered.filter(b => b.status === 'booked').length,
     active:     dateFiltered.filter(b => ['on_trip','waiting_trip'].includes(b.status)).length,
   }
@@ -176,7 +174,6 @@ export default function DispatchPage() {
   const statusColors: Record<string, { bg: string; text: string }> = {
     submitted:                    { bg: '#DBEAFE', text: '#1E3A5F' },
     pending_coordinator_approval: { bg: '#FEF3C7', text: '#92400E' },
-    pending_driver_approval:      { bg: '#FEF3C7', text: '#92400E' },
     booked:                       { bg: '#D8F3DC', text: '#2D6A4F' },
     on_trip:                      { bg: '#D8F3DC', text: '#2D6A4F' },
     waiting_trip:                 { bg: '#EDE9FE', text: '#4C1D95' },
@@ -222,7 +219,6 @@ export default function DispatchPage() {
           {([
             { key: 'all',        label: 'All' },
             { key: 'unassigned', label: 'Unassigned' },
-            { key: 'pending',    label: 'Pending driver' },
             { key: 'booked',     label: 'Confirmed' },
             { key: 'active',     label: 'Active' },
           ] as { key: FilterStatus; label: string }[]).map(f => (

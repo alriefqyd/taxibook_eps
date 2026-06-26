@@ -401,7 +401,7 @@ export default function StaffHomePage() {
                         {b.taxi_name} · {b.driver_name}
                       </span>
                     : <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>
-                        {b.status === 'pending_coordinator_approval' ? 'Awaiting approval' : 'Awaiting driver'}
+                        {b.status === 'pending_coordinator_approval' ? 'Awaiting approval' : 'Unassigned'}
                       </span>
                   }
                 </div>
@@ -947,7 +947,7 @@ function StaffBookingSheet({ booking, currentUserId, onClose, onCancelled }: {
   }
 
   const isOwner   = !!currentUserId && booking.passenger_id === currentUserId
-  const canCancel = isOwner && ['submitted','pending_coordinator_approval','pending_driver_approval','booked']
+  const canCancel = isOwner && ['submitted','pending_coordinator_approval','booked']
     .includes(booking.status)
 
   return (

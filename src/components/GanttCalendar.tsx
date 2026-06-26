@@ -424,8 +424,13 @@ function BookingSheet({ booking: b, onClose }: { booking: BookingDetail; onClose
             {format(new Date(b.scheduled_at), 'EEEE, dd MMMM yyyy · HH:mm', { locale: idLocale })}
           </p>
           {b.completed_at && (
-            <p style={{ fontSize: 12, color: '#059669', margin: 0 }}>
+            <p style={{ fontSize: 12, color: '#059669', margin: '0 0 2px' }}>
               Selesai: {format(new Date(b.completed_at), 'HH:mm')}
+              {b.completed_by && (
+                <span style={{ marginLeft: 6, fontSize: 11, color: '#94a3b8' }}>
+                  ({b.completed_by === 'driver' ? 'by driver' : b.completed_by === 'coordinator' ? 'by coordinator' : 'auto-completed'})
+                </span>
+              )}
             </p>
           )}
         </Row>

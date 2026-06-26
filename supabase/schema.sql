@@ -73,7 +73,6 @@ create table public.bookings (
   status            text not null default 'submitted' check (status in (
                       'submitted',
                       'pending_coordinator_approval',
-                      'pending_driver_approval',
                       'booked',
                       'on_trip',
                       'waiting_trip',
@@ -82,8 +81,10 @@ create table public.bookings (
                       'cancelled'
                     )),
   rejection_reason  text,
-  auto_complete_at  timestamptz,               -- system sets this
+  auto_complete_at  timestamptz,               -- system sets this; recalculated on start
+  assigned_at       timestamptz,               -- when driver was assigned (auto or manual)
   completed_at      timestamptz,               -- actual completion time
+  completed_by      text check (completed_by in ('driver','coordinator','system')),
   created_by        uuid references public.users(id),
   created_at        timestamptz default now(),
   updated_at        timestamptz default now()
@@ -146,16 +147,18 @@ create trigger set_booking_code
   before insert on public.bookings
   for each row execute function generate_booking_code();
 
--- Auto-set auto_complete_at
+-- Auto-set auto_complete_at (only when not already provided by application code)
 create or replace function set_auto_complete_at()
 returns trigger as $$
 begin
-  if new.trip_type = 'DROP' then
-    new.auto_complete_at := new.scheduled_at + interval '2 hours';
-  elsif new.trip_type = 'WAITING' then
-    new.auto_complete_at := new.scheduled_at
-      + (new.wait_minutes || ' minutes')::interval
-      + interval '2 hours';
+  if new.auto_complete_at is null then
+    if new.trip_type = 'DROP' then
+      new.auto_complete_at := new.scheduled_at + interval '2 hours';
+    elsif new.trip_type = 'WAITING' then
+      new.auto_complete_at := new.scheduled_at
+        + (new.wait_minutes || ' minutes')::interval
+        + interval '2 hours';
+    end if;
   end if;
   return new;
 end;
@@ -408,3 +411,41 @@ begin
   end if;
 end;
 $$;
+
+-- ============================================================
+-- MIGRATION: prevent driver double-booking at the DB level
+-- Run these two statements in Supabase SQL Editor
+-- ============================================================
+
+-- 1. Fix trigger: only apply 2h fallback when app did not provide auto_complete_at
+create or replace function set_auto_complete_at()
+returns trigger as $$
+begin
+  if new.auto_complete_at is null then
+    if new.trip_type = 'DROP' then
+      new.auto_complete_at := new.scheduled_at + interval '2 hours';
+    elsif new.trip_type = 'WAITING' then
+      new.auto_complete_at := new.scheduled_at
+        + (new.wait_minutes || ' minutes')::interval
+        + interval '2 hours';
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+-- 2. Exclusion constraint: two bookings for the same taxi cannot have overlapping
+--    time windows while in an active status.
+--    Requires btree_gist for the mixed = / && operators in a GIST index.
+create extension if not exists btree_gist;
+
+alter table public.bookings
+  drop constraint if exists no_driver_overlap;
+
+alter table public.bookings
+  add constraint no_driver_overlap
+  exclude using gist (
+    taxi_id   with =,
+    tstzrange(scheduled_at, auto_complete_at) with &&
+  )
+  where (taxi_id is not null and status in ('booked', 'on_trip', 'waiting_trip'));

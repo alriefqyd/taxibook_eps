@@ -44,14 +44,35 @@ export async function POST(
 
     if (!newTaxi) return NextResponse.json({ error: 'Taxi not found' }, { status: 404 })
 
+    // Check for driver schedule overlap
+    const { data: driverConflict } = await admin
+      .from('bookings')
+      .select('id, booking_code, scheduled_at')
+      .eq('taxi_id', new_taxi_id)
+      .in('status', ['booked', 'on_trip', 'waiting_trip'])
+      .neq('id', bookingId)
+      .lt('scheduled_at', booking.auto_complete_at)
+      .gt('auto_complete_at', booking.scheduled_at)
+      .limit(1)
+      .maybeSingle()
+
+    if (driverConflict) {
+      const t = new Date(driverConflict.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      return NextResponse.json(
+        { error: `Driver already has a booking at ${t} that overlaps this trip.` },
+        { status: 409 }
+      )
+    }
+
     const oldDriverId  = booking.taxis?.driver_id
     const newDriverId  = newTaxi.driver_id
     const newDriverName = (newTaxi.users as any)?.name || 'Driver'
 
     // Update booking — no driver approval needed
     await admin.from('bookings').update({
-      taxi_id: new_taxi_id,
-      status:  'booked',
+      taxi_id:     new_taxi_id,
+      status:      'booked',
+      assigned_at: new Date().toISOString(),
     }).eq('id', bookingId)
 
     // Notify old driver if different

@@ -39,7 +39,7 @@ const IconAlert = () => (
 interface TaxiRow {
   id: string; name: string; plate: string | null; color: string
   is_available: boolean; driver_id: string | null; driver_name: string | null
-  trips_today: number; declines_today: number
+  trips_today: number
   active_booking: any | null; next_booking: any | null
 }
 interface Booking {
@@ -86,11 +86,9 @@ export default function DriversPage() {
     if (!txs) return
 
     const enriched = await Promise.all(txs.map(async (t: any) => {
-      const [{ count: trips }, { count: declines }, { data: activeBk }, { data: nextBk }] = await Promise.all([
+      const [{ count: trips }, { data: activeBk }, { data: nextBk }] = await Promise.all([
         supabase.from('bookings').select('id', { count: 'exact', head: true })
           .eq('taxi_id', t.id).eq('status', 'completed').gte('completed_at', todayStart.toISOString()),
-        supabase.from('booking_responses').select('id', { count: 'exact', head: true })
-          .eq('taxi_id', t.id).eq('response', 'declined').gte('responded_at', todayStart.toISOString()),
         supabase.from('booking_details').select('*')
           .eq('taxi_id', t.id).in('status', ['on_trip','waiting_trip']).maybeSingle(),
         supabase.from('booking_details').select('*')
@@ -101,7 +99,7 @@ export default function DriversPage() {
       return { id: t.id, name: t.name, plate: t.plate, color: t.color,
         is_available: t.is_available, driver_id: t.driver_id,
         driver_name: t.users?.name || null, trips_today: trips || 0,
-        declines_today: declines || 0, active_booking: activeBk || null, next_booking: nextBk || null }
+        active_booking: activeBk || null, next_booking: nextBk || null }
     }))
     setTaxis(enriched)
     setLoading(false)
@@ -159,8 +157,10 @@ export default function DriversPage() {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
       body: JSON.stringify({ new_taxi_id: newTaxiId, reason }),
     })
-    if (!res.ok) alert('Failed to reassign')
-    else { setReassigning(null); await loadData() }
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      alert('Error: ' + (d.error || 'Failed to reassign'))
+    } else { setReassigning(null); await loadData() }
     setSaving(false)
   }
 
@@ -341,11 +341,10 @@ export default function DriversPage() {
                   <div style={{ borderTop: '1px solid rgba(0,0,0,0.08)', padding: '14px 16px 16px', background: '#F5F5F2' }}>
 
                     {/* Stats */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 12 }}>
                       {[
-                        { label: 'Today',      value: t.trips_today,    warn: false },
-                        { label: 'Declines',   value: t.declines_today, warn: t.declines_today >= 2 },
-                        { label: 'Scheduled',  value: taxiBks.filter(b => b.status === 'booked').length, warn: false },
+                        { label: 'Today',     value: t.trips_today, warn: false },
+                        { label: 'Scheduled', value: taxiBks.filter(b => b.status === 'booked').length, warn: false },
                       ].map(s => (
                         <div key={s.label} style={{ background: s.warn ? '#FEF9EC' : '#F0F7F8', borderRadius: 12, padding: '10px', textAlign: 'center', border: `1px solid ${s.warn ? '#FDE68A' : '#EDD9C4'}` }}>
                           <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: s.warn ? '#92400E' : '#9ca3af', margin: '0 0 4px' }}>{s.label}</p>
@@ -382,20 +381,6 @@ export default function DriversPage() {
                       </div>
                     )}
 
-                    {/* Warning + offline button */}
-                    {t.declines_today >= 2 && (
-                      <div style={{ background: '#ffdeac', border: '1px solid #FDE68A', borderRadius: 12, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                        <p style={{ fontSize: 12, color: '#7e5700', margin: 0, fontWeight: 600 }}>
-                          ⚠️ {t.declines_today} declines today
-                        </p>
-                        {t.is_available && (
-                          <button onClick={() => toggleAvail(t)} disabled={!!toggling}
-                            style={{ fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 10, border: 'none', background: '#92400E', color: '#fff', cursor: 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif", flexShrink: 0 }}>
-                            Set offline
-                          </button>
-                        )}
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

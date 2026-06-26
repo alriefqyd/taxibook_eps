@@ -790,14 +790,9 @@
         <td>Coordinator must Approve or Reject.</td>
       </tr>
       <tr>
-        <td><span class="pill pill-driver">Awaiting Driver</span></td>
-        <td>A taxi has been assigned and the driver has been notified.</td>
-        <td>Driver must Accept or Decline within the time limit.</td>
-      </tr>
-      <tr>
         <td><span class="pill pill-booked">Booked</span></td>
-        <td>Driver has accepted. The trip is confirmed.</td>
-        <td>Driver starts the trip at the scheduled time.</td>
+        <td>Driver assigned directly. Trip is confirmed — no driver acceptance required.</td>
+        <td>Driver must tap Start Trip within 15 minutes of assignment.</td>
       </tr>
       <tr>
         <td><span class="pill pill-ontrip">On Trip</span></td>
@@ -833,8 +828,6 @@
     <div class="flow-arrow">→</div>
     <div class="flow-step gold">Needs Approval<br/><span style="font-weight:400;font-size:9px;">(if required)</span></div>
     <div class="flow-arrow">→</div>
-    <div class="flow-step">Awaiting Driver</div>
-    <div class="flow-arrow">→</div>
     <div class="flow-step">Booked</div>
     <div class="flow-arrow">→</div>
     <div class="flow-step">On Trip</div>
@@ -869,7 +862,6 @@
       <tr><td>Book a trip</td><td>✅</td><td>—</td><td>—</td></tr>
       <tr><td>View own bookings</td><td>✅</td><td>—</td><td>—</td></tr>
       <tr><td>Live trip tracking map</td><td>✅</td><td>✅</td><td>✅</td></tr>
-      <tr><td>Accept / decline bookings</td><td>—</td><td>✅</td><td>—</td></tr>
       <tr><td>Start / complete trips</td><td>—</td><td>✅</td><td>—</td></tr>
       <tr><td>Approve / reject bookings</td><td>—</td><td>—</td><td>✅</td></tr>
       <tr><td>View all bookings</td><td>—</td><td>—</td><td>✅</td></tr>
@@ -920,7 +912,7 @@
 
   <div class="info-box tip">
     <div class="info-icon">💡</div>
-    <div class="info-content"><strong>Real-time updates</strong>Booking cards update automatically without refreshing the page. Status changes (e.g. "Driver Accepted") appear live.</div>
+    <div class="info-content"><strong>Real-time updates</strong>Booking cards update automatically without refreshing the page. Status changes (e.g. "Booked", "On Trip") appear live.</div>
   </div>
 
   <h2>6. How to Book a Trip</h2>
@@ -993,6 +985,11 @@
     </tbody>
   </table>
 
+  <div class="info-box note">
+    <div class="info-icon">📐</div>
+    <div class="info-content"><strong>Booking window</strong>Each booking reserves the driver for a calculated time slot: <em>scheduled time + travel to destination + return to base + wait minutes + 30 min buffer</em>. The system will reject a new booking if it overlaps with an existing slot for the same taxi. For WAITING trips, make sure the wait minutes you enter reflect the actual time needed — it directly affects how long the taxi is reserved.</div>
+  </div>
+
   <div class="info-box warn">
     <div class="info-icon">⚠️</div>
     <div class="info-content"><strong>Booking lead time</strong>Always book at least 15 minutes before your required departure time to allow the system to assign and notify a driver.</div>
@@ -1062,8 +1059,7 @@
     <tbody>
       <tr><td>Booking submitted</td><td>Confirmation that your booking was received.</td></tr>
       <tr><td>Coordinator approved</td><td>Your booking has been approved and is proceeding.</td></tr>
-      <tr><td>Driver assigned &amp; accepted</td><td>"Your driver [Name] in [Taxi] is confirmed for your trip."</td></tr>
-      <tr><td>Driver declined</td><td>A new driver will be assigned automatically.</td></tr>
+      <tr><td>Driver assigned</td><td>"A driver has been assigned to your trip. You will be notified when the trip starts."</td></tr>
       <tr><td>Booking rejected</td><td>Reason for rejection included (if provided by coordinator).</td></tr>
       <tr><td>15-minute reminder</td><td>Reminder 15 minutes before your scheduled departure.</td></tr>
       <tr><td>Trip started</td><td>Driver has started your trip.</td></tr>
@@ -1102,7 +1098,7 @@
     <div class="section-icon">🚗</div>
     <div>
       <h1>Driver Guide</h1>
-      <p>Receiving, accepting, and executing company taxi trips</p>
+      <p>Receiving and executing company taxi trips</p>
     </div>
     <div class="role-badge">DRIVER</div>
   </div>
@@ -1119,8 +1115,8 @@
   <p>After logging in, drivers see their personal trip dashboard:</p>
   <ul>
     <li><strong>Active trip</strong> — the current in-progress trip with map and controls.</li>
-    <li><strong>Upcoming trips</strong> — accepted bookings scheduled for later today.</li>
-    <li><strong>Pending requests</strong> — new bookings waiting for your Accept/Decline response.</li>
+    <li><strong>Upcoming trips</strong> — confirmed bookings scheduled for later today.</li>
+    <li><strong>Past trips</strong> — completed trips from earlier today for reference.</li>
   </ul>
   <p>The screen updates in real time whenever a new booking is assigned to your taxi.</p>
 
@@ -1129,28 +1125,12 @@
     <div class="info-content"><strong>Keep the app open</strong>For GPS tracking to work and for instant booking alerts, keep TaxiBook EPS open or installed as a PWA on your device during working hours.</div>
   </div>
 
-  <h2>10. Accept or Decline a Booking</h2>
-  <p>When a new trip is assigned to your taxi, you receive a push notification and the booking appears in your home screen as a pending request.</p>
-  <div class="steps">
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-body">
-        <div class="step-title">Review the booking details</div>
-        <div class="step-desc">Check the pickup point, destination, scheduled time, and trip type (DROP or WAITING).</div>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-body">
-        <div class="step-title">Tap Accept or Decline</div>
-        <div class="step-desc">If you can fulfil the trip, tap <strong>Accept</strong>. The passenger is notified immediately. If you cannot, tap <strong>Decline</strong> — the system will attempt to reassign to another available driver.</div>
-      </div>
-    </div>
-  </div>
+  <h2>10. New Booking Assignment</h2>
+  <p>When a trip is assigned to your taxi, you receive a push notification immediately. The booking moves directly to <span class="pill pill-booked">Booked</span> status — no acceptance step is required.</p>
 
-  <div class="info-box tip">
-    <div class="info-icon">💡</div>
-    <div class="info-content"><strong>Repeated declines are tracked</strong>The coordinator can see how many trips you have declined today. Excessive declines may trigger a coordinator review.</div>
+  <div class="info-box warn">
+    <div class="info-icon">⚠️</div>
+    <div class="info-content"><strong>15-minute start window</strong>You must tap <strong>Start Trip</strong> within 15 minutes of the booking being assigned. If the trip is not started within that window, it is automatically cancelled by the system and the coordinator is notified.</div>
   </div>
 
   <h2>11. Running a Trip</h2>
@@ -1158,8 +1138,8 @@
     <div class="step">
       <div class="step-num">1</div>
       <div class="step-body">
-        <div class="step-title">Tap "Start Trip"</div>
-        <div class="step-desc">When you depart to pick up the passenger, tap Start Trip. The booking status changes to <span class="pill pill-ontrip">On Trip</span>. The passenger can now see your live location on their map.</div>
+        <div class="step-title">Tap "Start Trip" immediately upon assignment</div>
+        <div class="step-desc">As soon as you receive the booking assignment, tap Start Trip to begin heading to the passenger. The booking status changes to <span class="pill pill-ontrip">On Trip</span> and the passenger can now see your live location on their map. You must start within 15 minutes of assignment or the booking is auto-cancelled.</div>
       </div>
     </div>
     <div class="step">
@@ -1413,7 +1393,7 @@
   <p>Access the <strong>Drivers</strong> page from the bottom navigation to see all registered drivers and taxis.</p>
   <ul>
     <li>View each driver's name, assigned taxi, and current availability status.</li>
-    <li>See trips completed today and number of declines (a high decline count is highlighted in red as a warning).</li>
+    <li>See trips completed today for each driver.</li>
     <li>Toggle a taxi's <strong>available/unavailable</strong> status directly from this screen.</li>
   </ul>
 
@@ -1640,8 +1620,8 @@
       <tr><td>Booking approved</td><td>Staff</td><td>Your booking has been approved.</td></tr>
       <tr><td>Booking rejected</td><td>Staff</td><td>Your booking was rejected. [Reason if given]</td></tr>
       <tr><td>Driver assigned</td><td>Driver</td><td>New trip assigned: [Passenger] → [Destination] at [Time].</td></tr>
-      <tr><td>Driver accepted</td><td>Staff</td><td>[Driver name] in [Taxi] has accepted your booking.</td></tr>
-      <tr><td>Driver declined</td><td>Staff, Coordinator</td><td>Driver declined the trip. Reassignment in progress.</td></tr>
+      <tr><td>Driver assigned</td><td>Staff</td><td>A driver has been assigned to your trip.</td></tr>
+      <tr><td>Auto-cancelled</td><td>Staff, Driver, Coordinator</td><td>Booking auto-cancelled: driver did not start within 15 minutes of assignment.</td></tr>
       <tr><td>15-min reminder</td><td>Staff, Driver</td><td>Your trip starts in 15 minutes.</td></tr>
       <tr><td>Start reminder</td><td>Driver</td><td>Time to start your trip to [Destination].</td></tr>
       <tr><td>Overdue alert</td><td>Driver, Coordinator</td><td>Trip [ID] is overdue and has not been started.</td></tr>
@@ -1652,25 +1632,47 @@
   </table>
 
   <h2>22. Auto-Complete &amp; Reminders</h2>
-  <p>The system runs automated jobs to handle trips and reminders without manual intervention:</p>
+  <p>The system runs automated jobs every 5 minutes to handle trips and reminders without manual intervention:</p>
 
   <div class="card-grid">
     <div class="card">
+      <div class="card-title">🚫 Auto-Cancel</div>
+      <div class="card-desc">If a driver does not tap <strong>Start Trip</strong> within 15 minutes of being assigned, the booking is automatically cancelled. The passenger, driver, and coordinator are all notified.</div>
+    </div>
+    <div class="card">
       <div class="card-title">⏰ Auto-Complete</div>
-      <div class="card-desc">If a driver forgets to mark a trip as completed, the system automatically closes it after the expected end time has passed. A notification is sent to both parties.</div>
+      <div class="card-desc">If a driver forgets to mark a trip as completed, the system automatically closes it after the calculated end time passes. A notification is sent to the staff and coordinator.</div>
     </div>
     <div class="card">
       <div class="card-title">🔔 15-Minute Reminder</div>
       <div class="card-desc">Sent to both staff and driver 15 minutes before the scheduled departure time, so everyone is prepared.</div>
     </div>
     <div class="card">
-      <div class="card-title">🚨 Start Reminder</div>
-      <div class="card-desc">Sent to the driver at exactly the scheduled departure time if the trip has not yet been started.</div>
-    </div>
-    <div class="card">
       <div class="card-title">⚠️ Overdue Alert</div>
-      <div class="card-desc">If a trip is significantly past its start time and still not started, the coordinator is alerted so they can intervene.</div>
+      <div class="card-desc">If a trip is significantly past its start time and still not started, the driver and coordinator are alerted so they can intervene.</div>
     </div>
+  </div>
+
+  <h3>Trip Window Formula</h3>
+  <p>When a booking is created, the system calculates an <strong>auto_complete_at</strong> timestamp that defines when the driver's slot ends and the next booking can begin. This is computed once at booking time and never changes after that.</p>
+
+  <div class="screen-box">
+    <div class="screen-title">📐 Booking Window Calculation</div>
+    <p style="font-family:monospace;font-size:12px;line-height:1.8;margin:0;">
+      <strong>auto_complete_at</strong> =<br/>
+      &nbsp;&nbsp;scheduled_at<br/>
+      &nbsp;&nbsp;+ travel time (pickup → destination)<br/>
+      &nbsp;&nbsp;+ return time (destination → pickup)<br/>
+      &nbsp;&nbsp;+ wait_minutes &nbsp;&nbsp;&nbsp;&nbsp;<em style="font-family:sans-serif;font-size:11px;">(WAITING trips only; 0 for DROP)</em><br/>
+      &nbsp;&nbsp;+ 30 min buffer
+    </p>
+  </div>
+
+  <p>Travel times are calculated using real road routes (OSRM). The 30-minute buffer accounts for boarding, delays, and the driver returning to base. Two bookings for the same taxi conflict if their windows overlap — the system rejects a new booking if <code>scheduled_at &lt; existing.auto_complete_at</code>.</p>
+
+  <div class="info-box note">
+    <div class="info-icon">ℹ️</div>
+    <div class="info-content"><strong>Window is fixed at creation</strong>The auto_complete_at time is set when the booking is created and is never recalculated — even when the driver taps Start Trip. This prevents the window from shifting and invalidating bookings that were already scheduled after this one.</div>
   </div>
 
   <div class="info-box tip">

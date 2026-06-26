@@ -24,47 +24,24 @@ interface Props { userId: string }
 
 export default function DriverTripAlert({ userId }: Props) {
   const supabase = createClient()
-  const [overdueTrips,  setOverdueTrips]  = useState<UrgentBooking[]>([])
-  const [pendingTrips,  setPendingTrips]  = useState<UrgentBooking[]>([])
-  const [upcomingTrips, setUpcomingTrips] = useState<UrgentBooking[]>([])
-  const [processing,    setProcessing]    = useState<string | null>(null)
-  const [overdueIdx,    setOverdueIdx]    = useState(0)
-  const [pendingIdx,    setPendingIdx]    = useState(0)
+  const [overdueTrips, setOverdueTrips] = useState<UrgentBooking[]>([])
+  const [processing,   setProcessing]   = useState<string | null>(null)
+  const [overdueIdx,   setOverdueIdx]   = useState(0)
 
   async function load() {
     const { data: taxi } = await supabase
       .from('taxis').select('id').eq('driver_id', userId).single()
     if (!taxi) return
 
-    const now = new Date()
-
-    // 1. Overdue — booked but not started, with 10 min grace period
-    // Grace period avoids false alarms while driver is en route to pickup
-    const overdueThreshold = new Date(now.getTime() - 10 * 60 * 1000)
+    const overdueThreshold = new Date(Date.now() - 10 * 60 * 1000)
     const { data: overdue } = await supabase
       .from('booking_details').select('*')
       .eq('taxi_id', taxi.id).eq('status', 'booked')
       .lte('scheduled_at', overdueThreshold.toISOString())
       .order('scheduled_at', { ascending: true })
 
-    // 2. Pending driver approval — needs accept/decline
-    const { data: pending } = await supabase
-      .from('booking_details').select('*')
-      .eq('taxi_id', taxi.id).eq('status', 'pending_driver_approval')
-      .order('scheduled_at', { ascending: true })
-
-    // 3. Upcoming confirmed (for warning on pending)
-    const { data: upcoming } = await supabase
-      .from('booking_details').select('*')
-      .eq('taxi_id', taxi.id).eq('status', 'booked')
-      .gt('scheduled_at', now.toISOString())
-      .order('scheduled_at', { ascending: true })
-
-    setOverdueTrips(overdue  || [])
-    setPendingTrips(pending  || [])
-    setUpcomingTrips(upcoming || [])
+    setOverdueTrips(overdue || [])
     setOverdueIdx(0)
-    setPendingIdx(0)
   }
 
   useEffect(() => {
@@ -97,27 +74,7 @@ export default function DriverTripAlert({ userId }: Props) {
     setProcessing(null)
   }
 
-  async function respond(bookingId: string, action: 'accept' | 'decline') {
-    setProcessing(bookingId)
-    const token = await getToken()
-    const res = await fetch(`/api/bookings/${bookingId}/respond`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ action }),
-    })
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}))
-      alert('Error: ' + (d.error || 'Failed'))
-    }
-    await load()
-    setProcessing(null)
-  }
-
-  // Show overdue first (cannot dismiss), then pending (can accept/decline)
-  const showOverdue  = overdueTrips.length > 0
-  const showPending  = !showOverdue && pendingTrips.length > 0
-
-  if (!showOverdue && !showPending) return null
+  if (overdueTrips.length === 0) return null
 
   return (
     <>
@@ -128,22 +85,13 @@ export default function DriverTripAlert({ userId }: Props) {
       <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 201 }}>
         <div style={{ background: '#ffffff', borderRadius: 20, width: '100%', maxWidth: 360, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
 
-          {showOverdue && <OverdueCard
+          <OverdueCard
             trips={overdueTrips}
             idx={overdueIdx}
             setIdx={setOverdueIdx}
             processing={processing}
             onStart={startTrip}
-          />}
-
-          {showPending && <PendingCard
-            trips={pendingTrips}
-            idx={pendingIdx}
-            setIdx={setPendingIdx}
-            upcomingTrips={upcomingTrips}
-            processing={processing}
-            onRespond={respond}
-          />}
+          />
 
         </div>
       </div>
@@ -192,103 +140,6 @@ function OverdueCard({ trips, idx, setIdx, processing, onStart }: {
         <p style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', margin: '10px 0 0' }}>
           Cannot dismiss — start the trip to close this
         </p>
-      </div>
-    </>
-  )
-}
-
-// ── PENDING card — accept or decline ──────────────────────
-function PendingCard({ trips, idx, setIdx, upcomingTrips, processing, onRespond }: {
-  trips: UrgentBooking[]
-  idx: number
-  setIdx: (i: number) => void
-  upcomingTrips: UrgentBooking[]
-  processing: string | null
-  onRespond: (id: string, action: 'accept' | 'decline') => void
-}) {
-  const trip = trips[idx]
-  if (!trip) return null
-
-  const isNow        = new Date(trip.scheduled_at) <= new Date(Date.now() + 5 * 60000)
-  const scheduledAt  = new Date(trip.scheduled_at)
-
-  // Warn about upcoming bookings that might conflict
-  // Find ALL upcoming trips that could conflict (within 4 hours)
-  const conflicts = upcomingTrips.filter(u => {
-    const diff = (new Date(u.scheduled_at).getTime() - scheduledAt.getTime()) / 60000
-    return diff > 0 && diff < 240 // within 4 hours
-  }).sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
-
-  const conflictWarning = conflicts[0] // nearest conflict
-
-  return (
-    <>
-      {/* Header */}
-      <div style={{ background: isNow ? '#006064' : '#2563EB', padding: '20px 20px 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-          <span style={{ fontSize: 24 }}>{isNow ? '⚡' : '🚗'}</span>
-          <div>
-            <p style={{ fontSize: 16, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.3px' }}>
-              {isNow ? 'New trip — RIGHT NOW' : 'New trip assigned'}
-            </p>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', margin: 0 }}>
-              {isNow
-                ? 'Accept if you can make it back in time'
-                : format(scheduledAt, 'EEE d MMM · HH:mm', { locale: idLocale })}
-            </p>
-          </div>
-        </div>
-        <Dots count={trips.length} current={idx} onSelect={setIdx} />
-      </div>
-
-      <TripBody trip={trip} />
-
-      {/* Conflict warnings — show all upcoming trips that could conflict */}
-      {conflicts.length > 0 && (
-        <div style={{ margin: '0 20px 16px' }}>
-          <div style={{ padding: '10px 14px', background: '#ffdeac', border: '1px solid #FCD34D', borderRadius: 12 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: '#7e5700', margin: '0 0 8px' }}>
-              ⚠ Upcoming schedule conflict{conflicts.length > 1 ? 's' : ''}
-            </p>
-            {conflicts.map((u, i) => {
-              const diffMin = Math.round((new Date(u.scheduled_at).getTime() - new Date(trip.scheduled_at).getTime()) / 60000)
-              const uIsWait = u.trip_type === 'WAITING'
-              return (
-                <div key={u.id} style={{ paddingTop: i > 0 ? 6 : 0, marginTop: i > 0 ? 6 : 0, borderTop: i > 0 ? '1px solid #FDE68A' : 'none' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: '#7e5700', margin: 0 }}>
-                      {format(new Date(u.scheduled_at), 'HH:mm')} — {u.destination}
-                    </p>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#7e5700', background: '#FDE68A', padding: '1px 7px', borderRadius: 9999 }}>
-                      in {diffMin}min
-                    </span>
-                  </div>
-                  <p style={{ fontSize: 11, color: '#7e5700', margin: '2px 0 0' }}>
-                    {uIsWait ? `⏱ Waiting ${u.wait_minutes}min` : '→ Drop'} · Decline if you can't make it back
-                  </p>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Actions */}
-      <div style={{ padding: '0 20px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        <button
-          onClick={() => onRespond(trip.id, 'decline')}
-          disabled={processing === trip.id}
-          style={{ padding: '13px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FECACA', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'system-ui' }}
-        >
-          Decline
-        </button>
-        <button
-          onClick={() => onRespond(trip.id, 'accept')}
-          disabled={processing === trip.id}
-          style={{ padding: '13px', background: '#065F46', color: '#fff', border: 'none', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'system-ui' }}
-        >
-          {processing === trip.id ? '...' : 'Accept'}
-        </button>
       </div>
     </>
   )

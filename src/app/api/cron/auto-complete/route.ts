@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     const admin = createAdminClient()
     const now   = new Date()
     const results = {
+      auto_cancelled:   0,
       auto_completed:   0,
       reminded_15min:   0,
       reminded_start:   0,
@@ -32,11 +33,66 @@ export async function GET(request: NextRequest) {
       notified_coord:   0,
     }
 
-    // ── 1. AUTO-COMPLETE overdue bookings ──────────────────
+    // ── 0. AUTO-CANCEL bookings not started 15+ min after assigned_at ──
+    // Window: driver must press "Start trip" within 15 min of being assigned
+    const cancelCutoff = new Date(now.getTime() - 15 * 60 * 1000)
+    const { data: notStarted } = await admin
+      .from('bookings')
+      .select('id, passenger_id, destination, taxi_id, taxis!taxi_id(driver_id)')
+      .eq('status', 'booked')
+      .not('assigned_at', 'is', null)
+      .lt('assigned_at', cancelCutoff.toISOString())
+
+    if (notStarted?.length) {
+      const ids = notStarted.map((b: any) => b.id)
+      await admin.from('bookings').update({
+        status:           'cancelled',
+        rejection_reason: 'Driver did not start trip within 15 minutes of scheduled time',
+      }).in('id', ids)
+
+      const { data: coordinators } = await admin
+        .from('users').select('id').eq('role', 'coordinator').eq('is_active', true)
+
+      const cancelNotifs: any[] = []
+      for (const b of notStarted as any[]) {
+        cancelNotifs.push({
+          user_id:    b.passenger_id,
+          booking_id: b.id,
+          title:      'Trip auto-cancelled',
+          body:       `Your trip to ${b.destination} was cancelled — driver did not start on time.`,
+          type:       'booking_cancelled',
+          url:        '/staff/home',
+        })
+        if (b.taxis?.driver_id) {
+          cancelNotifs.push({
+            user_id:    b.taxis.driver_id,
+            booking_id: b.id,
+            title:      'Trip auto-cancelled',
+            body:       `Trip to ${b.destination} was auto-cancelled. You did not start within 15 min of the scheduled time.`,
+            type:       'booking_cancelled',
+            url:        '/driver/home',
+          })
+        }
+        for (const c of (coordinators || []) as any[]) {
+          cancelNotifs.push({
+            user_id:    c.id,
+            booking_id: b.id,
+            title:      'Trip auto-cancelled',
+            body:       `Booking to ${b.destination} was auto-cancelled — driver did not start within 15 min of scheduled time.`,
+            type:       'booking_cancelled',
+            url:        '/coordinator/home',
+          })
+        }
+      }
+      if (cancelNotifs.length) await notify(cancelNotifs)
+      results.auto_cancelled = notStarted.length
+    }
+
+    // ── 1. AUTO-COMPLETE trips that have been started but not finished ──
     const { data: overdueBookings } = await admin
       .from('bookings')
       .select('id, passenger_id, destination, taxi_id, taxis!taxi_id(driver_id)')
-      .in('status', ['booked', 'on_trip', 'waiting_trip'])
+      .in('status', ['on_trip', 'waiting_trip'])
       .lt('auto_complete_at', now.toISOString())
 
     if (overdueBookings?.length) {
@@ -44,6 +100,7 @@ export async function GET(request: NextRequest) {
       await admin.from('bookings').update({
         status:       'completed',
         completed_at: now.toISOString(),
+        completed_by: 'system',
       }).in('id', ids)
 
       // Notify passengers + drivers

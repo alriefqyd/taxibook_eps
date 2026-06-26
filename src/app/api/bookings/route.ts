@@ -33,20 +33,44 @@ export async function POST(request: NextRequest) {
       ? requestedPassengerId
       : user.id
 
-    // ── Compute auto_complete_at from actual route duration (OSRM) ──
-    const MARGIN_S  = 10 * 60   // 10 min margin
+    // ── Compute auto_complete_at: pickup→destination + destination→pickup + wait + 30 min ──
+    // Window covers the full round trip so the driver isn't double-booked until back at base.
+    const MARGIN_S   = 30 * 60   // 30 min buffer
     const FALLBACK_S = 2 * 3600  // 2h fallback when route unavailable
-    const waitSec   = trip_type === 'WAITING' ? (wait_minutes || 0) * 60 : 0
+    const waitSec    = trip_type === 'WAITING' ? (wait_minutes || 0) * 60 : 0
 
     let routeSec = FALLBACK_S
     if (pickup_lat && pickup_lng && destination_lat && destination_lng) {
-      const osrm = await getRouteDurationSeconds(pickup_lat, pickup_lng, destination_lat, destination_lng)
-      if (osrm != null) routeSec = osrm
+      const [forward, back] = await Promise.all([
+        getRouteDurationSeconds(pickup_lat, pickup_lng, destination_lat, destination_lng),
+        getRouteDurationSeconds(destination_lat, destination_lng, pickup_lat, pickup_lng),
+      ])
+      if (forward != null && back != null) routeSec = forward + back
+      else if (forward != null)            routeSec = forward * 2  // mirror if return leg fails
     }
 
     const auto_complete_at = new Date(
       new Date(scheduled_at).getTime() + (routeSec + MARGIN_S + waitSec) * 1000
     ).toISOString()
+
+    // ── Passenger overlap check (server-side guard) ──
+    const { data: passengerConflict } = await admin
+      .from('bookings')
+      .select('booking_code, scheduled_at, destination')
+      .eq('passenger_id', passengerId)
+      .not('status', 'in', '("rejected","cancelled","completed")')
+      .lt('scheduled_at', auto_complete_at)
+      .gt('auto_complete_at', scheduled_at)
+      .limit(1)
+      .maybeSingle()
+
+    if (passengerConflict) {
+      const t = new Date(passengerConflict.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      return NextResponse.json(
+        { error: `Passenger already has a booking at ${t} to ${passengerConflict.destination} that overlaps this trip.` },
+        { status: 409 }
+      )
+    }
 
     // ── Insert booking ──
     const { data: inserted, error: insertError } = await admin
@@ -88,8 +112,9 @@ export async function POST(request: NextRequest) {
     const booking = inserted
 
     // ── Auto-assign if submitted ──
+    // Use the DB-returned auto_complete_at — the trigger may have adjusted it
     if (status === 'submitted') {
-      const result = await autoAssign(admin, booking.id, scheduled_at)
+      const result = await autoAssign(admin, booking.id, booking.scheduled_at, booking.auto_complete_at)
 
       if (result.taxi) {
         // Notify driver
@@ -143,7 +168,7 @@ export async function POST(request: NextRequest) {
 }
 
 // ── Auto-assign: fewest trips today + longest idle tiebreaker ────────────────
-async function autoAssign(admin: any, bookingId: string, scheduledAt: string) {
+async function autoAssign(admin: any, bookingId: string, scheduledAt: string, autoCompleteAt: string) {
   const scheduledTime = new Date(scheduledAt)
   const now           = new Date()
   const isNowBooking  = (scheduledTime.getTime() - now.getTime()) < 5 * 60 * 1000 // within 5 min = "now"
@@ -167,8 +192,7 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string) {
       let isFree = false
 
       if (isNowBooking) {
-        // NOW booking: check if driver is physically free RIGHT NOW
-        // Free = no booking currently active (scheduled_at <= now AND auto_complete_at >= now)
+        // NOW booking: no active trip overlapping right now
         const { data: currentTrip } = await admin
           .from('bookings')
           .select('id')
@@ -181,18 +205,19 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string) {
 
         isFree = !currentTrip
       } else {
-        // SCHEDULED booking: check if driver is free at that future time
+        // SCHEDULED booking: interval intersection — existing starts before new ends AND existing ends after new starts
         const { data: conflict } = await admin
           .from('bookings')
-          .select('auto_complete_at')
+          .select('id')
           .eq('taxi_id', taxi.id)
           .in('status', ['booked', 'on_trip', 'waiting_trip'])
-          .gt('auto_complete_at', scheduledTime.toISOString())
+          .neq('id', bookingId)
+          .lt('scheduled_at', autoCompleteAt)
+          .gt('auto_complete_at', scheduledAt)
           .limit(1)
           .maybeSingle()
 
-        const freeAt = conflict ? new Date(conflict.auto_complete_at) : new Date(0)
-        isFree = freeAt <= scheduledTime
+        isFree = !conflict
       }
 
       if (!isFree) return null
@@ -233,11 +258,17 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string) {
 
   const best = available[0].taxi
 
-  // Assign directly — no driver confirmation step
-  await admin
+  // Assign — the DB exclusion constraint (no_driver_overlap) is the final guard against race conditions
+  const { error: assignErr } = await admin
     .from('bookings')
-    .update({ taxi_id: best.id, status: 'booked' })
+    .update({ taxi_id: best.id, status: 'booked', assigned_at: new Date().toISOString() })
     .eq('id', bookingId)
+
+  if (assignErr) {
+    // 23P01 = exclusion constraint violation (race condition: another booking was assigned to this taxi first)
+    console.warn('autoAssign conflict on assignment:', assignErr.code, assignErr.message)
+    return { taxi: null }
+  }
 
   return {
     taxi: {

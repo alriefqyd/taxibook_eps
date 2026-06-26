@@ -40,8 +40,8 @@ function SuccessContent() {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px', borderBottom: isAssigned ? '1px solid #F0EEE8' : 'none' }}>
             <span style={{ fontSize: '12px', color: '#3f4949' }}>Status</span>
-            <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: isAssigned ? '#FEF3C7' : '#DBEAFE', color: isAssigned ? '#92400E' : '#1E3A5F' }}>
-              {isAssigned ? 'Awaiting driver' : 'Submitted'}
+            <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: isAssigned ? '#D1FAE5' : '#DBEAFE', color: isAssigned ? '#065F46' : '#1E3A5F' }}>
+              {isAssigned ? 'Booked' : 'Submitted'}
             </span>
           </div>
           {isAssigned && (
@@ -54,9 +54,9 @@ function SuccessContent() {
 
         {/* Info box */}
         {isAssigned ? (
-          <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', padding: '12px 14px', marginBottom: '20px' }}>
-            <p style={{ fontSize: '12px', color: '#92400E', margin: 0 }}>
-              Driver will accept or decline the trip. You will be notified once confirmed.
+          <div style={{ background: '#D1FAE5', border: '1px solid #6EE7B7', borderRadius: '10px', padding: '12px 14px', marginBottom: '20px' }}>
+            <p style={{ fontSize: '12px', color: '#065F46', margin: 0 }}>
+              A driver has been assigned to your trip. You will be notified when the trip starts.
             </p>
           </div>
         ) : (

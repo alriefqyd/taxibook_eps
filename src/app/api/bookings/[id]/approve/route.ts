@@ -57,7 +57,6 @@ export async function POST(
       // Auto-assign
       const todayStart = new Date()
       todayStart.setHours(0, 0, 0, 0)
-      const scheduledTime = new Date(booking.scheduled_at)
 
       const { data: taxis } = await admin
         .from('taxis')
@@ -71,16 +70,18 @@ export async function POST(
       if (taxis?.length) {
         const avail = await Promise.all(
           taxis.map(async (taxi: any) => {
-            const { data: last } = await admin
+            // Interval intersection: conflict if existing starts before new ends AND existing ends after new starts
+            const { data: conflict } = await admin
               .from('bookings')
-              .select('auto_complete_at')
+              .select('id')
               .eq('taxi_id', taxi.id)
-              .in('status', ['booked','on_trip','waiting_trip','pending_driver_approval'])
-              .order('auto_complete_at', { ascending: false })
+              .in('status', ['booked', 'on_trip', 'waiting_trip'])
+              .lt('scheduled_at', booking.auto_complete_at)
+              .gt('auto_complete_at', booking.scheduled_at)
               .limit(1)
               .maybeSingle()
 
-            const freeAt = last ? new Date(last.auto_complete_at) : new Date(0)
+            if (conflict) return null
 
             const { count: trips } = await admin
               .from('bookings')
@@ -89,48 +90,67 @@ export async function POST(
               .eq('status', 'completed')
               .gte('completed_at', todayStart.toISOString())
 
-            return { taxi, freeAt, tripsToday: trips || 0 }
+            // Last completion time for idle tiebreaker
+            const { data: lastBooking } = await admin
+              .from('bookings')
+              .select('auto_complete_at')
+              .eq('taxi_id', taxi.id)
+              .in('status', ['completed', 'booked', 'on_trip', 'waiting_trip'])
+              .order('auto_complete_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
+            const idleSince = lastBooking ? new Date(lastBooking.auto_complete_at).getTime() : 0
+
+            return { taxi, tripsToday: trips || 0, idleSince }
           })
         )
 
         const candidates = avail
-          .filter(({ freeAt }: any) => freeAt <= scheduledTime)
-          .sort((a, b) => {
+          .filter(Boolean)
+          .sort((a: any, b: any) => {
             if (a.tripsToday !== b.tripsToday) return a.tripsToday - b.tripsToday
-            return a.freeAt.getTime() - b.freeAt.getTime()
-          })
+            return a.idleSince - b.idleSince
+          }) as any[]
 
         if (candidates.length) {
-          // Pick best — fewest trips then longest idle
           assignedTaxi = candidates[0].taxi
-          await admin.from('bookings').update({
-            taxi_id: assignedTaxi.id,
-            status:  'pending_driver_approval',
+          const { error: assignErr } = await admin.from('bookings').update({
+            taxi_id:     assignedTaxi.id,
+            status:      'booked',
+            assigned_at: new Date().toISOString(),
           }).eq('id', bookingId)
 
-          // Notify driver
-          const { data: passenger } = await admin
-            .from('users').select('name').eq('id', booking.passenger_id).single()
-          const time = new Date(booking.scheduled_at).toLocaleTimeString('id-ID', {
-            hour: '2-digit', minute: '2-digit'
-          })
+          if (assignErr) {
+            console.warn('approve autoAssign conflict:', assignErr.code, assignErr.message)
+            assignedTaxi = null
+          }
 
-          await notify({
-            user_id:    assignedTaxi.driver_id,
-            booking_id: bookingId,
-            title:      'New trip assigned',
-            body:       `${passenger?.name} → ${booking.destination} at ${time}`,
-            type:       'driver_assigned',
-          })
+          if (assignedTaxi) {
+            // Notify driver
+            const { data: passenger } = await admin
+              .from('users').select('name').eq('id', booking.passenger_id).single()
+            const time = new Date(booking.scheduled_at).toLocaleTimeString('id-ID', {
+              hour: '2-digit', minute: '2-digit'
+            })
 
-          // Notify passenger
-          await notify({
-            user_id:    booking.passenger_id,
-            booking_id: bookingId,
-            title:      '✅ Trip approved!',
-            body:       `Your trip to ${booking.destination} is approved. ${assignedTaxi.name} will confirm shortly.`,
-            type:       'booking_confirmed',
-          })
+            await notify({
+              user_id:    assignedTaxi.driver_id,
+              booking_id: bookingId,
+              title:      'New trip assigned',
+              body:       `${passenger?.name} → ${booking.destination} at ${time}`,
+              type:       'driver_assigned',
+            })
+
+            // Notify passenger
+            await notify({
+              user_id:    booking.passenger_id,
+              booking_id: bookingId,
+              title:      '✅ Trip approved!',
+              body:       `Your trip to ${booking.destination} is approved and a driver has been assigned.`,
+              type:       'booking_confirmed',
+            })
+          }
         }
       }
 

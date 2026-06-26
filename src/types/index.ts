@@ -7,7 +7,6 @@ export type TripType = 'DROP' | 'WAITING'
 export type BookingStatus =
   | 'submitted'
   | 'pending_coordinator_approval'
-  | 'pending_driver_approval'
   | 'booked'
   | 'on_trip'
   | 'waiting_trip'
@@ -19,8 +18,8 @@ export type NotificationType =
   | 'booking_confirmed'
   | 'booking_rejected'
   | 'booking_reassigned'
+  | 'booking_cancelled'
   | 'driver_assigned'
-  | 'driver_declined'
   | 'trip_completed'
   | 'needs_approval'
   | 'driver_reassigned'
@@ -83,8 +82,10 @@ export interface Booking {
   status: BookingStatus
   rejection_reason: string | null
   auto_complete_at: string | null
-  completed_at: string | null
-  created_by: string | null
+  assigned_at:      string | null
+  completed_at:     string | null
+  completed_by:     'driver' | 'coordinator' | 'system' | null
+  created_by:       string | null
   created_at: string
   updated_at: string
   pickup_lat: number | null
@@ -138,7 +139,6 @@ export interface PushSubscription {
 export const STATUS_LABELS: Record<BookingStatus, string> = {
   submitted:                      'Submitted',
   pending_coordinator_approval:   'Needs approval',
-  pending_driver_approval:        'Awaiting driver',
   booked:                         'Booked',
   on_trip:                        'On trip',
   waiting_trip:                   'Waiting',
@@ -152,7 +152,6 @@ export const STATUS_COLORS: Record<BookingStatus, {
 }> = {
   submitted:                      { bg: '#DBEAFE', text: '#1E3A5F', border: '#93C5FD' },
   pending_coordinator_approval:   { bg: '#FEF3C7', text: '#92400E', border: '#FCD34D' },
-  pending_driver_approval:        { bg: '#FEF3C7', text: '#92400E', border: '#FCD34D' },
   booked:                         { bg: '#D1FAE5', text: '#065F46', border: '#6EE7B7' },
   on_trip:                        { bg: '#D1FAE5', text: '#065F46', border: '#6EE7B7' },
   waiting_trip:                   { bg: '#EDE9FE', text: '#4C1D95', border: '#C4B5FD' },

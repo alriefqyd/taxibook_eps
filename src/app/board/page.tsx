@@ -38,7 +38,7 @@ export default function BoardPage() {
   const loadData = useCallback(async () => {
     const [{ data: bks }, { data: txs }] = await Promise.all([
       supabase.from('booking_details').select('*')
-        .in('status', ['booked','on_trip','waiting_trip','pending_driver_approval','submitted','pending_coordinator_approval','completed'])
+        .in('status', ['booked','on_trip','waiting_trip','submitted','pending_coordinator_approval','completed'])
         .order('scheduled_at', { ascending: true }),
       supabase.from('taxis').select('*, users!driver_id(name)')
         .eq('is_active', true).order('name'),

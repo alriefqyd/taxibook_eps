@@ -198,21 +198,6 @@ export async function notifyDriverReassigned(
   })
 }
 
-export async function notifyDriverDeclined(
-  bookingId: string,
-  coordinatorIds: string[],
-  driverName: string,
-  destination: string
-) {
-  await sendNotification({
-    userIds: coordinatorIds,
-    title: 'Driver declined a trip',
-    body: `${driverName} declined trip to ${destination}. Please reassign.`,
-    type: 'driver_declined',
-    bookingId,
-    url: '/coordinator/home',
-  })
-}
 
 export async function notifyTripCompleted(
   bookingId: string,

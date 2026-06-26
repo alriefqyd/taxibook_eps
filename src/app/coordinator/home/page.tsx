@@ -23,17 +23,17 @@ interface TaxiRow {
   driver_id: string | null
   driver_name: string | null
   trips_today: number
-  declines_today: number
 }
 
 export default function CoordinatorHomePage() {
   const router   = useRouter()
   const supabase = createClient()
 
-  const [user,       setUser]       = useState<User | null>(null)
-  const [bookings,   setBookings]   = useState<BookingDetail[]>([])
-  const [taxis,      setTaxis]      = useState<TaxiRow[]>([])
-  const [loading,    setLoading]    = useState(true)
+  const [user,             setUser]             = useState<User | null>(null)
+  const [bookings,         setBookings]         = useState<BookingDetail[]>([])
+  const [calendarBookings, setCalendarBookings] = useState<BookingDetail[]>([])
+  const [taxis,            setTaxis]            = useState<TaxiRow[]>([])
+  const [loading,          setLoading]          = useState(true)
   const [view,        setView]        = useState<'list' | 'calendar'>('list')
   const [filter,     setFilter]     = useState<'all' | 'pending' | 'booked' | 'completed'>('all')
   const [rejectId,   setRejectId]   = useState<string | null>(null)
@@ -75,7 +75,8 @@ export default function CoordinatorHomePage() {
     const todayStart = parseDate(from); todayStart.setHours(0, 0, 0, 0)
     const todayEnd   = parseDate(to);   todayEnd.setHours(23, 59, 59, 999)
 
-    const [{ data: bks }, { data: txs }] = await Promise.all([
+    const [{ data: bks }, { data: allBks }, { data: txs }] = await Promise.all([
+      // Paginated list for the Bookings tab
       supabase
         .from('booking_details')
         .select('*')
@@ -84,6 +85,15 @@ export default function CoordinatorHomePage() {
         .not('status', 'in', '("cancelled","rejected")')
         .order('scheduled_at', { ascending: true })
         .range(pageNum * 10, pageNum * 10 + 9),
+      // Full list (no limit) for the Calendar tab
+      supabase
+        .from('booking_details')
+        .select('*')
+        .gte('scheduled_at', todayStart.toISOString())
+        .lt('scheduled_at', todayEnd.toISOString())
+        .not('status', 'in', '("cancelled","rejected")')
+        .order('scheduled_at', { ascending: true })
+        .limit(500),
       supabase
         .from('taxis')
         .select('*, users!driver_id(name)')
@@ -94,20 +104,12 @@ export default function CoordinatorHomePage() {
 
     const enriched = await Promise.all(
       (txs || []).map(async (t: any) => {
-        const [{ count: trips }, { count: declines }] = await Promise.all([
-          supabase
-            .from('bookings')
-            .select('id', { count: 'exact', head: true })
-            .eq('taxi_id', t.id)
-            .eq('status', 'completed')
-            .gte('completed_at', todayStart.toISOString()),
-          supabase
-            .from('booking_responses')
-            .select('id', { count: 'exact', head: true })
-            .eq('taxi_id', t.id)
-            .eq('response', 'declined')
-            .gte('responded_at', todayStart.toISOString()),
-        ])
+        const { count: trips } = await supabase
+          .from('bookings')
+          .select('id', { count: 'exact', head: true })
+          .eq('taxi_id', t.id)
+          .eq('status', 'completed')
+          .gte('completed_at', todayStart.toISOString())
         return {
           id:           t.id,
           name:         t.name,
@@ -117,13 +119,13 @@ export default function CoordinatorHomePage() {
           driver_id:    t.driver_id,
           driver_name:  t.users?.name || null,
           trips_today:  trips || 0,
-          declines_today: declines || 0,
         }
       })
     )
 
     const newBks = bks || []
     setBookings(prev => append ? [...prev, ...newBks] : newBks)
+    setCalendarBookings(allBks || [])
     setHasMore(newBks.length === 10)
     setTaxis(enriched)
   }, [supabase])
@@ -202,6 +204,19 @@ export default function CoordinatorHomePage() {
     })
     setRejectId(null)
     setRejectNote('')
+    await loadData(dateFrom, dateTo, 0, false)
+    setProcessing(null)
+  }
+
+  async function handleCancel(bookingId: string) {
+    if (!confirm('Cancel this booking?')) return
+    setProcessing(bookingId)
+    const token = await getToken()
+    await fetch(`/api/bookings/${bookingId}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ reason: '' }),
+    })
     await loadData(dateFrom, dateTo, 0, false)
     setProcessing(null)
   }
@@ -340,7 +355,7 @@ export default function CoordinatorHomePage() {
                   </p>
                 </div>
                 {pendingApproval.map(b => (
-                  <BookingCard key={b.id} booking={b} isProcessing={processing === b.id} onApprove={() => handleApprove(b.id)} onReject={() => setRejectId(b.id)} onReassign={() => router.push('/coordinator/dispatch')} />
+                  <BookingCard key={b.id} booking={b} isProcessing={processing === b.id} onApprove={() => handleApprove(b.id)} onReject={() => setRejectId(b.id)} onReassign={() => router.push('/coordinator/dispatch')} onCancel={b.created_by === user?.id ? () => handleCancel(b.id) : undefined} />
                 ))}
                 <div style={{ height: 1, background: 'rgba(0,0,0,0.08)', margin: '14px 0 16px' }} />
               </div>
@@ -352,7 +367,7 @@ export default function CoordinatorHomePage() {
               <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 10, paddingBottom: 2 }}>
                 {([
                   { key: 'all',       label: 'All',       count: mainBookings.length },
-                  { key: 'pending',   label: 'Pending',   count: mainBookings.filter(b=>['submitted','pending_driver_approval'].includes(b.status)).length },
+                  { key: 'pending',   label: 'Pending',   count: mainBookings.filter(b=>b.status==='submitted').length },
                   { key: 'booked',    label: 'Confirmed', count: mainBookings.filter(b=>['booked','on_trip','waiting_trip'].includes(b.status)).length },
                   { key: 'completed', label: 'Done',      count: mainBookings.filter(b=>b.status==='completed').length },
                 ] as const).map(f => (
@@ -405,6 +420,7 @@ export default function CoordinatorHomePage() {
                       onApprove={() => handleApprove(b.id)}
                       onReject={() => setRejectId(b.id)}
                       onReassign={() => router.push('/coordinator/dispatch')}
+                      onCancel={b.created_by === user?.id ? () => handleCancel(b.id) : undefined}
                     />
                   ))}
                   {hasMore && (
@@ -430,7 +446,7 @@ export default function CoordinatorHomePage() {
         {/* ── CALENDAR TAB ── */}
         {view === 'calendar' && (
           <div style={{ margin: '0 -16px' }}>
-            <GanttCalendar bookings={bookings} taxis={taxis} showCompleted />
+            <GanttCalendar bookings={calendarBookings} taxis={taxis} showCompleted />
           </div>
         )}
 
@@ -470,17 +486,7 @@ export default function CoordinatorHomePage() {
                     <p style={{ fontSize: '10px', color: '#9ca3af', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Trips today</p>
                     <p style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>{t.trips_today}</p>
                   </div>
-                  <div style={{ background: t.declines_today >= 2 ? '#FEE2E2' : 'rgba(0,0,0,0.04)', borderRadius: '8px', padding: '6px 10px', flex: 1, textAlign: 'center' }}>
-                    <p style={{ fontSize: '10px', color: t.declines_today >= 2 ? '#991B1B' : '#9ca3af', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Declines</p>
-                    <p style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: t.declines_today >= 2 ? '#991B1B' : '#006064' }}>{t.declines_today}</p>
-                  </div>
                 </div>
-
-                {t.declines_today >= 2 && (
-                  <p style={{ fontSize: '11px', color: '#991B1B', margin: '8px 0 0', background: '#ffdad6', padding: '6px 10px', borderRadius: '6px' }}>
-                    ⚠ {t.driver_name} has declined {t.declines_today} trips today. Consider marking unavailable.
-                  </p>
-                )}
               </div>
             ))}
           </div>
@@ -520,15 +526,17 @@ export default function CoordinatorHomePage() {
 }
 
 // ── Booking card ──────────────────────────────────────────────────────────────
-function BookingCard({ booking: b, isProcessing, onApprove, onReject, onReassign }: {
+function BookingCard({ booking: b, isProcessing, onApprove, onReject, onReassign, onCancel }: {
   booking: BookingDetail
   isProcessing: boolean
   onApprove: () => void
   onReject: () => void
   onReassign?: () => void
+  onCancel?: () => void
 }) {
   const sc = STATUS_COLORS[b.status]
   const needsApproval = b.status === 'pending_coordinator_approval'
+  const canCancel = !!onCancel && ['submitted', 'pending_coordinator_approval', 'booked'].includes(b.status)
 
   return (
     <div style={{ background: '#ffffff', borderRadius: 16, padding: '14px 16px', marginBottom: 10, boxShadow: '0 2px 8px rgba(0,96,100,0.06)', border: `1px solid ${needsApproval ? 'rgba(217,119,6,0.2)' : 'rgba(0,0,0,0.06)'}`, borderLeft: `3px solid ${needsApproval ? '#d97706' : '#006064'}` }}>
@@ -572,10 +580,19 @@ function BookingCard({ booking: b, isProcessing, onApprove, onReject, onReassign
           </button>
         </div>
       )}
-      {!needsApproval && !['completed','cancelled','rejected'].includes(b.status) && onReassign && (
-        <button onClick={onReassign} style={{ width: '100%', padding: '7px', background: '#F5F5F2', color: '#6f7979', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>
-          🔄 Reassign taxi
-        </button>
+      {!needsApproval && !['completed','cancelled','rejected'].includes(b.status) && (onReassign || canCancel) && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+          {onReassign && (
+            <button onClick={onReassign} style={{ flex: 1, padding: '7px', background: '#F5F5F2', color: '#6f7979', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+              🔄 Reassign taxi
+            </button>
+          )}
+          {canCancel && (
+            <button onClick={onCancel} disabled={isProcessing} style={{ flex: onReassign ? '0 0 auto' : 1, padding: '7px 12px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+              Cancel
+            </button>
+          )}
+        </div>
       )}
     </div>
   )

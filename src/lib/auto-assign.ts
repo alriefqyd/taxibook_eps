@@ -9,63 +9,56 @@ interface AssignResult {
 
 export async function autoAssignDriver(
   bookingId: string,
-  scheduledAt: string
+  scheduledAt: string,
+  autoCompleteAt: string
 ): Promise<AssignResult> {
   const supabase = createAdminClient()
 
   try {
-    const scheduledTime = new Date(scheduledAt)
-
-    // Get all active taxis with their drivers
+    // Get all active + available taxis with drivers
     const { data: taxis, error: taxiError } = await supabase
       .from('taxis')
       .select('*, users!driver_id(id, name)')
       .eq('is_active', true)
+      .eq('is_available', true)
       .not('driver_id', 'is', null)
 
     if (taxiError || !taxis || taxis.length === 0) {
       return { success: false, error: 'No taxis available' }
     }
 
-    // For each taxi, find when they are next free
+    // For each taxi, check interval intersection: conflict if existing starts before new ends AND ends after new starts
     const taxiAvailability = await Promise.all(
       taxis.map(async (taxi: Taxi) => {
-        // Find the latest booking for this taxi that hasn't completed yet
-        const { data: lastBooking } = await supabase
+        const { data: conflict } = await supabase
           .from('bookings')
-          .select('auto_complete_at, scheduled_at')
+          .select('id')
           .eq('taxi_id', taxi.id)
-          .in('status', ['booked', 'on_trip', 'waiting_trip', 'pending_driver_approval'])
-          .order('auto_complete_at', { ascending: false })
+          .in('status', ['booked', 'on_trip', 'waiting_trip'])
+          .neq('id', bookingId)
+          .lt('scheduled_at', autoCompleteAt)
+          .gt('auto_complete_at', scheduledAt)
           .limit(1)
-          .single()
+          .maybeSingle()
 
-        const freeAt = lastBooking
-          ? new Date(lastBooking.auto_complete_at)
-          : new Date(0) // No bookings = available from epoch
-
-        return { taxi, freeAt }
+        return conflict ? null : taxi
       })
     )
 
-    // Filter taxis that are free before the booking time
-    // and sort by earliest free (first available)
-    const available = taxiAvailability
-      .filter(({ freeAt }) => freeAt <= scheduledTime)
-      .sort((a, b) => a.freeAt.getTime() - b.freeAt.getTime())
+    const available = taxiAvailability.filter(Boolean) as Taxi[]
 
     if (available.length === 0) {
       return { success: false, error: 'No driver available at that time' }
     }
 
-    const assignedTaxi = available[0].taxi
+    const assignedTaxi = available[0]
 
-    // Update booking with assigned taxi
     const { error: updateError } = await supabase
       .from('bookings')
       .update({
-        taxi_id: assignedTaxi.id,
-        status: 'pending_driver_approval',
+        taxi_id:     assignedTaxi.id,
+        status:      'booked',
+        assigned_at: new Date().toISOString(),
       })
       .eq('id', bookingId)
 
@@ -81,15 +74,16 @@ export async function autoAssignDriver(
 }
 
 export async function getAvailableTaxisForTime(
-  scheduledAt: string
+  scheduledAt: string,
+  autoCompleteAt: string
 ): Promise<string[]> {
   const supabase = createAdminClient()
-  const scheduledTime = new Date(scheduledAt)
 
   const { data: taxis } = await supabase
     .from('taxis')
     .select('id')
     .eq('is_active', true)
+    .eq('is_available', true)
     .not('driver_id', 'is', null)
 
   if (!taxis) return []
@@ -97,20 +91,17 @@ export async function getAvailableTaxisForTime(
   const available: string[] = []
 
   for (const taxi of taxis) {
-    const { data: lastBooking } = await supabase
+    const { data: conflict } = await supabase
       .from('bookings')
-      .select('auto_complete_at')
+      .select('id')
       .eq('taxi_id', taxi.id)
-      .in('status', ['booked', 'on_trip', 'waiting_trip', 'pending_driver_approval'])
-      .order('auto_complete_at', { ascending: false })
+      .in('status', ['booked', 'on_trip', 'waiting_trip'])
+      .lt('scheduled_at', autoCompleteAt)
+      .gt('auto_complete_at', scheduledAt)
       .limit(1)
-      .single()
+      .maybeSingle()
 
-    const freeAt = lastBooking
-      ? new Date(lastBooking.auto_complete_at)
-      : new Date(0)
-
-    if (freeAt <= scheduledTime) {
+    if (!conflict) {
       available.push(taxi.id)
     }
   }
