@@ -141,16 +141,12 @@ export async function POST(request: NextRequest) {
         }, { status: 201 })
       }
 
-      // No driver available — notify coordinator
-      await notifyCoordinators(admin, booking, passengerId, destination,
-        'New booking — no driver available',
-        `Please assign manually.`
+      // No driver available — delete the booking and tell the user
+      await admin.from('bookings').delete().eq('id', booking.id)
+      return NextResponse.json(
+        { error: 'No driver available at this time. Please try a different time or contact your coordinator.' },
+        { status: 409 }
       )
-
-      return NextResponse.json({
-        booking, assigned: false,
-        message: 'No driver available — coordinator will assign manually',
-      }, { status: 201 })
     }
 
     // ── Pending approval — notify coordinator ──
@@ -247,11 +243,13 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string, au
   )
 
   // Filter nulls (unavailable taxis)
+  // Primary: fewest trips today (spread load)
+  // Tiebreaker: longest idle (smallest idleSince = has been free the longest)
   const available = availability
     .filter(Boolean)
     .sort((a: any, b: any) => {
       if (a.tripsToday !== b.tripsToday) return a.tripsToday - b.tripsToday
-      return a.idleSince - b.idleSince // longest idle first
+      return a.idleSince - b.idleSince
     }) as any[]
 
   if (!available.length) return { taxi: null }

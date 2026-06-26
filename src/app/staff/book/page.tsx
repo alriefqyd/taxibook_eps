@@ -196,7 +196,7 @@ export default function BookPage() {
 
       const data = await res.json()
       if (!res.ok) {
-        setError(res.status === 409 ? 'You already have a booking at this time.' : (data.error || 'Failed to submit'))
+        setError(data.error || 'Failed to submit')
         setLoading(false); return
       }
 
