@@ -64,7 +64,8 @@ export async function POST(
       const { data: taxis } = await admin
         .from('taxis')
         .select('id, name, driver_id, users!driver_id(name)')
-        .eq('is_active', true)
+        .eq('is_active',    true)
+        .eq('is_available', true)
         .not('driver_id', 'is', null)
 
       let assignedTaxi = null

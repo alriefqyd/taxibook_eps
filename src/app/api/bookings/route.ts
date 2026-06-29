@@ -175,11 +175,12 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string, au
   const todayStart    = new Date(nowWib.getTime() - WIB_MS)
   const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
-  // All active taxis with a driver assigned
+  // Active taxis with a driver on duty (is_available = driver manually set themselves online)
   const { data: taxis } = await admin
     .from('taxis')
     .select('id, name, driver_id, users!driver_id(name)')
-    .eq('is_active', true)
+    .eq('is_active',    true)
+    .eq('is_available', true)
     .not('driver_id', 'is', null)
 
   if (!taxis?.length) return { taxi: null }
