@@ -141,9 +141,11 @@ export async function POST(request: NextRequest) {
         }, { status: 201 })
       }
 
-      // No driver available — delete the booking and tell the user
-      const { error: deleteErr } = await admin.from('bookings').delete().eq('id', booking.id)
-      if (deleteErr) console.error('Failed to delete unassigned booking:', booking.id, deleteErr)
+      // No driver available — cancel the booking so it doesn't block future attempts
+      await admin.from('bookings').update({
+        status:           'cancelled',
+        rejection_reason: 'no_driver_available',
+      }).eq('id', booking.id)
       return NextResponse.json(
         { error: 'No driver available at this time. Please try a different time or contact your coordinator.' },
         { status: 409 }

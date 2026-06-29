@@ -55,14 +55,16 @@ export async function POST(
         .eq('id', bookingId)
 
       // Auto-assign
-      const todayStart = new Date()
-      todayStart.setHours(0, 0, 0, 0)
+      const WIB_MS      = 7 * 60 * 60 * 1000
+      const nowWib      = new Date(Date.now() + WIB_MS)
+      nowWib.setUTCHours(0, 0, 0, 0)
+      const todayStart    = new Date(nowWib.getTime() - WIB_MS)
+      const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
       const { data: taxis } = await admin
         .from('taxis')
         .select('id, name, driver_id, users!driver_id(name)')
         .eq('is_active', true)
-        .eq('is_available', true)
         .not('driver_id', 'is', null)
 
       let assignedTaxi = null
@@ -70,7 +72,6 @@ export async function POST(
       if (taxis?.length) {
         const avail = await Promise.all(
           taxis.map(async (taxi: any) => {
-            // Interval intersection: conflict if existing starts before new ends AND existing ends after new starts
             const { data: conflict } = await admin
               .from('bookings')
               .select('id')
@@ -87,15 +88,16 @@ export async function POST(
               .from('bookings')
               .select('id', { count: 'exact', head: true })
               .eq('taxi_id', taxi.id)
-              .eq('status', 'completed')
-              .gte('completed_at', todayStart.toISOString())
+              .not('status', 'in', '(cancelled,rejected)')
+              .gte('scheduled_at', todayStart.toISOString())
+              .lt('scheduled_at', tomorrowStart.toISOString())
 
-            // Last completion time for idle tiebreaker
             const { data: lastBooking } = await admin
               .from('bookings')
               .select('auto_complete_at')
               .eq('taxi_id', taxi.id)
               .in('status', ['completed', 'booked', 'on_trip', 'waiting_trip'])
+              .lte('auto_complete_at', booking.scheduled_at)
               .order('auto_complete_at', { ascending: false })
               .limit(1)
               .maybeSingle()
