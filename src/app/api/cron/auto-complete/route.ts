@@ -33,21 +33,21 @@ export async function GET(request: NextRequest) {
       notified_coord:   0,
     }
 
-    // ── 0. AUTO-CANCEL bookings not started 15+ min after assigned_at ──
-    // Window: driver must press "Start trip" within 15 min of being assigned
+    // ── 0. AUTO-CANCEL bookings not started 15+ min after scheduled_at ──
+    // Window: driver must press "Start trip" within 15 min of the scheduled trip time
     const cancelCutoff = new Date(now.getTime() - 15 * 60 * 1000)
     const { data: notStarted } = await admin
       .from('bookings')
       .select('id, passenger_id, destination, taxi_id, taxis!taxi_id(driver_id)')
       .eq('status', 'booked')
-      .not('assigned_at', 'is', null)
-      .lt('assigned_at', cancelCutoff.toISOString())
+      .not('taxi_id', 'is', null)
+      .lt('scheduled_at', cancelCutoff.toISOString())
 
     if (notStarted?.length) {
       const ids = notStarted.map((b: any) => b.id)
       await admin.from('bookings').update({
         status:           'cancelled',
-        rejection_reason: 'Driver did not start trip within 15 minutes of scheduled time',
+        rejection_reason: 'Driver did not start trip within 15 minutes of the scheduled time',
       }).in('id', ids)
 
       const { data: coordinators } = await admin
@@ -240,15 +240,18 @@ export async function GET(request: NextRequest) {
 
       if (!shouldNotify) continue
 
+      const passengerTitle = distanceM !== null
+        ? '🚗 Your driver is nearby'
+        : '⏰ Time to head to your pickup point'
       const passengerBody = distanceM !== null
         ? `Your driver is ~${distanceM}m away from the pickup point. Please be ready.`
-        : `Your trip to ${b.destination} is starting. Please be ready at the pickup point.`
+        : `Your trip to ${b.destination} is scheduled now. Please head to the pickup point.`
 
       const notifs: any[] = [
         {
           user_id:    b.passenger_id,
           booking_id: b.id,
-          title:      '🚗 Your driver is arriving now',
+          title:      passengerTitle,
           body:       passengerBody,
           type:       'reminder_start',
           url:        '/staff/home',

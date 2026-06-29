@@ -14,7 +14,8 @@ import type { BookingDetail, User } from '@/types'
 import { STATUS_COLORS, STATUS_LABELS } from '@/types'
 import OnboardingTour from '@/components/OnboardingTour'
 
-const TrackingMap = dynamic(() => import('@/components/map/TrackingMap'), { ssr: false })
+const TrackingMap    = dynamic(() => import('@/components/map/TrackingMap'),    { ssr: false })
+const DriverFleetMap = dynamic(() => import('@/components/map/DriverFleetMap'), { ssr: false })
 
 type ViewMode = 'day' | 'week' | 'month'
 
@@ -310,6 +311,23 @@ export default function StaffHomePage() {
             <span style={{ fontSize:18 }}>+</span> New booking
           </button>
         </Link>
+      </div>
+
+      {/* ── Live Fleet Map ── */}
+      <div style={{ background: '#ffffff', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+        <div style={{ padding: '12px 20px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: 0 }}>
+            Live Fleet
+          </p>
+          {activeBookings.length > 0 && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#006064', background: 'rgba(0,96,100,0.08)', padding: '2px 8px', borderRadius: 9999 }}>
+              Your driver is on the map
+            </span>
+          )}
+        </div>
+        <div style={{ height: 240, position: 'relative' }}>
+          <DriverFleetMap style={{ borderRadius: 0, height: '100%' }} />
+        </div>
       </div>
 
       {/* ── View tabs + nav ── */}
