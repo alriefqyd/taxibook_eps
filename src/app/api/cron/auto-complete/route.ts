@@ -307,7 +307,7 @@ export async function GET(request: NextRequest) {
       // ≤ 3km + fresh GPS → clearly en route, skip driver nag
       const driverEnRoute  = distanceKm !== null && distanceKm <= 3.0
 
-      // ── Throttle: skip if last overdue notif was < 5 min ago ──
+      // ── Throttle: skip if last overdue notif was < 9.5 min ago ──
       const { data: lastNotif } = await admin
         .from('notifications')
         .select('created_at')
@@ -319,7 +319,7 @@ export async function GET(request: NextRequest) {
 
       if (lastNotif) {
         const minsSince = (now.getTime() - new Date(lastNotif.created_at).getTime()) / 60000
-        if (minsSince < 4.5) continue
+        if (minsSince < 9.5) continue
       }
 
       const notifs: any[] = []
@@ -350,43 +350,28 @@ export async function GET(request: NextRequest) {
         })
       }
 
-      // ── Passenger alert after 5 min overdue ─────────────
+      // ── Passenger alert — only once they're actually late (≥5 min) ──
       if (minutesLate >= 5) {
-        const { data: lastPassengerNotif } = await admin
-          .from('notifications')
-          .select('created_at')
-          .eq('booking_id', b.id)
-          .eq('type', 'reminder_overdue')
-          .eq('user_id', b.passenger_id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        const shouldNotifyPassenger = !lastPassengerNotif ||
-          (now.getTime() - new Date(lastPassengerNotif.created_at).getTime()) / 60000 >= 9.5
-
-        if (shouldNotifyPassenger) {
-          let passengerBody: string
-          if (driverAtPickup) {
-            passengerBody = `Your driver is almost there — ~${Math.round(distanceKm! * 1000)}m from pickup. Please be ready.`
-          } else if (driverEnRoute) {
-            passengerBody = `Your driver is on the way (~${distanceKm!.toFixed(1)}km from pickup, ${minutesLate} min late). Please wait.`
-          } else if (gpsIsFresh && distanceKm !== null) {
-            passengerBody = `Your trip is ${minutesLate} min late. Driver is ${distanceKm.toFixed(1)}km away.`
-          } else {
-            passengerBody = `Your trip to ${b.destination} is ${minutesLate} min late. Please contact the coordinator if needed.`
-          }
-
-          notifs.push({
-            user_id:    b.passenger_id,
-            booking_id: b.id,
-            title:      `Your driver is ${minutesLate} min late`,
-            body:       passengerBody,
-            type:       'reminder_overdue',
-            url:        '/staff/home',
-          })
-          results.notified_coord++
+        let passengerBody: string
+        if (driverAtPickup) {
+          passengerBody = `Your driver is almost there — ~${Math.round(distanceKm! * 1000)}m from pickup. Please be ready.`
+        } else if (driverEnRoute) {
+          passengerBody = `Your driver is on the way (~${distanceKm!.toFixed(1)}km from pickup, ${minutesLate} min late). Please wait.`
+        } else if (gpsIsFresh && distanceKm !== null) {
+          passengerBody = `Your trip is ${minutesLate} min late. Driver is ${distanceKm.toFixed(1)}km away.`
+        } else {
+          passengerBody = `Your trip to ${b.destination} is ${minutesLate} min late. Please contact the coordinator if needed.`
         }
+
+        notifs.push({
+          user_id:    b.passenger_id,
+          booking_id: b.id,
+          title:      `Your driver is ${minutesLate} min late`,
+          body:       passengerBody,
+          type:       'reminder_overdue',
+          url:        '/staff/home',
+        })
+        results.notified_coord++
       }
 
       if (notifs.length) {

@@ -168,6 +168,9 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
                 if (isDone && b.completed_at) {
                   const endH = new Date(b.completed_at).getHours() + new Date(b.completed_at).getMinutes() / 60
                   durH = Math.min(Math.max(endH - startH, 0.3), HOUR_END - startH)
+                } else if (b.auto_complete_at) {
+                  const durationH = (new Date(b.auto_complete_at).getTime() - new Date(b.scheduled_at).getTime()) / 3_600_000
+                  durH = Math.min(Math.max(durationH, 0.3), HOUR_END - startH)
                 } else {
                   durH = b.trip_type === 'WAITING'
                     ? Math.min(b.wait_minutes / 60 + 2, HOUR_END - startH)
