@@ -63,6 +63,23 @@ export default function LocationPickerMap({ title, onConfirm, onClose, autoGps }
   const [flyTarget,   setFlyTarget]   = useState<[number, number] | null>(null)
   const [savedLocs,   setSavedLocs]   = useState<RegisteredLocation[]>([])
   const [dropdown,    setDropdown]    = useState<RegisteredLocation[]>([])
+  // Track visual viewport so the modal resizes when the mobile keyboard appears
+  const [vpStyle,     setVpStyle]     = useState<React.CSSProperties>({})
+
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    function update() {
+      setVpStyle({ height: vv!.height, top: vv!.offsetTop })
+    }
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    update()
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
 
   useEffect(() => {
     supabase
@@ -135,6 +152,7 @@ export default function LocationPickerMap({ title, onConfirm, onClose, autoGps }
       position: 'fixed', inset: 0, zIndex: 9999,
       display: 'flex', flexDirection: 'column',
       fontFamily: "var(--font-inter), 'Inter', sans-serif",
+      ...vpStyle, // shrinks to visual viewport height when keyboard is open
     }}>
       {/* Header */}
       <div style={{
@@ -159,11 +177,13 @@ export default function LocationPickerMap({ title, onConfirm, onClose, autoGps }
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: 8 }}>
           <input
             type="text"
+            inputMode="search"
+            autoComplete="off"
             value={searchQuery}
             onChange={e => { setSearchQuery(e.target.value); setSearchErr('') }}
             placeholder="Search saved places or address..."
             style={{
-              flex: 1, padding: '10px 14px', fontSize: 13,
+              flex: 1, padding: '10px 14px', fontSize: 16,
               border: 'none', borderRadius: 10,
               background: 'rgba(255,255,255,0.15)', color: '#fff',
               outline: 'none', fontFamily: "var(--font-inter), 'Inter', sans-serif",

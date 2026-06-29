@@ -18,6 +18,13 @@ interface Props {
   role: 'staff' | 'coordinator' | 'driver'
 }
 
+// Convert any Indonesian phone format to WhatsApp-ready number (no + or spaces)
+function toWaNumber(phone: string): string {
+  let n = phone.replace(/\D/g, '')
+  if (n.startsWith('0')) n = '62' + n.slice(1)
+  return n
+}
+
 export default function ProfilePage({ role }: Props) {
   const router   = useRouter()
   const supabase = createClient()
@@ -35,8 +42,21 @@ export default function ProfilePage({ role }: Props) {
   const [isPWA,          setIsPWA]          = useState(false)
   const [subStatus,      setSubStatus]      = useState<'idle' | 'checking' | 'registered' | 'failed'>('idle')
 
-  // Shared helper — subscribe browser to push and save endpoint to DB.
-  // Returns null on success, or an error string on failure.
+  // ── Phone editing ──────────────────────────────────────────
+  const [editPhone,   setEditPhone]   = useState(false)
+  const [phoneInput,  setPhoneInput]  = useState('')
+  const [savingPhone, setSavingPhone] = useState(false)
+  const [phoneMsg,    setPhoneMsg]    = useState<{ text: string; ok: boolean } | null>(null)
+
+  // ── Password change ────────────────────────────────────────
+  const [showChangePw, setShowChangePw] = useState(false)
+  const [pwForm,       setPwForm]       = useState({ newPw: '', confirmPw: '' })
+  const [showNewPw,    setShowNewPw]    = useState(false)
+  const [showConfirmPw,setShowConfirmPw]= useState(false)
+  const [savingPw,     setSavingPw]     = useState(false)
+  const [pwMsg,        setPwMsg]        = useState<{ text: string; ok: boolean } | null>(null)
+
+  // ── Shared push helper ─────────────────────────────────────
   async function subscribeAndSave(): Promise<string | null> {
     try {
       if (!('serviceWorker' in navigator) || !('PushManager' in window))
@@ -45,16 +65,12 @@ export default function ProfilePage({ role }: Props) {
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
       if (!vapidKey) return 'VAPID key not configured'
 
-      // Unregister any stale non-pwa service workers that may block activation
       const allRegs = await navigator.serviceWorker.getRegistrations()
       for (const r of allRegs) {
         const swUrl = r.active?.scriptURL || r.installing?.scriptURL || r.waiting?.scriptURL || ''
-        if (swUrl && !swUrl.endsWith('/sw.js')) {
-          await r.unregister()
-        }
+        if (swUrl && !swUrl.endsWith('/sw.js')) await r.unregister()
       }
 
-      // Ensure /sw.js is registered (next-pwa does this automatically, but guard against cold starts)
       const swReg = await navigator.serviceWorker.getRegistration('/')
       if (!swReg) {
         try { await navigator.serviceWorker.register('/sw.js', { scope: '/' }) } catch { /* ignore */ }
@@ -101,16 +117,11 @@ export default function ProfilePage({ role }: Props) {
     if (!('Notification' in window)) { setNotifPerm('unsupported'); return }
     const perm = Notification.permission
     setNotifPerm(perm)
-    // If already granted, register this device automatically on load
     if (perm === 'granted') {
       setSubStatus('checking')
       subscribeAndSave().then(err => {
-        if (err) {
-          setSubStatus('failed')
-          setPushResult('❌ ' + err)
-        } else {
-          setSubStatus('registered')
-        }
+        setSubStatus(err ? 'failed' : 'registered')
+        if (err) setPushResult('❌ ' + err)
       })
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -120,11 +131,9 @@ export default function ProfilePage({ role }: Props) {
       const { data: { user: au } } = await supabase.auth.getUser()
       if (!au) { router.push('/login'); return }
 
-      const { data: p } = await supabase
-        .from('users').select('*').eq('id', au.id).single()
+      const { data: p } = await supabase.from('users').select('*').eq('id', au.id).single()
       setUser({ ...p, email: au.email })
 
-      // Load taxi if driver
       if (role === 'driver') {
         const { data: t } = await supabase
           .from('taxis').select('*, users!driver_id(name)')
@@ -132,8 +141,7 @@ export default function ProfilePage({ role }: Props) {
         setTaxi(t)
       }
 
-      // Load stats based on role
-      const now       = new Date()
+      const now        = new Date()
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
       const weekStart  = new Date(now); weekStart.setDate(now.getDate() - now.getDay())
 
@@ -146,8 +154,7 @@ export default function ProfilePage({ role }: Props) {
         setStats({ total: total || 0, thisMonth: month || 0, thisWeek: week || 0 })
 
       } else if (role === 'driver') {
-        const { data: myTaxi } = await supabase
-          .from('taxis').select('id').eq('driver_id', au.id).single()
+        const { data: myTaxi } = await supabase.from('taxis').select('id').eq('driver_id', au.id).single()
         if (myTaxi) {
           const [{ count: total }, { count: month }, { count: week }] = await Promise.all([
             supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('taxi_id', myTaxi.id).eq('status', 'completed'),
@@ -169,13 +176,49 @@ export default function ProfilePage({ role }: Props) {
       setLoading(false)
     }
     init()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function savePhone() {
+    const phone = phoneInput.trim()
+    setSavingPhone(true)
+    setPhoneMsg(null)
+    const { error } = await supabase
+      .from('users')
+      .update({ phone: phone || null })
+      .eq('id', user.id)
+    setSavingPhone(false)
+    if (error) {
+      setPhoneMsg({ text: 'Failed to save: ' + error.message, ok: false })
+    } else {
+      setUser((prev: any) => ({ ...prev, phone: phone || null }))
+      setEditPhone(false)
+      setPhoneMsg({ text: 'Phone number updated.', ok: true })
+      setTimeout(() => setPhoneMsg(null), 3000)
+    }
+  }
+
+  async function changePassword() {
+    setPwMsg(null)
+    const { newPw, confirmPw } = pwForm
+    if (newPw.length < 8) { setPwMsg({ text: 'Password must be at least 8 characters.', ok: false }); return }
+    if (newPw !== confirmPw) { setPwMsg({ text: 'Passwords do not match.', ok: false }); return }
+    setSavingPw(true)
+    const { error } = await supabase.auth.updateUser({ password: newPw })
+    setSavingPw(false)
+    if (error) {
+      setPwMsg({ text: 'Failed: ' + error.message, ok: false })
+    } else {
+      setPwMsg({ text: 'Password changed successfully.', ok: true })
+      setPwForm({ newPw: '', confirmPw: '' })
+      setShowChangePw(false)
+      setTimeout(() => setPwMsg(null), 4000)
+    }
+  }
 
   async function testPush() {
     setTestingPush(true)
     setPushResult(null)
     try {
-      // Ensure subscription is saved before sending test
       const subErr = await subscribeAndSave()
       if (subErr) { setPushResult('❌ ' + subErr); setTestingPush(false); return }
 
@@ -187,11 +230,7 @@ export default function ProfilePage({ role }: Props) {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
       })
       const data = await res.json()
-      if (data.success) {
-        setPushResult('✅ Test push sent! Check your notifications.')
-      } else {
-        setPushResult(`❌ ${data.error || 'Failed'} — ${data.hint || ''}`)
-      }
+      setPushResult(data.success ? '✅ Test push sent! Check your notifications.' : `❌ ${data.error || 'Failed'} — ${data.hint || ''}`)
     } catch (err: any) {
       setPushResult('❌ Error: ' + err.message)
     }
@@ -238,20 +277,14 @@ export default function ProfilePage({ role }: Props) {
   }
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "var(--font-inter), 'Inter', sans-serif", background: '#F5F5F2' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, background: '#F5F5F2' }}>
       <p style={{ color: '#9ca3af' }}>Loading...</p>
     </div>
   )
 
-  const roleLabels: Record<string, string> = {
-    staff:       'Staff',
-    coordinator: 'Coordinator',
-    driver:      'Driver',
-  }
-
+  const roleLabels: Record<string, string> = { staff: 'Staff', coordinator: 'Coordinator', driver: 'Driver' }
   const roleBg:  Record<string, string> = { staff: '#DBEAFE', coordinator: '#FEF3C7', driver: '#D8F3DC' }
   const roleClr: Record<string, string> = { staff: '#1E3A5F', coordinator: '#92400E', driver: '#2D6A4F' }
-
   const initials = user?.name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') || '?'
 
   const statLabels: Record<string, [string, string, string]> = {
@@ -260,14 +293,15 @@ export default function ProfilePage({ role }: Props) {
     coordinator: ['Total bookings', 'This month', 'Pending approval'],
   }
 
+  const hasPhone = !!user?.phone
+
   return (
-    <div style={{ fontFamily: "var(--font-inter), 'Inter', sans-serif", minHeight: '100vh', background: '#F5F5F2', WebkitFontSmoothing: 'antialiased' }}>
+    <div style={{ fontFamily: FONT, minHeight: '100vh', background: '#F5F5F2', WebkitFontSmoothing: 'antialiased' }}>
 
       {/* Header */}
       <div style={{ background: '#ffffff', padding: '20px 20px 24px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
         <h1 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 20px', letterSpacing: '-0.2px' }}>Profile</h1>
 
-        {/* Avatar + name */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ width: 56, height: 56, borderRadius: '50%', background: roleBg[role], color: roleClr[role], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, flexShrink: 0 }}>
             {initials}
@@ -305,30 +339,192 @@ export default function ProfilePage({ role }: Props) {
           ))}
         </div>
 
-        {/* Account info */}
+        {/* ── Account info ── */}
         <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>Account</p>
-        <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', marginBottom: 20 }}>
+        <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', marginBottom: 12 }}>
+
+          {/* Static rows */}
           {[
             { label: 'Full name',  value: user?.name },
             { label: 'Email',      value: user?.email },
             { label: 'Role',       value: roleLabels[role] },
             ...(taxi ? [{ label: 'Assigned taxi', value: `${taxi.name} · ${taxi.plate_number || ''}` }] : []),
             { label: 'Member since', value: user?.created_at ? format(new Date(user.created_at), 'd MMM yyyy', { locale: idLocale }) : '—' },
-          ].map((row, i, arr) => (
-            <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}>
+          ].map(row => (
+            <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
               <span style={{ fontSize: 13, color: '#6f7979' }}>{row.label}</span>
               <span style={{ fontSize: 13, fontWeight: 600, textAlign: 'right', maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.value}</span>
             </div>
           ))}
+
+          {/* Phone row — editable */}
+          <div style={{ padding: '12px 16px' }}>
+            {!editPhone ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: '#6f7979' }}>Phone</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: hasPhone ? '#1a1c1b' : '#9ca3af' }}>
+                    {user?.phone || 'Not set'}
+                  </span>
+                  <button
+                    onClick={() => { setPhoneInput(user?.phone || ''); setEditPhone(true); setPhoneMsg(null) }}
+                    style={{ fontSize: 12, fontWeight: 700, color: '#006064', background: 'rgba(0,96,100,0.08)', border: 'none', borderRadius: 8, padding: '3px 10px', cursor: 'pointer', fontFamily: FONT }}
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', margin: '0 0 8px' }}>Phone number</p>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={phoneInput}
+                  onChange={e => setPhoneInput(e.target.value)}
+                  placeholder="e.g. 081234567890"
+                  style={{ width: '100%', padding: '10px 12px', fontSize: 15, border: '1.5px solid #006064', borderRadius: 10, outline: 'none', fontFamily: FONT, boxSizing: 'border-box', marginBottom: 10 }}
+                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => { setEditPhone(false); setPhoneMsg(null) }}
+                    style={{ flex: 1, padding: '10px', background: '#F5F5F2', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT, color: '#006064' }}>
+                    Cancel
+                  </button>
+                  <button onClick={savePhone} disabled={savingPhone}
+                    style={{ flex: 1, padding: '10px', background: savingPhone ? '#9ca3af' : '#006064', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: savingPhone ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
+                    {savingPhone ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            )}
+            {phoneMsg && (
+              <p style={{ fontSize: 12, fontWeight: 600, margin: '8px 0 0', color: phoneMsg.ok ? '#2D6A4F' : '#991B1B' }}>
+                {phoneMsg.text}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* ── Contact actions ── */}
+        {hasPhone && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+            <a
+              href={`tel:${user.phone}`}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 10px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, textDecoration: 'none', color: '#006064', fontSize: 14, fontWeight: 700, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.63 4.35 2 2 0 0 1 3.6 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.16 6.16l.97-.97a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+              Call
+            </a>
+            <a
+              href={`https://wa.me/${toWaNumber(user.phone)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 10px', background: '#25D366', border: 'none', borderRadius: 16, textDecoration: 'none', color: '#ffffff', fontSize: 14, fontWeight: 700, boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/>
+              </svg>
+              WhatsApp
+            </a>
+          </div>
+        )}
+
+        {/* ── Security ── */}
+        <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>Security</p>
+        <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', marginBottom: 20 }}>
+          {!showChangePw ? (
+            <button
+              onClick={() => { setShowChangePw(true); setPwMsg(null); setPwForm({ newPw: '', confirmPw: '' }) }}
+              style={{ width: '100%', padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: FONT }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#006064' }}>Change password</span>
+              </div>
+              <span style={{ fontSize: 16, color: '#9ca3af' }}>›</span>
+            </button>
+          ) : (
+            <div style={{ padding: '16px' }}>
+              <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 14px', color: '#006064' }}>Change password</p>
+
+              {/* New password */}
+              <div style={{ marginBottom: 10 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 6 }}>New password</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showNewPw ? 'text' : 'password'}
+                    value={pwForm.newPw}
+                    onChange={e => setPwForm(f => ({ ...f, newPw: e.target.value }))}
+                    placeholder="Min 8 characters"
+                    style={{ width: '100%', padding: '10px 40px 10px 12px', fontSize: 15, border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 10, outline: 'none', fontFamily: FONT, boxSizing: 'border-box' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPw(v => !v)}
+                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4 }}
+                  >
+                    {showNewPw ? <EyeOff /> : <Eye />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm password */}
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 6 }}>Confirm password</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showConfirmPw ? 'text' : 'password'}
+                    value={pwForm.confirmPw}
+                    onChange={e => setPwForm(f => ({ ...f, confirmPw: e.target.value }))}
+                    placeholder="Repeat new password"
+                    style={{ width: '100%', padding: '10px 40px 10px 12px', fontSize: 15, border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 10, outline: 'none', fontFamily: FONT, boxSizing: 'border-box' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPw(v => !v)}
+                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4 }}
+                  >
+                    {showConfirmPw ? <EyeOff /> : <Eye />}
+                  </button>
+                </div>
+              </div>
+
+              {pwMsg && (
+                <div style={{ padding: '8px 12px', borderRadius: 10, marginBottom: 12, background: pwMsg.ok ? '#D8F3DC' : '#FEE2E2' }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: pwMsg.ok ? '#2D6A4F' : '#991B1B' }}>{pwMsg.text}</p>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setShowChangePw(false); setPwMsg(null) }}
+                  style={{ flex: 1, padding: '11px', background: '#F5F5F2', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT, color: '#006064' }}>
+                  Cancel
+                </button>
+                <button onClick={changePassword} disabled={savingPw}
+                  style={{ flex: 1, padding: '11px', background: savingPw ? '#9ca3af' : '#006064', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: savingPw ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
+                  {savingPw ? 'Saving…' : 'Update password'}
+                </button>
+              </div>
+            </div>
+          )}
+          {pwMsg && !showChangePw && (
+            <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(0,0,0,0.04)' }}>
+              <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: pwMsg.ok ? '#2D6A4F' : '#991B1B' }}>{pwMsg.text}</p>
+            </div>
+          )}
         </div>
 
         {/* App info */}
         <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>App</p>
         <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', marginBottom: 28 }}>
           {[
-            { label: 'App name',    value: 'TaxiBook' },
-            { label: 'Version',     value: '1.0.0' },
-            { label: 'Company',     value: 'PT Vale Indonesia' },
+            { label: 'App name', value: 'TaxiBook' },
+            { label: 'Version',  value: '1.0.0' },
+            { label: 'Company',  value: 'PT Vale Indonesia' },
           ].map((row, i, arr) => (
             <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}>
               <span style={{ fontSize: 13, color: '#6f7979' }}>{row.label}</span>
@@ -343,7 +539,6 @@ export default function ProfilePage({ role }: Props) {
             <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>Push Notifications</p>
             <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, padding: '14px 16px', marginBottom: 20 }}>
 
-              {/* Not yet asked — show enable button */}
               {notifPerm === 'default' && (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -375,10 +570,8 @@ export default function ProfilePage({ role }: Props) {
                 </>
               )}
 
-              {/* Granted */}
               {notifPerm === 'granted' && (
                 <>
-                  {/* Device registration status */}
                   {subStatus === 'checking' && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '8px 12px', background: '#F3F4F6', borderRadius: 10 }}>
                       <span style={{ fontSize: 13, color: '#6b7280' }}>Registering device…</span>
@@ -424,7 +617,6 @@ export default function ProfilePage({ role }: Props) {
                 </>
               )}
 
-              {/* Blocked */}
               {notifPerm === 'denied' && (
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                   <span style={{ fontSize: 20, flexShrink: 0 }}>🚫</span>
@@ -436,7 +628,6 @@ export default function ProfilePage({ role }: Props) {
                   </div>
                 </div>
               )}
-
             </div>
           </>
         )}
@@ -445,7 +636,7 @@ export default function ProfilePage({ role }: Props) {
         {!showConfirm ? (
           <button
             onClick={() => setShowConfirm(true)}
-            style={{ width: '100%', padding: '13px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FECACA', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif" }}
+            style={{ width: '100%', padding: '13px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FECACA', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}
           >
             Sign out
           </button>
@@ -454,17 +645,12 @@ export default function ProfilePage({ role }: Props) {
             <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>Sign out of TaxiBook?</p>
             <p style={{ fontSize: 13, color: '#6f7979', margin: '0 0 14px' }}>You'll need to log in again to use the app.</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <button
-                onClick={() => setShowConfirm(false)}
-                style={{ padding: '11px', background: '#F5F5F2', color: '#006064', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif" }}
-              >
+              <button onClick={() => setShowConfirm(false)}
+                style={{ padding: '11px', background: '#F5F5F2', color: '#006064', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT }}>
                 Cancel
               </button>
-              <button
-                onClick={handleLogout}
-                disabled={loggingOut}
-                style={{ padding: '11px', background: '#991B1B', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif" }}
-              >
+              <button onClick={handleLogout} disabled={loggingOut}
+                style={{ padding: '11px', background: '#991B1B', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}>
                 {loggingOut ? 'Signing out...' : 'Yes, sign out'}
               </button>
             </div>
@@ -472,5 +658,22 @@ export default function ProfilePage({ role }: Props) {
         )}
       </div>
     </div>
+  )
+}
+
+function Eye() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+    </svg>
+  )
+}
+
+function EyeOff() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
   )
 }

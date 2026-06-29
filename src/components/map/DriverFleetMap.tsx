@@ -109,19 +109,35 @@ interface Props { style?: React.CSSProperties }
 export default function DriverFleetMap({ style }: Props) {
   const drivers = useDriverLocations()
   const [routes, setRoutes] = useState<Record<string, [number, number][]>>({})
-  const [isFs, setIsFs] = useState(false)
+  const [isFs,    setIsFs]    = useState(false)
+  const [isCssFs, setIsCssFs] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    function onFSChange() { setIsFs(!!document.fullscreenElement) }
+    function onFSChange() {
+      const entering = !!document.fullscreenElement
+      setIsFs(entering)
+      if (!entering) setIsCssFs(false)
+    }
     document.addEventListener('fullscreenchange', onFSChange)
     return () => document.removeEventListener('fullscreenchange', onFSChange)
   }, [])
 
   function toggleFullscreen() {
-    if (!document.fullscreenElement) containerRef.current?.requestFullscreen()
-    else document.exitFullscreen()
+    if (isFs || isCssFs) {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+      setIsCssFs(false)
+      return
+    }
+    if (containerRef.current && document.fullscreenEnabled) {
+      containerRef.current.requestFullscreen().catch(() => setIsCssFs(true))
+    } else {
+      // CSS fullscreen fallback (iOS Safari)
+      setIsCssFs(true)
+    }
   }
+
+  const isFullscreen = isFs || isCssFs
 
   const tripKey = drivers
     .filter(d => d.active_booking && ['on_trip', 'waiting_trip'].includes(d.active_booking.status) && d.latitude != null && d.longitude != null)
@@ -153,7 +169,15 @@ export default function DriverFleetMap({ style }: Props) {
   const fitPositions: [number, number][] = positioned.map(d => [d.latitude!, d.longitude!])
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', overflow: 'hidden', height: '100%', background: '#e8e0d8', ...style }}>
+    <div ref={containerRef} style={{
+      position: isCssFs ? 'fixed' : 'relative',
+      inset: isCssFs ? 0 : undefined,
+      zIndex: isCssFs ? 9999 : undefined,
+      overflow: 'hidden',
+      height: '100%',
+      background: '#e8e0d8',
+      ...(!isCssFs ? style : {}),
+    }}>
       <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl>
         <TileLayer url={TILE_URL} attribution={DEFAULT_TILE_ATTRIBUTION} />
         {fitPositions.length > 0 && <FitBounds positions={fitPositions} />}
@@ -236,7 +260,7 @@ export default function DriverFleetMap({ style }: Props) {
       {/* Fullscreen toggle */}
       <button
         onClick={toggleFullscreen}
-        title={isFs ? 'Exit fullscreen' : 'Fullscreen'}
+        title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
         style={{
           position: 'absolute', top: 10, right: 10, zIndex: 1000,
           width: 34, height: 34, borderRadius: 6,
@@ -246,7 +270,7 @@ export default function DriverFleetMap({ style }: Props) {
           color: '#374151',
         }}
       >
-        {isFs ? <CompressIcon /> : <ExpandIcon />}
+        {isFullscreen ? <CompressIcon /> : <ExpandIcon />}
       </button>
 
       {positioned.length === 0 && (
