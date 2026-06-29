@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Plus_Jakarta_Sans, Inter } from 'next/font/google'
 import './globals.css'
 
@@ -18,7 +18,14 @@ export const metadata: Metadata = {
   title:       'TaxiBook',
   description: 'Company fleet booking system — PT Vale Indonesia',
   manifest:    '/manifest.json',
-  themeColor:  '#006064',
+}
+
+export const viewport: Viewport = {
+  width:        'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor:   '#006064',
 }
 
 import AuthProvider from '@/components/AuthProvider'
