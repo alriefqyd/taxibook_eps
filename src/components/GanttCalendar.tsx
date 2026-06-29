@@ -458,46 +458,33 @@ function BookingSheet({ booking: b, onClose }: { booking: BookingDetail; onClose
 
         {/* Contact actions */}
         {(b.driver_phone || b.passenger_phone) && (
-          <div style={{ marginBottom: 16 }}>
-            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 8px' }}>Contact</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {b.driver_phone && (
-                <div>
-                  <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 5px', fontWeight: 600 }}>
-                    Driver{b.driver_name ? ` · ${b.driver_name}` : ''}
-                  </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <a href={`tel:${b.driver_phone}`}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 10, textDecoration: 'none', color: '#0369A1', fontSize: 13, fontWeight: 700 }}>
-                      <PhoneIcon /> Call
-                    </a>
-                    <a href={`https://wa.me/${toWaNumber(b.driver_phone)}?text=${encodeURIComponent(buildWaMessage(b))}`}
-                      target="_blank" rel="noopener noreferrer"
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 10, textDecoration: 'none', color: '#15803D', fontSize: 13, fontWeight: 700 }}>
-                      <WaIcon /> WhatsApp
-                    </a>
-                  </div>
-                </div>
-              )}
-              {b.passenger_phone && (
-                <div>
-                  <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 5px', fontWeight: 600 }}>
-                    Passenger{b.passenger_name ? ` · ${b.passenger_name}` : ''}
-                  </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <a href={`tel:${b.passenger_phone}`}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 10, textDecoration: 'none', color: '#0369A1', fontSize: 13, fontWeight: 700 }}>
-                      <PhoneIcon /> Call
-                    </a>
-                    <a href={`https://wa.me/${toWaNumber(b.passenger_phone)}`}
-                      target="_blank" rel="noopener noreferrer"
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '10px', background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 10, textDecoration: 'none', color: '#15803D', fontSize: 13, fontWeight: 700 }}>
-                      <WaIcon /> WhatsApp
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
+          <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {b.driver_phone && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <a href={`tel:${b.driver_phone}`}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 8px', background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 10, textDecoration: 'none', color: '#0369A1', fontSize: 12, fontWeight: 700 }}>
+                  <PhoneIcon /> Telp Driver
+                </a>
+                <a href={`https://wa.me/${toWaNumber(b.driver_phone)}?text=${encodeURIComponent(buildWaMessage(b))}`}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 8px', background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 10, textDecoration: 'none', color: '#15803D', fontSize: 12, fontWeight: 700 }}>
+                  <WaIcon /> WA Driver
+                </a>
+              </div>
+            )}
+            {b.passenger_phone && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <a href={`tel:${b.passenger_phone}`}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 8px', background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 10, textDecoration: 'none', color: '#0369A1', fontSize: 12, fontWeight: 700 }}>
+                  <PhoneIcon /> Telp Penumpang
+                </a>
+                <a href={`https://wa.me/${toWaNumber(b.passenger_phone)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 8px', background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 10, textDecoration: 'none', color: '#15803D', fontSize: 12, fontWeight: 700 }}>
+                  <WaIcon /> WA Penumpang
+                </a>
+              </div>
+            )}
           </div>
         )}
 
@@ -526,19 +513,19 @@ function toWaNumber(phone: string): string {
 
 function buildWaMessage(b: BookingDetail): string {
   const time = format(new Date(b.scheduled_at), 'EEE dd MMM yyyy · HH:mm', { locale: idLocale })
-  const type = b.trip_type === 'DROP' ? 'Drop' : `Waiting ${b.wait_minutes} min`
+  const type = b.trip_type === 'DROP' ? 'Drop' : `Waiting ${b.wait_minutes} menit`
   return [
-    `📋 *TaxiBook – Trip Assignment*`,
+    `📋 *TaxiBook – Penugasan Perjalanan*`,
     `━━━━━━━━━━━━━`,
     `🔖 *${b.booking_code}*`,
-    `👤 Passenger: *${b.passenger_name}*`,
-    `📍 From: ${b.pickup}`,
-    `🏁 To: *${b.destination}*`,
-    `🕐 Schedule: ${time}`,
-    `🚗 Type: ${type}`,
-    ...(b.notes ? [`📝 Notes: ${b.notes}`] : []),
+    `👤 Penumpang: *${b.passenger_name}*`,
+    `📍 Dari: ${b.pickup}`,
+    `🏁 Tujuan: *${b.destination}*`,
+    `🕐 Jadwal: ${time}`,
+    `🚗 Jenis: ${type}`,
+    ...(b.notes ? [`📝 Catatan: ${b.notes}`] : []),
     `━━━━━━━━━━━━━`,
-    `Please confirm receipt of this trip.`,
+    `Mohon konfirmasi penerimaan perjalanan ini.`,
   ].join('\n')
 }
 

@@ -134,10 +134,11 @@ export async function POST(request: NextRequest) {
         })
 
         return NextResponse.json({
-          booking:     { ...booking, taxi_id: result.taxi.id, status: 'booked' },
-          assigned:    true,
-          taxi_name:   result.taxi.name,
-          driver_name: result.taxi.driver_name,
+          booking:      { ...booking, taxi_id: result.taxi.id, status: 'booked' },
+          assigned:     true,
+          taxi_name:    result.taxi.name,
+          driver_name:  result.taxi.driver_name,
+          driver_phone: result.taxi.driver_phone,
         }, { status: 201 })
       }
 
@@ -178,7 +179,7 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string, au
   // Active taxis with a driver on duty (is_available = driver manually set themselves online)
   const { data: taxis } = await admin
     .from('taxis')
-    .select('id, name, driver_id, users!driver_id(name)')
+    .select('id, name, driver_id, users!driver_id(name, phone)')
     .eq('is_active',    true)
     .eq('is_available', true)
     .not('driver_id', 'is', null)
@@ -257,10 +258,11 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string, au
 
   return {
     taxi: {
-      id:          best.id,
-      name:        best.name,
-      driver_id:   best.driver_id,
-      driver_name: best.users?.name || 'Driver',
+      id:           best.id,
+      name:         best.name,
+      driver_id:    best.driver_id,
+      driver_name:  best.users?.name  || 'Driver',
+      driver_phone: best.users?.phone || null,
     }
   }
 }

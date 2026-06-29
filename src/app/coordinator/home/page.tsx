@@ -534,19 +534,19 @@ function toWaNumber(phone: string): string {
 
 function buildWaMessage(b: BookingDetail): string {
   const time = format(new Date(b.scheduled_at), 'EEE dd MMM yyyy · HH:mm', { locale: idLocale })
-  const type = b.trip_type === 'DROP' ? 'Drop' : `Waiting ${b.wait_minutes} min`
+  const type = b.trip_type === 'DROP' ? 'Drop' : `Waiting ${b.wait_minutes} menit`
   return [
-    `📋 *TaxiBook – Trip Assignment*`,
+    `📋 *TaxiBook – Penugasan Perjalanan*`,
     `━━━━━━━━━━━━━`,
     `🔖 *${b.booking_code}*`,
-    `👤 Passenger: *${b.passenger_name}*`,
-    `📍 From: ${b.pickup}`,
-    `🏁 To: *${b.destination}*`,
-    `🕐 Schedule: ${time}`,
-    `🚗 Type: ${type}`,
-    ...(b.notes ? [`📝 Notes: ${b.notes}`] : []),
+    `👤 Penumpang: *${b.passenger_name}*`,
+    `📍 Dari: ${b.pickup}`,
+    `🏁 Tujuan: *${b.destination}*`,
+    `🕐 Jadwal: ${time}`,
+    `🚗 Jenis: ${type}`,
+    ...(b.notes ? [`📝 Catatan: ${b.notes}`] : []),
     `━━━━━━━━━━━━━`,
-    `Please confirm receipt of this trip.`,
+    `Mohon konfirmasi penerimaan perjalanan ini.`,
   ].join('\n')
 }
 

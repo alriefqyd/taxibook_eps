@@ -219,8 +219,9 @@ export default function CoordinatorUsersPage() {
       {/* List */}
       <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af', fontSize: '14px' }}>
-            Loading...
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid rgba(0,96,100,0.15)', borderTop: '3px solid #006064', animation: 'spin 0.8s linear infinite' }} />
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af', fontSize: '14px' }}>

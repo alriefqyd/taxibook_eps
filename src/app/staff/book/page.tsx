@@ -203,9 +203,10 @@ export default function BookPage() {
 
       const code = data.booking.booking_code
       const assigned = data.assigned
-        ? `&taxi=${encodeURIComponent(data.taxi_name)}&driver=${encodeURIComponent(data.driver_name)}` : ''
+        ? `&taxi=${encodeURIComponent(data.taxi_name)}&driver=${encodeURIComponent(data.driver_name)}${data.driver_phone ? `&phone=${encodeURIComponent(data.driver_phone)}` : ''}` : ''
+      const extra = `&pickup=${encodeURIComponent(form.pickup)}&dest=${encodeURIComponent(form.destination)}&time=${encodeURIComponent(scheduledDate.toISOString())}&type=${form.trip_type}${form.trip_type === 'WAITING' ? `&wait=${form.wait_minutes}` : ''}${form.notes ? `&notes=${encodeURIComponent(form.notes)}` : ''}`
 
-      router.push(`/staff/success?code=${code}${assigned}`)
+      router.push(`/staff/success?code=${code}${assigned}${extra}`)
     } catch (e: any) {
       setError('Error: ' + e.message); setLoading(false)
     }
@@ -215,6 +216,74 @@ export default function BookPage() {
 
   return (
     <div style={{ fontFamily: "var(--font-inter), 'Inter', sans-serif", minHeight: '100vh', background: C.surface, WebkitFontSmoothing: 'antialiased' }}>
+
+      {/* ── Submit loading overlay ── */}
+      {loading && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: '#F5F5F2',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "var(--font-inter), 'Inter', sans-serif",
+        }}>
+          <style>{`
+            @keyframes carSlide {
+              0%   { transform: translateX(-72px); }
+              42%  { transform: translateX(72px); }
+              50%  { transform: translateX(72px); }
+              92%  { transform: translateX(-72px); }
+              100% { transform: translateX(-72px); }
+            }
+            @keyframes roadMove {
+              from { background-position-x: 0; }
+              to   { background-position-x: 36px; }
+            }
+            @keyframes dotBounce {
+              0%, 80%, 100% { transform: translateY(0); opacity: 0.25; }
+              40%           { transform: translateY(-10px); opacity: 1; }
+            }
+          `}</style>
+
+          {/* Road + car */}
+          <div style={{ width: 200, height: 72, position: 'relative', marginBottom: 20 }}>
+            <div style={{
+              position: 'absolute', top: 4, left: '50%', marginLeft: -18,
+              fontSize: 36, lineHeight: 1,
+              animation: 'carSlide 2.4s ease-in-out infinite',
+              display: 'inline-block',
+            }}>
+              🚕
+            </div>
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0, height: 28,
+              background: '#374151', borderRadius: 10, overflow: 'hidden',
+            }}>
+              <div style={{
+                position: 'absolute', top: '50%', left: 0, right: 0, height: 3,
+                transform: 'translateY(-50%)',
+                backgroundImage: 'repeating-linear-gradient(90deg,rgba(255,255,255,0.6) 0,rgba(255,255,255,0.6) 16px,transparent 16px,transparent 32px)',
+                animation: 'roadMove 0.5s linear infinite',
+              }} />
+            </div>
+          </div>
+
+          {/* Bouncing dots */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+            {([0, 0.2, 0.4] as number[]).map((delay, i) => (
+              <div key={i} style={{
+                width: 9, height: 9, borderRadius: '50%', background: '#006064',
+                animation: `dotBounce 1s ${delay}s ease-in-out infinite`,
+              }} />
+            ))}
+          </div>
+
+          <p style={{ fontSize: 20, fontWeight: 700, color: '#1a1c1b', margin: '0 0 6px', letterSpacing: '-0.3px' }}>
+            Finding a Driver
+          </p>
+          <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>
+            Please wait a moment...
+          </p>
+        </div>
+      )}
 
       {/* Location picker modal */}
       {pickerField && (
@@ -501,7 +570,7 @@ export default function BookPage() {
               disabled={loading}
               style={{ width: '100%', padding: '14px 20px', background: loading ? C.border2 : C.black, color: C.white, border: 'none', borderRadius: 16, fontSize: 15, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif", letterSpacing: '-0.1px' }}
             >
-              {loading ? 'Submitting...' : 'Confirm booking'}
+              Confirm booking
             </button>
           )}
         </div>
