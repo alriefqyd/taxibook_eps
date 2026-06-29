@@ -142,7 +142,8 @@ export async function POST(request: NextRequest) {
       }
 
       // No driver available — delete the booking and tell the user
-      await admin.from('bookings').delete().eq('id', booking.id)
+      const { error: deleteErr } = await admin.from('bookings').delete().eq('id', booking.id)
+      if (deleteErr) console.error('Failed to delete unassigned booking:', booking.id, deleteErr)
       return NextResponse.json(
         { error: 'No driver available at this time. Please try a different time or contact your coordinator.' },
         { status: 409 }
@@ -165,26 +166,19 @@ export async function POST(request: NextRequest) {
 
 // ── Auto-assign: fewest trips today + longest idle tiebreaker ────────────────
 async function autoAssign(admin: any, bookingId: string, scheduledAt: string, autoCompleteAt: string) {
-  const scheduledTime = new Date(scheduledAt)
-  const now           = new Date()
-  const isNowBooking  = (scheduledTime.getTime() - now.getTime()) < 5 * 60 * 1000 // within 5 min = "now"
-  const todayStart    = new Date()
-  todayStart.setHours(0, 0, 0, 0)
+  // Midnight WIB (UTC+7) expressed as UTC — trips are counted per local business day
+  const WIB_MS      = 7 * 60 * 60 * 1000
+  const nowWib      = new Date(Date.now() + WIB_MS)
+  nowWib.setUTCHours(0, 0, 0, 0)
+  const todayStart    = new Date(nowWib.getTime() - WIB_MS)
+  const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
-  // Get active taxis with a driver assigned.
-  // is_available reflects real-time status — skip it for future bookings
-  // since a driver busy now may be free at scheduled_at.
-  let taxiQuery = admin
+  // All active taxis with a driver assigned
+  const { data: taxis } = await admin
     .from('taxis')
     .select('id, name, driver_id, users!driver_id(name)')
     .eq('is_active', true)
     .not('driver_id', 'is', null)
-
-  if (isNowBooking) {
-    taxiQuery = taxiQuery.eq('is_available', true)
-  }
-
-  const { data: taxis } = await taxiQuery
 
   if (!taxis?.length) return { taxi: null }
 
@@ -192,53 +186,36 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string, au
   const availability = await Promise.all(
     taxis.map(async (taxi: any) => {
 
-      let isFree = false
+      // No schedule conflict: existing booking starts before new ends AND existing ends after new starts
+      const { data: conflict } = await admin
+        .from('bookings')
+        .select('id')
+        .eq('taxi_id', taxi.id)
+        .in('status', ['booked', 'on_trip', 'waiting_trip'])
+        .neq('id', bookingId)
+        .lt('scheduled_at', autoCompleteAt)
+        .gt('auto_complete_at', scheduledAt)
+        .limit(1)
+        .maybeSingle()
 
-      if (isNowBooking) {
-        // NOW booking: no active trip overlapping right now
-        const { data: currentTrip } = await admin
-          .from('bookings')
-          .select('id')
-          .eq('taxi_id', taxi.id)
-          .in('status', ['booked', 'on_trip', 'waiting_trip'])
-          .lte('scheduled_at', now.toISOString())
-          .gte('auto_complete_at', now.toISOString())
-          .limit(1)
-          .maybeSingle()
+      if (conflict) return null
 
-        isFree = !currentTrip
-      } else {
-        // SCHEDULED booking: interval intersection — existing starts before new ends AND existing ends after new starts
-        const { data: conflict } = await admin
-          .from('bookings')
-          .select('id')
-          .eq('taxi_id', taxi.id)
-          .in('status', ['booked', 'on_trip', 'waiting_trip'])
-          .neq('id', bookingId)
-          .lt('scheduled_at', autoCompleteAt)
-          .gt('auto_complete_at', scheduledAt)
-          .limit(1)
-          .maybeSingle()
-
-        isFree = !conflict
-      }
-
-      if (!isFree) return null
-
-      // Trips completed today (fewest trips sort)
+      // Count all non-cancelled trips scheduled today — includes active bookings, not just completed
       const { count: tripsToday } = await admin
         .from('bookings')
         .select('id', { count: 'exact', head: true })
         .eq('taxi_id', taxi.id)
-        .eq('status', 'completed')
-        .gte('completed_at', todayStart.toISOString())
+        .not('status', 'in', '(cancelled,rejected)')
+        .gte('scheduled_at', todayStart.toISOString())
+        .lt('scheduled_at', tomorrowStart.toISOString())
 
-      // Last idle time (longest idle tiebreaker)
+      // Last booking that ends before the new booking starts — excludes future bookings from idle calc
       const { data: lastBooking } = await admin
         .from('bookings')
         .select('auto_complete_at')
         .eq('taxi_id', taxi.id)
         .in('status', ['completed', 'booked', 'on_trip', 'waiting_trip'])
+        .lte('auto_complete_at', scheduledAt)
         .order('auto_complete_at', { ascending: false })
         .limit(1)
         .maybeSingle()

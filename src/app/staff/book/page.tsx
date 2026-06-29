@@ -154,14 +154,15 @@ export default function BookPage() {
         setError('Booking time must be in the future.'); setLoading(false); return
       }
 
-      const windowStart = new Date(scheduledDate.getTime() - 30 * 60 * 1000)
-      const windowEnd   = new Date(scheduledDate.getTime() + 2 * 60 * 60 * 1000)
+      // Use 3hr as a conservative estimate for the new booking's end time.
+      // Server is the authoritative check; this gives quick pre-flight feedback.
+      const estimatedEnd = new Date(scheduledDate.getTime() + 3 * 60 * 60 * 1000)
       const { data: conflicts } = await supabase.from('bookings')
         .select('booking_code, scheduled_at, destination')
         .eq('passenger_id', user.id)
         .not('status', 'in', '(rejected,cancelled,completed)')
-        .gte('scheduled_at', windowStart.toISOString())
-        .lte('scheduled_at', windowEnd.toISOString())
+        .lt('scheduled_at', estimatedEnd.toISOString())
+        .gt('auto_complete_at', scheduledDate.toISOString())
 
       if (conflicts?.length) {
         const c = conflicts[0]

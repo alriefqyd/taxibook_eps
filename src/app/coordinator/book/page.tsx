@@ -110,15 +110,14 @@ export default function CoordinatorBookPage() {
         ? new Date(Date.now() + 2 * 60000)
         : new Date(form.scheduled_at)
 
-      // Conflict check: same passenger, overlapping window
-      const windowStart = new Date(scheduledDate.getTime() - 30 * 60 * 1000)
-      const windowEnd   = new Date(scheduledDate.getTime() + 2 * 60 * 60 * 1000)
+      // Conflict check: proper interval overlap against existing bookings
+      const estimatedEnd = new Date(scheduledDate.getTime() + 3 * 60 * 60 * 1000)
       const { data: conflicts } = await supabase.from('bookings')
         .select('booking_code, scheduled_at, destination')
         .eq('passenger_id', form.passenger_id)
         .not('status', 'in', '(rejected,cancelled,completed)')
-        .gte('scheduled_at', windowStart.toISOString())
-        .lte('scheduled_at', windowEnd.toISOString())
+        .lt('scheduled_at', estimatedEnd.toISOString())
+        .gt('auto_complete_at', scheduledDate.toISOString())
 
       if (conflicts?.length) {
         const c = conflicts[0]
