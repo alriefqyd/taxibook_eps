@@ -45,7 +45,8 @@ export default function CoordinatorHomePage() {
   const dateToRef   = React.useRef(new Date().toISOString().slice(0,10))
   const [page,        setPage]        = useState(0)
   const [hasMore,     setHasMore]     = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadingMore,  setLoadingMore]  = useState(false)
+  const [unreadCount,  setUnreadCount]  = useState(0)
   const [menuOpen,    setMenuOpen]    = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const PAGE_SIZE = 10
@@ -139,6 +140,7 @@ export default function CoordinatorHomePage() {
       setUser(p)
       await loadData(new Date().toISOString().slice(0,10), new Date().toISOString().slice(0,10), 0, false)
       setPage(0)
+      supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', p.id).eq('is_read', false).then(({ count }) => setUnreadCount(count || 0))
       setLoading(false)
     }
     init()
@@ -273,6 +275,11 @@ export default function CoordinatorHomePage() {
             </button>
             <button onClick={() => router.push('/coordinator/notifications')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              {unreadCount > 0 && (
+                <span style={{ position:'absolute', top:2, right:2, minWidth:16, height:16, borderRadius:8, background:'#EF4444', color:'#fff', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', border:'1.5px solid #fff', pointerEvents:'none', lineHeight:1 }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
             <div style={{ position: 'relative' }}>
               <div onClick={() => setMenuOpen(o => !o)} style={{ width: 36, height: 36, borderRadius: '50%', background: '#006064', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, border: '2px solid rgba(0,96,100,0.3)', cursor: 'pointer' }}>
@@ -533,20 +540,32 @@ function toWaNumber(phone: string): string {
 }
 
 function buildWaMessage(b: BookingDetail): string {
-  const time = format(new Date(b.scheduled_at), 'EEE dd MMM yyyy · HH:mm', { locale: idLocale })
-  const type = b.trip_type === 'DROP' ? 'Drop' : `Waiting ${b.wait_minutes} menit`
+  const time = format(new Date(b.scheduled_at), 'EEEE, dd MMMM yyyy · HH:mm', { locale: idLocale })
+  const type = b.trip_type === 'DROP' ? 'Drop (antar saja)' : `Waiting ${b.wait_minutes} menit (tunggu penumpang)`
+  const taxi = b.taxi_name ? `${b.taxi_name}${b.taxi_plate ? ` (${b.taxi_plate})` : ''}` : null
   return [
     `📋 *TaxiBook – Penugasan Perjalanan*`,
-    `━━━━━━━━━━━━━`,
-    `🔖 *${b.booking_code}*`,
-    `👤 Penumpang: *${b.passenger_name}*`,
-    `📍 Dari: ${b.pickup}`,
-    `🏁 Tujuan: *${b.destination}*`,
-    `🕐 Jadwal: ${time}`,
-    `🚗 Jenis: ${type}`,
-    ...(b.notes ? [`📝 Catatan: ${b.notes}`] : []),
-    `━━━━━━━━━━━━━`,
-    `Mohon konfirmasi penerimaan perjalanan ini.`,
+    `━━━━━━━━━━━━━━━━━━`,
+    `🔖 Kode Booking: *${b.booking_code}*`,
+    ``,
+    `👤 *Penumpang*`,
+    `   Nama : ${b.passenger_name}`,
+    ...(b.passenger_phone ? [`   HP   : ${b.passenger_phone}`] : []),
+    ``,
+    `📍 *Rute Perjalanan*`,
+    `   Dari    : ${b.pickup}`,
+    `   Tujuan  : ${b.destination}`,
+    ``,
+    `🕐 *Jadwal*`,
+    `   ${time}`,
+    ``,
+    `🚗 *Detail Trip*`,
+    `   Jenis : ${type}`,
+    ...(taxi ? [`   Taksi : ${taxi}`] : []),
+    ...(b.notes ? [`   Catatan : ${b.notes}`] : []),
+    ``,
+    `━━━━━━━━━━━━━━━━━━`,
+    `Mohon konfirmasi kesiapan Anda untuk perjalanan ini. Terima kasih! 🙏`,
   ].join('\n')
 }
 

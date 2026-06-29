@@ -39,7 +39,8 @@ export default function StaffHomePage() {
   const [dateTo,   setDateTo]   = useState('')
   const [bkPage,      setBkPage]      = useState(0)
   const [hasMoreBk,   setHasMoreBk]   = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadingMore,  setLoadingMore]  = useState(false)
+  const [unreadCount,  setUnreadCount]  = useState(0)
   const [view,         setView]         = useState<ViewMode>('day')
   const [cursor,       setCursor]       = useState(new Date())
   const [selectedBk,   setSelectedBk]   = useState<any | null>(null)
@@ -130,6 +131,7 @@ export default function StaffHomePage() {
       setUser(p)
       userId = au.id
       await loadData(au.id)
+      supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', au.id).eq('is_read', false).then(({ count }) => setUnreadCount(count || 0))
       setLoading(false)
     }
     init()
@@ -245,7 +247,16 @@ export default function StaffHomePage() {
                 </svg>
               </span>
             </button>
-            <Link href="/staff/notifications" style={{ textDecoration:'none', width:40, height:40, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></Link>
+            <div style={{ position: 'relative', display: 'inline-flex' }}>
+              <Link href="/staff/notifications" style={{ textDecoration:'none', width:40, height:40, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              </Link>
+              {unreadCount > 0 && (
+                <span style={{ position:'absolute', top:2, right:2, minWidth:16, height:16, borderRadius:8, background:'#EF4444', color:'#fff', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', border:'1.5px solid #F5F5F2', pointerEvents:'none', lineHeight:1 }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </div>
             <div style={{ position: 'relative' }}>
               <div onClick={() => setMenuOpen(o => !o)} style={{ width: 36, height: 36, borderRadius: '50%', background: '#006064', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: '2px solid rgba(0,96,100,0.3)' }}>
                 {user?.name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') || 'S'}
@@ -923,22 +934,34 @@ function staffToWaNumber(phone: string): string {
 
 function staffBuildWaMessage(b: any): string {
   const time = new Date(b.scheduled_at).toLocaleString('id-ID', {
-    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
-  const type = b.trip_type === 'DROP' ? 'Drop' : `Waiting ${b.wait_minutes} menit`
+  const type = b.trip_type === 'DROP' ? 'Drop (antar saja)' : `Waiting ${b.wait_minutes} menit (tunggu penumpang)`
+  const taxi = b.taxi_name ? `${b.taxi_name}${b.taxi_plate ? ` (${b.taxi_plate})` : ''}` : null
   return [
     `📋 *TaxiBook – Penugasan Perjalanan*`,
-    `━━━━━━━━━━━━━`,
-    `🔖 *${b.booking_code}*`,
-    `👤 Penumpang: *${b.passenger_name || 'Anda'}*`,
-    `📍 Dari: ${b.pickup}`,
-    `🏁 Tujuan: *${b.destination}*`,
-    `🕐 Jadwal: ${time}`,
-    `🚗 Jenis: ${type}`,
-    ...(b.notes ? [`📝 Catatan: ${b.notes}`] : []),
-    `━━━━━━━━━━━━━`,
-    `Mohon konfirmasi penerimaan perjalanan ini.`,
+    `━━━━━━━━━━━━━━━━━━`,
+    `🔖 Kode Booking: *${b.booking_code}*`,
+    ``,
+    `👤 *Penumpang*`,
+    `   Nama : ${b.passenger_name || 'Anda'}`,
+    ...(b.passenger_phone ? [`   HP   : ${b.passenger_phone}`] : []),
+    ``,
+    `📍 *Rute Perjalanan*`,
+    `   Dari    : ${b.pickup}`,
+    `   Tujuan  : ${b.destination}`,
+    ``,
+    `🕐 *Jadwal*`,
+    `   ${time}`,
+    ``,
+    `🚗 *Detail Trip*`,
+    `   Jenis : ${type}`,
+    ...(taxi ? [`   Taksi : ${taxi}`] : []),
+    ...(b.notes ? [`   Catatan : ${b.notes}`] : []),
+    ``,
+    `━━━━━━━━━━━━━━━━━━`,
+    `Mohon konfirmasi kesiapan Anda untuk perjalanan ini. Terima kasih! 🙏`,
   ].join('\n')
 }
 

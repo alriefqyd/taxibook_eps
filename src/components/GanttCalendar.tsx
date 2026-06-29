@@ -512,20 +512,32 @@ function toWaNumber(phone: string): string {
 }
 
 function buildWaMessage(b: BookingDetail): string {
-  const time = format(new Date(b.scheduled_at), 'EEE dd MMM yyyy · HH:mm', { locale: idLocale })
-  const type = b.trip_type === 'DROP' ? 'Drop' : `Waiting ${b.wait_minutes} menit`
+  const time = format(new Date(b.scheduled_at), 'EEEE, dd MMMM yyyy · HH:mm', { locale: idLocale })
+  const type = b.trip_type === 'DROP' ? 'Drop (antar saja)' : `Waiting ${b.wait_minutes} menit (tunggu penumpang)`
+  const taxi = b.taxi_name ? `${b.taxi_name}${b.taxi_plate ? ` (${b.taxi_plate})` : ''}` : null
   return [
     `📋 *TaxiBook – Penugasan Perjalanan*`,
-    `━━━━━━━━━━━━━`,
-    `🔖 *${b.booking_code}*`,
-    `👤 Penumpang: *${b.passenger_name}*`,
-    `📍 Dari: ${b.pickup}`,
-    `🏁 Tujuan: *${b.destination}*`,
-    `🕐 Jadwal: ${time}`,
-    `🚗 Jenis: ${type}`,
-    ...(b.notes ? [`📝 Catatan: ${b.notes}`] : []),
-    `━━━━━━━━━━━━━`,
-    `Mohon konfirmasi penerimaan perjalanan ini.`,
+    `━━━━━━━━━━━━━━━━━━`,
+    `🔖 Kode Booking: *${b.booking_code}*`,
+    ``,
+    `👤 *Penumpang*`,
+    `   Nama : ${b.passenger_name}`,
+    ...(b.passenger_phone ? [`   HP   : ${b.passenger_phone}`] : []),
+    ``,
+    `📍 *Rute Perjalanan*`,
+    `   Dari    : ${b.pickup}`,
+    `   Tujuan  : ${b.destination}`,
+    ``,
+    `🕐 *Jadwal*`,
+    `   ${time}`,
+    ``,
+    `🚗 *Detail Trip*`,
+    `   Jenis : ${type}`,
+    ...(taxi ? [`   Taksi : ${taxi}`] : []),
+    ...(b.notes ? [`   Catatan : ${b.notes}`] : []),
+    ``,
+    `━━━━━━━━━━━━━━━━━━`,
+    `Mohon konfirmasi kesiapan Anda untuk perjalanan ini. Terima kasih! 🙏`,
   ].join('\n')
 }
 

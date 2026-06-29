@@ -57,6 +57,7 @@ export default function NotificationsPage({ role }: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading,       setLoading]       = useState(true)
   const [userId,        setUserId]        = useState('')
+  const [selectedNotif, setSelectedNotif] = useState<Notification | null>(null)
 
   const loadNotifications = useCallback(async (uid: string) => {
     let query = supabase
@@ -170,6 +171,48 @@ export default function NotificationsPage({ role }: Props) {
         </div>
       </div>
 
+      {/* Notification detail popup */}
+      {selectedNotif && (() => {
+        const c = TYPE_COLORS[selectedNotif.type] || { bg:'#f3f4f6', border:'rgba(0,0,0,0.08)', dot:'#9ca3af' }
+        const ic = TYPE_ICONS[selectedNotif.type] || '🔔'
+        const time = formatDistanceToNow(new Date(selectedNotif.sent_at), { addSuffix: true, locale: idLocale })
+        const fullDate = new Date(selectedNotif.sent_at).toLocaleString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+        return (
+          <>
+            <div onClick={() => setSelectedNotif(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:200 }} />
+            <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:201, background:'#fff', borderRadius:'20px 20px 0 0', padding:'20px 20px 36px', maxHeight:'75vh', overflowY:'auto' }}>
+              <div style={{ width:36, height:4, borderRadius:9999, background:'rgba(0,0,0,0.12)', margin:'0 auto 20px' }} />
+
+              {/* Icon + title */}
+              <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:16 }}>
+                <div style={{ width:52, height:52, borderRadius:'50%', background:c.bg, border:`1.5px solid ${c.border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, flexShrink:0 }}>
+                  {ic}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <p style={{ fontSize:16, fontWeight:700, color:'#006064', margin:'0 0 3px', lineHeight:1.3 }}>{selectedNotif.title}</p>
+                  <p style={{ fontSize:11, color:'#9ca3af', margin:0 }}>{time} · {fullDate}</p>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div style={{ height:1, background:'rgba(0,0,0,0.07)', margin:'0 0 14px' }} />
+
+              {/* Body */}
+              <p style={{ fontSize:14, color:'#374151', lineHeight:1.65, margin:'0 0 24px', whiteSpace:'pre-line' }}>
+                {selectedNotif.body}
+              </p>
+
+              <button
+                onClick={() => setSelectedNotif(null)}
+                style={{ width:'100%', padding:'14px', background:'#006064', color:'#fff', border:'none', borderRadius:16, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
+              >
+                Close
+              </button>
+            </div>
+          </>
+        )
+      })()}
+
       {/* Notifications list */}
       <div style={{ padding:'12px 16px 20px' }}>
         {notifications.length === 0 ? (
@@ -186,15 +229,25 @@ export default function NotificationsPage({ role }: Props) {
             const icon   = TYPE_ICONS[n.type] || '🔔'
             const timeAgo = formatDistanceToNow(new Date(n.sent_at), { addSuffix:true, locale: idLocale })
 
+            async function openNotif() {
+              setSelectedNotif(n)
+              if (!n.is_read) {
+                await supabase.from('notifications').update({ is_read: true }).eq('id', n.id)
+                setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x))
+              }
+            }
+
             return (
               <div
                 key={n.id}
+                onClick={openNotif}
                 style={{
                   background: n.is_read ? '#fff' : colors.bg,
                   border: `1px solid ${n.is_read ? 'rgba(0,0,0,0.08)' : colors.border}`,
                   borderLeft: `3px solid ${n.is_read ? 'rgba(0,0,0,0.08)' : colors.dot}`,
                   borderRadius:'12px', padding:'12px 14px', marginBottom:'8px',
                   display:'flex', gap:'12px', alignItems:'flex-start',
+                  cursor: 'pointer',
                 }}
               >
                 {/* Icon */}

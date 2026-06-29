@@ -57,7 +57,8 @@ export default function DriverHomePage() {
   const [hasMoreUp,   setHasMoreUp]   = useState(false)
   const [pastPage,    setPastPage]    = useState(0)
   const [hasMorePast, setHasMorePast] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadingMore,  setLoadingMore]  = useState(false)
+  const [unreadCount,  setUnreadCount]  = useState(0)
   const [menuOpen,   setMenuOpen]   = useState(false)
   const uidRef = React.useRef('')
   const [toggling,   setToggling]   = useState(false)
@@ -129,6 +130,7 @@ export default function DriverHomePage() {
       const { data: taxi } = await supabase
         .from('taxis').select('*, users!driver_id(name)').eq('driver_id', au.id).single()
       if (taxi) setMyTaxi({ ...taxi, driver_name: taxi.users?.name || p.name })
+      supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', au.id).eq('is_read', false).then(({ count }) => setUnreadCount(count || 0))
       setLoading(false)
     }
     init()
@@ -228,8 +230,13 @@ export default function DriverHomePage() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button onClick={() => router.push('/driver/notifications')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={() => router.push('/driver/notifications')} style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              {unreadCount > 0 && (
+                <span style={{ position:'absolute', top:2, right:2, minWidth:16, height:16, borderRadius:8, background:'#EF4444', color:'#fff', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px', border:'1.5px solid #fff', pointerEvents:'none', lineHeight:1 }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
             <div style={{ position: 'relative' }}>
               <div onClick={() => setMenuOpen(o => !o)} style={{ width: 36, height: 36, borderRadius: '50%', background: '#006064', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, cursor: 'pointer', border: '2px solid rgba(0,96,100,0.3)', position: 'relative', flexShrink: 0 }}>
