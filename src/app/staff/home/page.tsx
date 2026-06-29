@@ -17,7 +17,7 @@ import OnboardingTour from '@/components/OnboardingTour'
 const TrackingMap    = dynamic(() => import('@/components/map/TrackingMap'),    { ssr: false })
 const DriverFleetMap = dynamic(() => import('@/components/map/DriverFleetMap'), { ssr: false })
 
-type ViewMode = 'day' | 'week' | 'month'
+type ViewMode = 'day' | 'week' | 'month' | 'map'
 
 const HOUR_START = 7
 const HOUR_END   = 19
@@ -313,29 +313,12 @@ export default function StaffHomePage() {
         </Link>
       </div>
 
-      {/* ── Live Fleet Map ── */}
-      <div style={{ background: '#ffffff', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-        <div style={{ padding: '12px 20px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: 0 }}>
-            Live Fleet
-          </p>
-          {activeBookings.length > 0 && (
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#006064', background: 'rgba(0,96,100,0.08)', padding: '2px 8px', borderRadius: 9999 }}>
-              Your driver is on the map
-            </span>
-          )}
-        </div>
-        <div style={{ height: 240, position: 'relative' }}>
-          <DriverFleetMap style={{ borderRadius: 0, height: '100%' }} />
-        </div>
-      </div>
-
       {/* ── View tabs + nav ── */}
       <div style={{ background:'#ffffff', borderBottom:'1px solid rgba(0,0,0,0.08)', padding:'12px 16px' }}>
         {/* Tabs */}
-        <div style={{ display:'flex', background:'#F5F5F2', borderRadius:10, padding:'3px', gap:'2px', marginBottom:'10px' }}>
-          {(['day','week','month'] as ViewMode[]).map(v => (
-            <button key={v} onClick={() => { setView(v); setCursor(new Date()) }} style={{
+        <div style={{ display:'flex', background:'#F5F5F2', borderRadius:10, padding:'3px', gap:'2px', marginBottom: view === 'map' ? 0 : '10px' }}>
+          {(['day','week','month','map'] as ViewMode[]).map(v => (
+            <button key={v} onClick={() => { setView(v); if (v !== 'map') setCursor(new Date()) }} style={{
               flex:1, padding:'6px 4px', fontSize:'12px', fontWeight:600,
               border:'none', borderRadius:'999px', cursor:'pointer',
               background: view === v ? '#ffffff' : 'transparent',
@@ -347,20 +330,27 @@ export default function StaffHomePage() {
           ))}
         </div>
 
-        {/* Nav row */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <button onClick={() => navigate(-1)} style={navBtn}>←</button>
-          <span style={{ fontSize:'13px', fontWeight:700, color:'#006064', textAlign:'center', flex:1, padding:'0 8px' }}>
-            {getNavLabel()}
-          </span>
-          <button onClick={() => navigate(1)} style={navBtn}>→</button>
-        </div>
+        {/* Nav row — hidden on map tab */}
+        {view !== 'map' && (
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <button onClick={() => navigate(-1)} style={navBtn}>←</button>
+            <span style={{ fontSize:'13px', fontWeight:700, color:'#006064', textAlign:'center', flex:1, padding:'0 8px' }}>
+              {getNavLabel()}
+            </span>
+            <button onClick={() => navigate(1)} style={navBtn}>→</button>
+          </div>
+        )}
       </div>
 
       {/* ── Views ── */}
       {view === 'day'   && <DayGantt   bookings={allActiveBookings} taxis={taxis} cursor={cursor} scrollRef={dayScrollRef} onSelectBooking={setSelectedBk} currentUserId={user?.id} />}
       {view === 'week'  && <WeekView   bookings={allActiveBookings} cursor={cursor} onSelectBooking={setSelectedBk} currentUserId={user?.id} />}
       {view === 'month' && <MonthView  bookings={allBookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} />}
+      {view === 'map'   && (
+        <div style={{ height: 'calc(100vh - 280px)', minHeight: 400, position: 'relative' }}>
+          <DriverFleetMap style={{ borderRadius: 0, height: '100%' }} />
+        </div>
+      )}
 
       {/* ── My bookings list ── */}
       <div style={{ padding: '16px 16px 100px' }}>
