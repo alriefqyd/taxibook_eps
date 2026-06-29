@@ -159,7 +159,7 @@ export default function BookPage() {
       const { data: conflicts } = await supabase.from('bookings')
         .select('booking_code, scheduled_at, destination')
         .eq('passenger_id', user.id)
-        .not('status', 'in', '("rejected","cancelled","completed")')
+        .not('status', 'in', '(rejected,cancelled,completed)')
         .gte('scheduled_at', windowStart.toISOString())
         .lte('scheduled_at', windowEnd.toISOString())
 
