@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       .from('bookings')
       .select('booking_code, scheduled_at, destination')
       .eq('passenger_id', passengerId)
-      .not('status', 'in', '("rejected","cancelled","completed")')
+      .not('status', 'in', '(rejected,cancelled,completed)')
       .lt('scheduled_at', auto_complete_at)
       .gt('auto_complete_at', scheduled_at)
       .limit(1)
@@ -171,13 +171,20 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string, au
   const todayStart    = new Date()
   todayStart.setHours(0, 0, 0, 0)
 
-  // Get available taxis (active + available + has driver)
-  const { data: taxis } = await admin
+  // Get active taxis with a driver assigned.
+  // is_available reflects real-time status — skip it for future bookings
+  // since a driver busy now may be free at scheduled_at.
+  let taxiQuery = admin
     .from('taxis')
     .select('id, name, driver_id, users!driver_id(name)')
-    .eq('is_active',    true)
-    .eq('is_available', true)
+    .eq('is_active', true)
     .not('driver_id', 'is', null)
+
+  if (isNowBooking) {
+    taxiQuery = taxiQuery.eq('is_available', true)
+  }
+
+  const { data: taxis } = await taxiQuery
 
   if (!taxis?.length) return { taxi: null }
 
