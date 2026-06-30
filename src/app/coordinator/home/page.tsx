@@ -88,15 +88,19 @@ export default function CoordinatorHomePage() {
         .not('status', 'in', '("cancelled","rejected","pending_coordinator_approval")')
         .order('scheduled_at', { ascending: true })
         .range(pageNum * 10, pageNum * 10 + 9),
-      // Full list (no limit) for the Calendar tab
-      supabase
-        .from('booking_details')
-        .select('*')
-        .gte('scheduled_at', todayStart.toISOString())
-        .lt('scheduled_at', todayEnd.toISOString())
-        .not('status', 'in', '("cancelled","rejected")')
-        .order('scheduled_at', { ascending: true })
-        .limit(500),
+      // Full list for the Calendar tab — wide window so internal navigation works
+      (() => {
+        const calStart = new Date(); calStart.setHours(0, 0, 0, 0); calStart.setDate(calStart.getDate() - 7)
+        const calEnd   = new Date(); calEnd.setHours(23, 59, 59, 999); calEnd.setDate(calEnd.getDate() + 90)
+        return supabase
+          .from('booking_details')
+          .select('*')
+          .gte('scheduled_at', calStart.toISOString())
+          .lt('scheduled_at', calEnd.toISOString())
+          .not('status', 'in', '("cancelled","rejected")')
+          .order('scheduled_at', { ascending: true })
+          .limit(1000)
+      })(),
       supabase
         .from('taxis')
         .select('*, users!driver_id(name)')
