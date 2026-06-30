@@ -55,10 +55,10 @@ export async function POST(
         .eq('id', bookingId)
 
       // Auto-assign
-      const WIB_MS      = 7 * 60 * 60 * 1000
-      const nowWib      = new Date(Date.now() + WIB_MS)
-      nowWib.setUTCHours(0, 0, 0, 0)
-      const todayStart    = new Date(nowWib.getTime() - WIB_MS)
+      const WITA_MS     = 8 * 60 * 60 * 1000
+      const nowWita     = new Date(Date.now() + WITA_MS)
+      nowWita.setUTCHours(0, 0, 0, 0)
+      const todayStart    = new Date(nowWita.getTime() - WITA_MS)
       const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
       const { data: taxis } = await admin
@@ -134,7 +134,7 @@ export async function POST(
             const { data: passenger } = await admin
               .from('users').select('name').eq('id', booking.passenger_id).single()
             const time = new Date(booking.scheduled_at).toLocaleTimeString('id-ID', {
-              hour: '2-digit', minute: '2-digit'
+              hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar'
             })
 
             await notify({

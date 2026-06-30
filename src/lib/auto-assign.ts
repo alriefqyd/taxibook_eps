@@ -27,9 +27,22 @@ export async function autoAssignDriver(
       return { success: false, error: 'No taxis available' }
     }
 
-    // For each taxi, check interval intersection: conflict if existing starts before new ends AND ends after new starts
+    // Exclude taxis with a full-day assignment on the booking's WITA date
+    const witaDate = new Date(new Date(scheduledAt).getTime() + 8 * 3600000).toISOString().slice(0, 10)
+    const { data: dayAssigned } = await supabase
+      .from('driver_day_assignments')
+      .select('taxi_id')
+      .eq('assign_date', witaDate)
+    const dayAssignedIds = new Set((dayAssigned || []).map((d: any) => d.taxi_id))
+    const candidates = taxis.filter((t: Taxi) => !dayAssignedIds.has(t.id))
+
+    if (candidates.length === 0) {
+      return { success: false, error: 'No driver available at that time' }
+    }
+
+    // For each candidate, check interval intersection: conflict if existing starts before new ends AND ends after new starts
     const taxiAvailability = await Promise.all(
-      taxis.map(async (taxi: Taxi) => {
+      candidates.map(async (taxi: Taxi) => {
         const { data: conflict } = await supabase
           .from('bookings')
           .select('id')
@@ -88,9 +101,18 @@ export async function getAvailableTaxisForTime(
 
   if (!taxis) return []
 
+  // Exclude taxis with a full-day assignment on the booking's WITA date
+  const witaDate = new Date(new Date(scheduledAt).getTime() + 8 * 3600000).toISOString().slice(0, 10)
+  const { data: dayAssigned } = await supabase
+    .from('driver_day_assignments')
+    .select('taxi_id')
+    .eq('assign_date', witaDate)
+  const dayAssignedIds = new Set((dayAssigned || []).map((d: any) => d.taxi_id))
+  const candidates = taxis.filter((t: any) => !dayAssignedIds.has(t.id))
+
   const available: string[] = []
 
-  for (const taxi of taxis) {
+  for (const taxi of candidates) {
     const { data: conflict } = await supabase
       .from('bookings')
       .select('id')

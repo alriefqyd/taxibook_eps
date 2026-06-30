@@ -158,6 +158,7 @@ export async function notifyDriverAssigned(
   const time = new Date(scheduledAt).toLocaleTimeString('id-ID', {
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Asia/Makassar',
   })
   await sendNotification({
     userIds: [driverId],

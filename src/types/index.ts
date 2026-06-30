@@ -134,6 +134,15 @@ export interface PushSubscription {
   created_at: string
 }
 
+export interface DriverDayAssignment {
+  id: string
+  taxi_id: string
+  assign_date: string  // YYYY-MM-DD (WITA date)
+  reason: string | null
+  created_by: string | null
+  created_at: string
+}
+
 // ── Status display helpers ──────────────────────────────────
 
 export const STATUS_LABELS: Record<BookingStatus, string> = {

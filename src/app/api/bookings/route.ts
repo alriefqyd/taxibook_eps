@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (passengerConflict) {
-      const t = new Date(passengerConflict.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      const t = new Date(passengerConflict.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar' })
       return NextResponse.json(
         { error: `Passenger already has a booking at ${t} to ${passengerConflict.destination} that overlaps this trip.` },
         { status: 409 }
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
           .from('users').select('name').eq('id', passengerId).single()
 
         const time = new Date(scheduled_at).toLocaleTimeString('id-ID', {
-          hour: '2-digit', minute: '2-digit'
+          hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar'
         })
 
         await notify({
@@ -169,11 +169,11 @@ export async function POST(request: NextRequest) {
 
 // ── Auto-assign: fewest trips today + longest idle tiebreaker ────────────────
 async function autoAssign(admin: any, bookingId: string, scheduledAt: string, autoCompleteAt: string) {
-  // Midnight WIB (UTC+7) expressed as UTC — trips are counted per local business day
-  const WIB_MS      = 7 * 60 * 60 * 1000
-  const nowWib      = new Date(Date.now() + WIB_MS)
-  nowWib.setUTCHours(0, 0, 0, 0)
-  const todayStart    = new Date(nowWib.getTime() - WIB_MS)
+  // Midnight WITA (UTC+8) expressed as UTC — trips are counted per local business day
+  const WITA_MS     = 8 * 60 * 60 * 1000
+  const nowWita     = new Date(Date.now() + WITA_MS)
+  nowWita.setUTCHours(0, 0, 0, 0)
+  const todayStart    = new Date(nowWita.getTime() - WITA_MS)
   const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
   // Active taxis with a driver on duty (is_available = driver manually set themselves online)
@@ -186,9 +186,20 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string, au
 
   if (!taxis?.length) return { taxi: null }
 
+  // Exclude taxis with a full-day assignment on the booking's WITA date
+  const witaDate = new Date(new Date(scheduledAt).getTime() + 8 * 3600000).toISOString().slice(0, 10)
+  const { data: dayAssigned } = await admin
+    .from('driver_day_assignments')
+    .select('taxi_id')
+    .eq('assign_date', witaDate)
+  const dayAssignedIds = new Set((dayAssigned || []).map((d: any) => d.taxi_id))
+  const candidates = taxis.filter((t: any) => !dayAssignedIds.has(t.id))
+
+  if (!candidates.length) return { taxi: null }
+
   // Build availability data for each taxi
   const availability = await Promise.all(
-    taxis.map(async (taxi: any) => {
+    candidates.map(async (taxi: any) => {
 
       // No schedule conflict: existing booking starts before new ends AND existing ends after new starts
       const { data: conflict } = await admin

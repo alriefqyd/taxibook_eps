@@ -35,12 +35,25 @@ const IconAlert = () => (
     <polygon points="12 2 22 20 2 20"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
   </svg>
 )
+const IconCalendarPlus = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/>
+  </svg>
+)
+const IconX = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+)
 
 interface TaxiRow {
   id: string; name: string; plate: string | null; color: string
   is_available: boolean; driver_id: string | null; driver_name: string | null
   trips_today: number
   active_booking: any | null; next_booking: any | null
+}
+interface DayAssignment {
+  id: string; taxi_id: string; assign_date: string; reason: string | null
 }
 interface Booking {
   id: string; booking_code: string; passenger_name: string
@@ -68,20 +81,39 @@ export default function DriversPage() {
   const [saving,       setSaving]       = useState(false)
   const [dateFilter,   setDateFilter]   = useState(new Date().toISOString().slice(0, 10))
 
+  // Full-day assignment state
+  const [dayAssignments,  setDayAssignments]  = useState<Record<string, DayAssignment[]>>({})
+  const [assigningTaxi,   setAssigningTaxi]   = useState<TaxiRow | null>(null)
+  const [assignDate,      setAssignDate]      = useState('')
+  const [assignReason,    setAssignReason]    = useState('')
+  const [savingAssign,    setSavingAssign]    = useState(false)
+
   const loadData = useCallback(async (date?: string) => {
     const d = date || dateFilter
     const start = new Date(d); start.setHours(0,0,0,0)
     const end   = new Date(d); end.setHours(23,59,59,999)
     const todayStart = new Date(); todayStart.setHours(0,0,0,0)
 
-    const [{ data: txs }, { data: bks }] = await Promise.all([
+    // Current WITA date for day assignments
+    const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+
+    const [{ data: txs }, { data: bks }, { data: dayAssignRaw }] = await Promise.all([
       supabase.from('taxis').select('*, users!driver_id(name)').eq('is_active', true).order('name'),
       supabase.from('booking_details').select('*')
         .gte('scheduled_at', start.toISOString())
         .lte('scheduled_at', end.toISOString())
         .not('status', 'in', '("cancelled","rejected")')
         .order('scheduled_at', { ascending: true }),
+      supabase.from('driver_day_assignments').select('*').gte('assign_date', witaToday).order('assign_date', { ascending: true }),
     ])
+
+    // Build day assignments map keyed by taxi_id
+    const assignMap: Record<string, DayAssignment[]> = {}
+    for (const a of (dayAssignRaw || [])) {
+      if (!assignMap[a.taxi_id]) assignMap[a.taxi_id] = []
+      assignMap[a.taxi_id].push(a)
+    }
+    setDayAssignments(assignMap)
     setBookings(bks || [])
     if (!txs) return
 
@@ -162,6 +194,42 @@ export default function DriversPage() {
       alert('Error: ' + (d.error || 'Failed to reassign'))
     } else { setReassigning(null); await loadData() }
     setSaving(false)
+  }
+
+  function openAssignFullDay(taxi: TaxiRow) {
+    setAssigningTaxi(taxi)
+    setAssignDate(new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10))
+    setAssignReason('')
+  }
+
+  async function confirmAssignFullDay() {
+    if (!assigningTaxi || !assignDate) return
+    setSavingAssign(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setSavingAssign(false); return }
+    const res = await fetch('/api/driver-day-assignments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ taxi_id: assigningTaxi.id, assign_date: assignDate, reason: assignReason || null }),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      alert(d.error || 'Failed to assign')
+    } else {
+      setAssigningTaxi(null)
+      await loadData()
+    }
+    setSavingAssign(false)
+  }
+
+  async function releaseFullDay(assignmentId: string) {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    await fetch(`/api/driver-day-assignments/${assignmentId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${session.access_token}` },
+    })
+    await loadData()
   }
 
   if (loading) return (
@@ -249,6 +317,10 @@ export default function DriversPage() {
             const isToggling = toggling === t.id
             const taxiBks    = bookings.filter(b => b.taxi_id === t.id)
 
+            const witaTodayStr = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+            const taxiAssignments = dayAssignments[t.id] || []
+            const hasAssignmentToday = taxiAssignments.some(a => a.assign_date === witaTodayStr)
+
             return (
               <div key={t.id} style={{
                 background: '#ffffff',
@@ -258,7 +330,7 @@ export default function DriversPage() {
                 boxShadow: isActive
                   ? `0 4px 16px rgba(196,98,45,0.12), 0 1px 4px rgba(0,0,0,0.06)`
                   : '0 1px 4px rgba(0,0,0,0.06)',
-                border: `1px solid ${isActive ? t.color + '40' : 'rgba(0,0,0,0.08)'}`,
+                border: `1px solid ${hasAssignmentToday ? '#FCD34D' : isActive ? t.color + '40' : 'rgba(0,0,0,0.08)'}`,
               }}>
 
                 {/* Colored top strip if active */}
@@ -284,6 +356,13 @@ export default function DriversPage() {
                       )}
                     </div>
                     <p style={{ fontSize: 12, color: '#6f7979', margin: '0 0 5px' }}>{t.driver_name || 'No driver'}</p>
+
+                    {/* Full Day badge */}
+                    {hasAssignmentToday && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: '#92400E', background: '#FEF3C7', padding: '2px 8px', borderRadius: 9999, border: '1px solid #FCD34D', marginBottom: 3 }}>
+                        ★ Full Day Today
+                      </span>
+                    )}
 
                     {/* Status pill */}
                     {isActive ? (
@@ -381,6 +460,39 @@ export default function DriversPage() {
                         })}
                       </div>
                     )}
+
+                    {/* Full Day Assignments */}
+                    <div style={{ borderTop: taxiBks.length > 0 ? '1px solid rgba(0,0,0,0.06)' : 'none', paddingTop: taxiBks.length > 0 ? 12 : 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: 0 }}>Full Day Duty</p>
+                        {t.driver_id && (
+                          <button onClick={e => { e.stopPropagation(); openAssignFullDay(t) }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, padding: '5px 11px', borderRadius: 9, background: '#006064', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif" }}>
+                            <IconCalendarPlus /> Assign Day
+                          </button>
+                        )}
+                      </div>
+                      {taxiAssignments.length > 0 ? (
+                        taxiAssignments.map(a => (
+                          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 11px', background: a.assign_date === witaTodayStr ? '#FEF3C7' : '#FFFBEB', borderRadius: 10, marginBottom: 5, border: `1px solid ${a.assign_date === witaTodayStr ? '#FCD34D' : '#FDE68A'}` }}>
+                            <span style={{ fontSize: 14 }}>★</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ fontSize: 12, fontWeight: 700, color: '#92400E', margin: 0 }}>
+                                {format(new Date(a.assign_date + 'T12:00:00'), 'EEE, d MMM yyyy', { locale: idLocale })}
+                                {a.assign_date === witaTodayStr && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#b45309', background: '#FCD34D', padding: '1px 5px', borderRadius: 4 }}>TODAY</span>}
+                              </p>
+                              {a.reason && <p style={{ fontSize: 11, color: '#b45309', margin: '2px 0 0', fontStyle: 'italic' }}>{a.reason}</p>}
+                            </div>
+                            <button onClick={e => { e.stopPropagation(); releaseFullDay(a.id) }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 7, background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5', cursor: 'pointer', flexShrink: 0, fontFamily: "var(--font-inter), 'Inter', sans-serif" }}>
+                              <IconX /> Release
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <p style={{ fontSize: 12, color: '#9ca3af', margin: 0, padding: '4px 0' }}>No upcoming full day duty scheduled</p>
+                      )}
+                    </div>
 
                   </div>
                 )}
@@ -496,6 +608,54 @@ export default function DriversPage() {
               <p style={{ fontSize: 13, color: '#6f7979', margin: 0 }}>No bookings for this date</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Assign Full Day sheet ── */}
+      {assigningTaxi && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 100 }}
+          onClick={() => setAssigningTaxi(null)}>
+          <div style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', maxHeight: '80vh', overflowY: 'auto' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.08)', margin: '0 auto 20px' }} />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <div style={{ width: 38, height: 38, borderRadius: '50%', background: assigningTaxi.color + '20', border: `2px solid ${assigningTaxi.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>★</div>
+              <div>
+                <p style={{ fontSize: 16, fontWeight: 800, margin: 0, letterSpacing: '-0.3px' }}>Assign Full Day Duty</p>
+                <p style={{ fontSize: 12, color: '#6f7979', margin: '2px 0 0' }}>{assigningTaxi.name} · {assigningTaxi.driver_name}</p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>Date</p>
+            <input type="date" value={assignDate}
+              onChange={e => setAssignDate(e.target.value)}
+              min={new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)}
+              style={{ width: '100%', padding: '12px 14px', fontSize: 14, fontWeight: 600, border: '1.5px solid rgba(0,0,0,0.12)', borderRadius: 13, outline: 'none', marginBottom: 14, boxSizing: 'border-box', fontFamily: "var(--font-inter), 'Inter', sans-serif", color: '#006064' }} />
+
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>Duty description (optional)</p>
+            <input type="text" value={assignReason}
+              onChange={e => setAssignReason(e.target.value)}
+              placeholder="e.g. VIP escort, site visit, security duty..."
+              style={{ width: '100%', padding: '12px 14px', fontSize: 14, border: '1.5px solid rgba(0,0,0,0.12)', borderRadius: 13, outline: 'none', marginBottom: 22, boxSizing: 'border-box', fontFamily: "var(--font-inter), 'Inter', sans-serif" }} />
+
+            <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 12, padding: '10px 14px', marginBottom: 18 }}>
+              <p style={{ fontSize: 12, color: '#92400E', margin: 0, fontWeight: 500 }}>
+                Driver will not appear in auto-assign for this date. Coordinator can still manually assign them if needed.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setAssigningTaxi(null)}
+                style={{ flex: 1, padding: '14px', fontSize: 14, fontWeight: 700, border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 14, background: '#F5F5F2', color: '#6f7979', cursor: 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif" }}>
+                Cancel
+              </button>
+              <button onClick={confirmAssignFullDay} disabled={!assignDate || savingAssign}
+                style={{ flex: 2, padding: '14px', fontSize: 14, fontWeight: 800, border: 'none', borderRadius: 14, background: !assignDate || savingAssign ? '#D1D5DB' : '#006064', color: '#fff', cursor: !assignDate || savingAssign ? 'not-allowed' : 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif" }}>
+                {savingAssign ? 'Assigning...' : 'Confirm Full Day Duty'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

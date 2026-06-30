@@ -57,7 +57,7 @@ export async function POST(
       .maybeSingle()
 
     if (driverConflict) {
-      const t = new Date(driverConflict.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      const t = new Date(driverConflict.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar' })
       return NextResponse.json(
         { error: `Driver already has a booking at ${t} that overlaps this trip.` },
         { status: 409 }
@@ -100,7 +100,7 @@ export async function POST(
       .from('users').select('name').eq('id', booking.passenger_id).single()
 
     const time = new Date(booking.scheduled_at).toLocaleTimeString('id-ID', {
-      hour: '2-digit', minute: '2-digit'
+      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar'
     })
 
     if (newDriverId) {
