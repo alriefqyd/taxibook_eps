@@ -927,31 +927,33 @@ function WeekView({ bookings, cursor, onSelectBooking, currentUserId, dayAssignm
             const dayStr = format(d, 'yyyy-MM-dd')
             const assignCount = dayAssignments.filter(a => a.assign_date === dayStr).length
             return (
-              <div key={d.toISOString()} style={{ borderRight:'1px solid rgba(0,0,0,0.08)', padding:'4px 2px', minHeight:120, background: assignCount > 0 ? 'rgba(254,179,0,0.06)' : 'transparent' }}>
+              <div key={d.toISOString()} style={{ borderRight:'1px solid rgba(0,0,0,0.08)', padding:'4px 2px', minHeight:120, background: assignCount > 0 ? 'rgba(254,179,0,0.06)' : 'transparent', overflow:'hidden', minWidth:0 }}>
                 {assignCount > 0 && (
-                  <div style={{ fontSize:'8px', fontWeight:700, color:'#7e5700', background:'rgba(254,179,0,0.18)', borderRadius:3, padding:'1px 3px', marginBottom:3, textAlign:'center' }}>
-                    ★ {assignCount} full day
+                  <div style={{ fontSize:'7px', fontWeight:700, color:'#7e5700', background:'rgba(254,179,0,0.18)', borderRadius:3, padding:'1px 2px', marginBottom:3, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    ★ full day
                   </div>
                 )}
                 {dayBks.map(b => {
                   const color     = b.taxi_color || '#3f4949'
                   const isPending = b.status.includes('pending')
                   const isOwner   = currentUserId && b.passenger_id === currentUserId
+                  const isDone    = b.status === 'completed'
                   return (
                     <div
                       key={b.id}
                       onClick={isOwner ? () => onSelectBooking(b) : undefined}
                       style={{
-                        background: color + '20',
-                        border:`1px ${isPending?'dashed':'solid'} ${color}`,
-                        borderRadius:3, padding:'2px 4px', marginBottom:2,
-                        fontSize:'9px', fontWeight:700, color,
+                        background: isDone ? '#F1F5F9' : color + '20',
+                        border:`1px ${isPending?'dashed':'solid'} ${isDone ? '#94a3b8' : color}`,
+                        borderRadius:3, padding:'2px 3px', marginBottom:2,
+                        fontSize:'8px', fontWeight:700, color: isDone ? '#64748b' : color,
                         overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                        width:'100%', boxSizing:'border-box',
                         cursor: isOwner ? 'pointer' : 'default',
-                        opacity: isOwner ? 1 : 0.6,
+                        opacity: isDone ? 0.75 : isOwner ? 1 : 0.6,
                       }}
                     >
-                      {format(new Date(b.scheduled_at),'HH:mm')} {b.passenger_name}
+                      {isDone ? '✓' : ''}{format(new Date(b.scheduled_at),'HH:mm')}
                     </div>
                   )
                 })}
