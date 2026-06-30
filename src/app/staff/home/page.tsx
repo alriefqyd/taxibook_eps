@@ -547,20 +547,19 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, current
                       : Math.min(2, HOUR_END - startH)
                 const width     = Math.max(durH * HOUR_W - 4, 44)
                 const isPending = b.status.includes('pending')
-                const isOwner   = currentUserId && b.passenger_id === currentUserId
                 const blockColor = isDone ? '#94a3b8' : taxi.color
                 return (
                   <div
                     key={b.id}
-                    onClick={isOwner ? () => onSelectBooking(b) : undefined}
+                    onClick={() => onSelectBooking(b)}
                     style={{
                       position:'absolute', left:left+2, top:5,
                       width, height:ROW_H - 10,
                       background: isDone ? '#F1F5F9' : taxi.color + '22',
                       border:`1.5px ${isPending?'dashed':'solid'} ${blockColor}`,
                       borderRadius:'7px', padding:'4px 6px', overflow:'hidden', zIndex:5,
-                      cursor: isOwner ? 'pointer' : 'default',
-                      opacity: isDone ? 0.75 : isOwner ? 1 : 0.6,
+                      cursor: 'pointer',
+                      opacity: isDone ? 0.75 : 1,
                     }}
                   >
                     <p style={{ fontSize:'10px', fontWeight:800, color:blockColor, margin:'0 0 1px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
@@ -889,7 +888,7 @@ const navBtn: React.CSSProperties = {
 }
 
 // ── WEEK VIEW (original grid) ───────────────────────────────
-function WeekView({ bookings, cursor, onSelectBooking, currentUserId, dayAssignments = [] }: { bookings: BookingDetail[]; cursor: Date; onSelectBooking: (b: BookingDetail) => void; currentUserId?: string; dayAssignments?: { taxi_id: string; assign_date: string }[] }) {
+function WeekView({ bookings, cursor, onSelectBooking, dayAssignments = [] }: { bookings: BookingDetail[]; cursor: Date; onSelectBooking: (b: BookingDetail) => void; currentUserId?: string; dayAssignments?: { taxi_id: string; assign_date: string }[] }) {
   const today  = new Date()
   const monday = startOfWeek(cursor, { weekStartsOn: 1 })
   const days   = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
@@ -936,12 +935,11 @@ function WeekView({ bookings, cursor, onSelectBooking, currentUserId, dayAssignm
                 {dayBks.map(b => {
                   const color     = b.taxi_color || '#3f4949'
                   const isPending = b.status.includes('pending')
-                  const isOwner   = currentUserId && b.passenger_id === currentUserId
                   const isDone    = b.status === 'completed'
                   return (
                     <div
                       key={b.id}
-                      onClick={isOwner ? () => onSelectBooking(b) : undefined}
+                      onClick={() => onSelectBooking(b)}
                       style={{
                         background: isDone ? '#F1F5F9' : color + '20',
                         border:`1px ${isPending?'dashed':'solid'} ${isDone ? '#94a3b8' : color}`,
@@ -949,8 +947,8 @@ function WeekView({ bookings, cursor, onSelectBooking, currentUserId, dayAssignm
                         fontSize:'8px', fontWeight:700, color: isDone ? '#64748b' : color,
                         overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                         width:'100%', boxSizing:'border-box',
-                        cursor: isOwner ? 'pointer' : 'default',
-                        opacity: isDone ? 0.75 : isOwner ? 1 : 0.6,
+                        cursor: 'pointer',
+                        opacity: isDone ? 0.75 : 1,
                       }}
                     >
                       {isDone ? '✓' : ''}{format(new Date(b.scheduled_at),'HH:mm')}
@@ -1061,9 +1059,10 @@ function StaffBookingSheet({ booking, currentUserId, onClose, onCancelled }: {
     onClose()
   }
 
-  const isOwner   = !!currentUserId && booking.passenger_id === currentUserId
-  const canCancel = isOwner && ['submitted','pending_coordinator_approval','booked']
-    .includes(booking.status)
+  const isCreator = !!currentUserId && (
+    booking.created_by === currentUserId || booking.passenger_id === currentUserId
+  )
+  const canCancel = isCreator && ['submitted','pending_coordinator_approval','booked'].includes(booking.status)
 
   return (
     <div
@@ -1116,6 +1115,8 @@ function StaffBookingSheet({ booking, currentUserId, onClose, onCancelled }: {
         <div style={{ background: '#F5F5F2', borderRadius: 16, padding: '12px 14px', marginBottom: '16px' }}>
           {[
             { label: 'Booking ID',  value: booking.booking_code },
+            { label: 'Penumpang',   value: booking.passenger_name || '—' },
+            ...(booking.passenger_phone ? [{ label: 'No. HP penumpang', value: booking.passenger_phone }] : []),
             { label: 'Pickup',      value: booking.pickup },
             { label: 'Status',      value: booking.status?.replace(/_/g,' ') },
             { label: 'Taxi',        value: booking.taxi_name ? `${booking.taxi_name} · ${booking.driver_name}` : 'Not assigned yet' },
@@ -1128,8 +1129,8 @@ function StaffBookingSheet({ booking, currentUserId, onClose, onCancelled }: {
           ))}
         </div>
 
-        {/* Action buttons — call & WhatsApp side by side, cancel below */}
-        {booking.driver_phone && !showCancel && (
+        {/* Action buttons — only shown to the booking creator */}
+        {isCreator && booking.driver_phone && !showCancel && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: canCancel ? 8 : 0 }}>
             <a
               href={`tel:${booking.driver_phone}`}
