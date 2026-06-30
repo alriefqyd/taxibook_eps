@@ -18,13 +18,14 @@ const DAY_W      = 100
 const ROW_H      = 52
 
 interface GanttCalendarProps {
-  bookings:       BookingDetail[]
-  taxis:          any[]
-  showCompleted?: boolean
-  onRefresh?:     () => void
+  bookings:        BookingDetail[]
+  taxis:           any[]
+  showCompleted?:  boolean
+  onRefresh?:      () => void
+  dayAssignments?: { taxi_id: string; assign_date: string }[]
 }
 
-export default function GanttCalendar({ bookings, taxis, showCompleted = false }: GanttCalendarProps) {
+export default function GanttCalendar({ bookings, taxis, showCompleted = false, dayAssignments = [] }: GanttCalendarProps) {
   const [view,            setView]            = useState<ViewMode>('day')
   const [cursor,          setCursor]          = useState(new Date())
   const [selectedBooking, setSelectedBooking] = useState<BookingDetail | null>(null)
@@ -96,9 +97,9 @@ export default function GanttCalendar({ bookings, taxis, showCompleted = false }
       </div>
 
       {/* ── Views ── */}
-      {view === 'day'   && <DayGantt   bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={dayRef}  onSelectBooking={setSelectedBooking} />}
-      {view === 'week'  && <WeekGantt  bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={weekRef} onSelectBooking={setSelectedBooking} />}
-      {view === 'month' && <MonthView  bookings={ganttBookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} />}
+      {view === 'day'   && <DayGantt   bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={dayRef}  onSelectBooking={setSelectedBooking} dayAssignments={dayAssignments} />}
+      {view === 'week'  && <WeekGantt  bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={weekRef} onSelectBooking={setSelectedBooking} dayAssignments={dayAssignments} />}
+      {view === 'month' && <MonthView  bookings={ganttBookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} dayAssignments={dayAssignments} />}
 
       {/* ── Booking detail sheet ── */}
       {selectedBooking && (
@@ -109,12 +110,14 @@ export default function GanttCalendar({ bookings, taxis, showCompleted = false }
 }
 
 // ── DAY GANTT ───────────────────────────────────────────────
-function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
+function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAssignments }: {
   bookings: BookingDetail[]; taxis: any[]; cursor: Date; scrollRef: React.RefObject<HTMLDivElement>
   onSelectBooking: (b: BookingDetail) => void
+  dayAssignments: { taxi_id: string; assign_date: string }[]
 }) {
-  const today     = new Date()
-  const dayBks    = bookings.filter(b => isSameDay(new Date(b.scheduled_at), cursor))
+  const today        = new Date()
+  const cursorDateStr = format(cursor, 'yyyy-MM-dd')
+  const dayBks       = bookings.filter(b => isSameDay(new Date(b.scheduled_at), cursor))
   const activeCnt = dayBks.filter(b => b.status !== 'completed').length
   const doneCnt   = dayBks.filter(b => b.status === 'completed').length
   const hours  = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => i + HOUR_START)
@@ -144,7 +147,9 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
             ))}
           </div>
           {/* Taxi rows */}
-          {taxis.map((taxi, idx) => (
+          {taxis.map((taxi, idx) => {
+            const isFullDay = dayAssignments.some(a => a.taxi_id === taxi.id && a.assign_date === cursorDateStr)
+            return (
             <GanttRow
               key={taxi.id}
               taxi={taxi}
@@ -158,6 +163,11 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#EF4444', position: 'absolute', top: -3, left: -2 }} />
                 </div>
               ) : null}
+              overlay={isFullDay ? (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(254,243,199,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderTop: '2px solid #FCD34D', borderBottom: '2px solid #FCD34D' }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: '#92400E', letterSpacing: '0.05em' }}>★ FULL DAY DUTY</span>
+                </div>
+              ) : undefined}
               bookings={dayBks.filter(b => b.taxi_id === taxi.id)}
               renderBlock={(b) => {
                 const dt          = new Date(b.scheduled_at)
@@ -191,7 +201,8 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
                 )
               }}
             />
-          ))}
+            )
+          })}
           <GanttLegend />
         </div>
       </div>
@@ -200,9 +211,10 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
 }
 
 // ── WEEK GANTT ──────────────────────────────────────────────
-function WeekGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
+function WeekGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAssignments }: {
   bookings: BookingDetail[]; taxis: any[]; cursor: Date; scrollRef: React.RefObject<HTMLDivElement>
   onSelectBooking: (b: BookingDetail) => void
+  dayAssignments: { taxi_id: string; assign_date: string }[]
 }) {
   const today  = new Date()
   const monday = startOfWeek(cursor, { weekStartsOn: 1 })
@@ -256,6 +268,19 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
                     <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#EF4444', position: 'absolute', top: -3, left: -2 }} />
                   </div>
                 ) : null}
+                overlay={
+                  <>
+                    {days.map((d, i) => {
+                      const isAssigned = dayAssignments.some(a => a.taxi_id === taxi.id && a.assign_date === format(d, 'yyyy-MM-dd'))
+                      if (!isAssigned) return null
+                      return (
+                        <div key={d.toISOString()} style={{ position: 'absolute', left: i * DAY_W + 1, top: 0, width: DAY_W - 2, bottom: 0, background: 'rgba(254,243,199,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderLeft: '2px solid #FCD34D', borderRight: '1px solid #FCD34D' }}>
+                          <span style={{ fontSize: 8, fontWeight: 800, color: '#92400E', letterSpacing: '0.04em', writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap' }}>★ FULL DAY</span>
+                        </div>
+                      )
+                    })}
+                  </>
+                }
                 bookings={weekBks}
                 renderBlock={(b) => {
                   const dt     = new Date(b.scheduled_at)
@@ -284,8 +309,9 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking }: {
 }
 
 // ── MONTH VIEW ──────────────────────────────────────────────
-function MonthView({ bookings, cursor, onDayClick }: {
+function MonthView({ bookings, cursor, onDayClick, dayAssignments }: {
   bookings: BookingDetail[]; cursor: Date; onDayClick: (d: Date) => void
+  dayAssignments: { taxi_id: string; assign_date: string }[]
 }) {
   const today = new Date()
   const start = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 })
@@ -301,14 +327,21 @@ function MonthView({ bookings, cursor, onDayClick }: {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
           {days.map(d => {
-            const inMonth = isSameMonth(d, cursor)
-            const isToday = isSameDay(d, today)
-            const bks     = bookings.filter(b => isSameDay(new Date(b.scheduled_at), d))
+            const inMonth    = isSameMonth(d, cursor)
+            const isToday    = isSameDay(d, today)
+            const bks        = bookings.filter(b => isSameDay(new Date(b.scheduled_at), d))
+            const dateStr    = format(d, 'yyyy-MM-dd')
+            const assignedCount = dayAssignments.filter(a => a.assign_date === dateStr).length
             return (
-              <div key={d.toISOString()} onClick={() => onDayClick(d)} style={{ minHeight: 52, borderRight: '1px solid rgba(0,0,0,0.08)', borderBottom: '1px solid rgba(0,0,0,0.08)', padding: '4px', opacity: inMonth ? 1 : 0.3, cursor: 'pointer', background: isToday ? 'rgba(0,96,100,0.06)' : 'transparent' }}>
-                <div style={{ width: 20, height: 20, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 3, background: isToday ? '#006064' : 'transparent', fontSize: '11px', fontWeight: 700, color: isToday ? '#fff' : '#006064' }}>
+              <div key={d.toISOString()} onClick={() => onDayClick(d)} style={{ minHeight: 52, borderRight: '1px solid rgba(0,0,0,0.08)', borderBottom: '1px solid rgba(0,0,0,0.08)', padding: '4px', opacity: inMonth ? 1 : 0.3, cursor: 'pointer', background: assignedCount > 0 ? 'rgba(254,243,199,0.4)' : isToday ? 'rgba(0,96,100,0.06)' : 'transparent' }}>
+                <div style={{ width: 20, height: 20, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 2, background: isToday ? '#006064' : 'transparent', fontSize: '11px', fontWeight: 700, color: isToday ? '#fff' : '#006064' }}>
                   {format(d, 'd')}
                 </div>
+                {assignedCount > 0 && (
+                  <div style={{ fontSize: '8px', fontWeight: 800, color: '#92400E', background: '#FEF3C7', borderRadius: 3, padding: '1px 3px', marginBottom: 2, border: '1px solid #FCD34D', display: 'inline-block' }}>
+                    ★ {assignedCount}
+                  </div>
+                )}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                   {bks.slice(0, 3).map(b => (
                     <span key={b.id} style={{ width: 6, height: 6, borderRadius: '50%', background: b.taxi_color || '#9ca3af', display: 'inline-block' }} />
@@ -325,10 +358,11 @@ function MonthView({ bookings, cursor, onDayClick }: {
 }
 
 // ── Shared Gantt row ────────────────────────────────────────
-function GanttRow({ taxi, idx, bookings, renderBlock, nowLine, gridLines, totalW }: {
+function GanttRow({ taxi, idx, bookings, renderBlock, nowLine, gridLines, totalW, overlay }: {
   taxi: any; idx: number; bookings: BookingDetail[]
   renderBlock: (b: BookingDetail) => React.ReactNode
   nowLine: React.ReactNode; gridLines: React.ReactNode; totalW: number
+  overlay?: React.ReactNode
 }) {
   return (
     <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.08)', background: idx % 2 === 0 ? '#fff' : '#f9f9f6' }}>
@@ -346,6 +380,7 @@ function GanttRow({ taxi, idx, bookings, renderBlock, nowLine, gridLines, totalW
         {!taxi.is_available && (
           <div style={{ position: 'absolute', inset: 0, background: 'repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(0,0,0,0.03) 5px,rgba(0,0,0,0.03) 10px)', zIndex: 1 }} />
         )}
+        {overlay}
         {nowLine}
         {bookings.map(b => renderBlock(b))}
         {bookings.length === 0 && taxi.is_available && (

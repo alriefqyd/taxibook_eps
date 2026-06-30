@@ -46,7 +46,8 @@ export default function DriverHomePage() {
   const [upcoming,   setUpcoming]   = useState<DriverBooking[]>([])
   const [past,       setPast]       = useState<DriverBooking[]>([])
   const [activeTrip,  setActiveTrip]  = useState<DriverBooking | null>(null)
-  const [myTaxi,     setMyTaxi]     = useState<any | null>(null)
+  const [myTaxi,        setMyTaxi]        = useState<any | null>(null)
+  const [dayAssignments, setDayAssignments] = useState<{ taxi_id: string; assign_date: string }[]>([])
   const [loading,    setLoading]    = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
   const [selected,   setSelected]   = useState<DriverBooking | null>(null)
@@ -129,7 +130,13 @@ export default function DriverHomePage() {
       await loadTrips(au.id)
       const { data: taxi } = await supabase
         .from('taxis').select('*, users!driver_id(name)').eq('driver_id', au.id).single()
-      if (taxi) setMyTaxi({ ...taxi, driver_name: taxi.users?.name || p.name })
+      if (taxi) {
+        setMyTaxi({ ...taxi, driver_name: taxi.users?.name || p.name })
+        const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+        supabase.from('driver_day_assignments').select('taxi_id, assign_date')
+          .eq('taxi_id', taxi.id).gte('assign_date', witaToday)
+          .then(({ data }) => setDayAssignments(data || []))
+      }
       supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', au.id).eq('is_read', false).then(({ count }) => setUnreadCount(count || 0))
       setLoading(false)
     }
@@ -461,6 +468,7 @@ export default function DriverHomePage() {
           bookings={[...upcoming, ...(activeTrip ? [activeTrip] : []), ...past] as any}
           taxis={[myTaxi]}
           showCompleted
+          dayAssignments={dayAssignments}
         />
       )}
 

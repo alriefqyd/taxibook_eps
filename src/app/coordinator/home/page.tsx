@@ -33,6 +33,7 @@ export default function CoordinatorHomePage() {
   const [bookings,         setBookings]         = useState<BookingDetail[]>([])
   const [calendarBookings, setCalendarBookings] = useState<BookingDetail[]>([])
   const [taxis,            setTaxis]            = useState<TaxiRow[]>([])
+  const [dayAssignments,   setDayAssignments]   = useState<{ taxi_id: string; assign_date: string }[]>([])
   const [loading,          setLoading]          = useState(true)
   const [view,        setView]        = useState<'list' | 'calendar'>('list')
   const [filter,     setFilter]     = useState<'all' | 'pending' | 'booked' | 'completed'>('all')
@@ -124,11 +125,18 @@ export default function CoordinatorHomePage() {
       })
     )
 
+    const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+    const { data: dayAssign } = await supabase
+      .from('driver_day_assignments')
+      .select('taxi_id, assign_date')
+      .gte('assign_date', witaToday)
+
     const newBks = bks || []
     setBookings(prev => append ? [...prev, ...newBks] : newBks)
     setCalendarBookings(allBks || [])
     setHasMore(newBks.length === 10)
     setTaxis(enriched)
+    setDayAssignments(dayAssign || [])
   }, [supabase])
 
   useEffect(() => {
@@ -453,7 +461,7 @@ export default function CoordinatorHomePage() {
         {/* ── CALENDAR TAB ── */}
         {view === 'calendar' && (
           <div style={{ margin: '0 -16px' }}>
-            <GanttCalendar bookings={calendarBookings} taxis={taxis} showCompleted />
+            <GanttCalendar bookings={calendarBookings} taxis={taxis} showCompleted dayAssignments={dayAssignments} />
           </div>
         )}
 

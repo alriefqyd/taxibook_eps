@@ -26,8 +26,9 @@ export default function BoardPage() {
   const router   = useRouter()
   const supabase = createClient()
 
-  const [bookings,  setBookings]  = useState<any[]>([])
-  const [taxis,     setTaxis]     = useState<any[]>([])
+  const [bookings,       setBookings]       = useState<any[]>([])
+  const [taxis,          setTaxis]          = useState<any[]>([])
+  const [dayAssignments, setDayAssignments] = useState<{ taxi_id: string; assign_date: string }[]>([])
   const [loading,   setLoading]   = useState(true)
   const [view,      setView]      = useState<View>('day')
   const [cursor,    setCursor]    = useState(new Date())
@@ -43,8 +44,12 @@ export default function BoardPage() {
       supabase.from('taxis').select('*, users!driver_id(name)')
         .eq('is_active', true).order('name'),
     ])
+    const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+    const { data: dayAssign } = await supabase
+      .from('driver_day_assignments').select('taxi_id, assign_date').gte('assign_date', witaToday)
     setBookings(bks || [])
     setTaxis((txs || []).map((t: any) => ({ ...t, driver_name: t.users?.name || 'No driver' })))
+    setDayAssignments(dayAssign || [])
   }, [supabase])
 
   useEffect(() => {
@@ -238,13 +243,13 @@ export default function BoardPage() {
         <div style={{ flex: 1, padding: '16px 28px 24px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ background: '#fff', border: '1px solid #D4E8EA', borderRadius: 12, overflow: 'auto', flex: 1 }}>
             {view === 'day' && (
-              <DayView bookings={bookings} taxis={taxis} cursor={cursor} today={today} tooltip={tooltip} setTooltip={setTooltip} />
+              <DayView bookings={bookings} taxis={taxis} cursor={cursor} today={today} tooltip={tooltip} setTooltip={setTooltip} dayAssignments={dayAssignments} />
             )}
             {view === 'week' && (
-              <WeekView bookings={bookings} cursor={cursor} today={today} tooltip={tooltip} setTooltip={setTooltip} />
+              <WeekView bookings={bookings} cursor={cursor} today={today} tooltip={tooltip} setTooltip={setTooltip} dayAssignments={dayAssignments} />
             )}
             {view === 'month' && (
-              <MonthView bookings={bookings} cursor={cursor} today={today} onDayClick={(d: Date) => { setCursor(d); setView('day') }} />
+              <MonthView bookings={bookings} cursor={cursor} today={today} onDayClick={(d: Date) => { setCursor(d); setView('day') }} dayAssignments={dayAssignments} />
             )}
           </div>
         </div>
@@ -256,8 +261,9 @@ export default function BoardPage() {
 // ── DAY VIEW — Gantt (taxi on Y, time on X) ────────────────
 const HOUR_W = 80 // px per hour in Gantt
 
-function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip }: any) {
-  const dayBks  = bookings.filter((b: any) => isSameDay(new Date(b.scheduled_at), cursor))
+function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip, dayAssignments = [] }: any) {
+  const dayBks     = bookings.filter((b: any) => isSameDay(new Date(b.scheduled_at), cursor))
+  const cursorDateStr = format(cursor, 'yyyy-MM-dd')
   const isToday = isSameDay(cursor, today)
   const nowLeft = isToday ? (today.getHours() + today.getMinutes() / 60 - HOUR_S) * HOUR_W : null
   const totalW  = HOURS.length * HOUR_W
@@ -276,7 +282,8 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip }: any) {
 
       {/* Taxi rows */}
       {taxis.map((t: any, idx: number) => {
-        const txBks = dayBks.filter((b: any) => b.taxi_id === t.id)
+        const txBks     = dayBks.filter((b: any) => b.taxi_id === t.id)
+        const isFullDay = dayAssignments.some((a: any) => a.taxi_id === t.id && a.assign_date === cursorDateStr)
         return (
           <div key={t.id} style={{ display: 'flex', borderBottom: '1px solid #D4E8EA', background: idx % 2 === 0 ? '#fff' : '#f9f9f6' }}>
             {/* Taxi label */}
@@ -288,6 +295,7 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip }: any) {
               <span style={{ fontSize: 10, color: '#9CA3AF', paddingLeft: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {t.is_available ? t.driver_name : 'Unavailable'}
               </span>
+              {isFullDay && <span style={{ fontSize: 9, fontWeight: 800, color: '#92400E', background: '#FEF3C7', padding: '1px 5px', borderRadius: 4, border: '1px solid #FCD34D', marginTop: 2, display: 'inline-block' }}>★ Full Day</span>}
             </div>
 
             {/* Timeline */}
@@ -299,6 +307,12 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip }: any) {
               {/* Unavailable hatch */}
               {!t.is_available && (
                 <div style={{ position: 'absolute', inset: 0, background: 'repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(0,0,0,0.03) 5px,rgba(0,0,0,0.03) 10px)' }} />
+              )}
+              {/* Full day duty overlay */}
+              {isFullDay && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(254,243,199,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderTop: '2px solid #FCD34D', borderBottom: '2px solid #FCD34D' }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: '#92400E', letterSpacing: '0.05em' }}>★ FULL DAY DUTY</span>
+                </div>
               )}
               {/* Now line */}
               {nowLeft !== null && (
@@ -353,7 +367,7 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip }: any) {
 }
 
 // ── WEEK VIEW ───────────────────────────────────────────────
-function WeekView({ bookings, cursor, today, tooltip, setTooltip }: any) {
+function WeekView({ bookings, cursor, today, tooltip, setTooltip, dayAssignments = [] }: any) {
   const monday = startOfWeek(cursor, { weekStartsOn: 1 })
   const days   = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
   const nowPct = (today.getHours() + today.getMinutes() / 60 - HOUR_S) * H_PX
@@ -388,11 +402,13 @@ function WeekView({ bookings, cursor, today, tooltip, setTooltip }: any) {
           ))}
         </div>
         {days.map(d => {
-          const isToday = isSameDay(d, today)
-          const dayBks  = bookings.filter((b: any) => isSameDay(new Date(b.scheduled_at), d))
+          const isToday   = isSameDay(d, today)
+          const dayBks    = bookings.filter((b: any) => isSameDay(new Date(b.scheduled_at), d))
+          const dayAssignCount = dayAssignments.filter((a: any) => a.assign_date === format(d, 'yyyy-MM-dd')).length
           return (
-            <div key={d.toISOString()} style={{ position: 'relative', borderRight: '1px solid #D4E8EA' }}>
+            <div key={d.toISOString()} style={{ position: 'relative', borderRight: '1px solid #D4E8EA', background: dayAssignCount > 0 ? 'rgba(254,243,199,0.18)' : undefined }}>
               {HOURS.map(h => <div key={h} style={{ height: H_PX, borderBottom: '1px solid #EAF4F5' }} />)}
+              {dayAssignCount > 0 && <div style={{ position: 'absolute', top: 4, left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 6, pointerEvents: 'none' }}><span style={{ fontSize: 9, fontWeight: 800, color: '#92400E', background: '#FEF3C7', padding: '2px 6px', borderRadius: 4, border: '1px solid #FCD34D' }}>★ {dayAssignCount} full day</span></div>}
               {isToday && <div style={{ position: 'absolute', left: 0, right: 0, top: nowPct, height: 2, background: '#EF4444', zIndex: 10, pointerEvents: 'none' }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444', position: 'absolute', top: -3, left: -4 }} /></div>}
               {dayBks.map((b: any) => {
                 const dt     = new Date(b.scheduled_at)
@@ -433,7 +449,7 @@ function WeekView({ bookings, cursor, today, tooltip, setTooltip }: any) {
 }
 
 // ── MONTH VIEW ──────────────────────────────────────────────
-function MonthView({ bookings, cursor, today, onDayClick }: any) {
+function MonthView({ bookings, cursor, today, onDayClick, dayAssignments = [] }: any) {
   const start = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 })
   const days  = Array.from({ length: 42 }, (_, i) => addDays(start, i))
 
@@ -446,15 +462,17 @@ function MonthView({ bookings, cursor, today, onDayClick }: any) {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
         {days.map(d => {
-          const inMonth = isSameMonth(d, cursor)
-          const isToday = isSameDay(d, today)
-          const bks     = bookings.filter((b: any) => isSameDay(new Date(b.scheduled_at), d))
-          const shown   = bks.slice(0, 4)
+          const inMonth    = isSameMonth(d, cursor)
+          const isToday    = isSameDay(d, today)
+          const bks        = bookings.filter((b: any) => isSameDay(new Date(b.scheduled_at), d))
+          const shown      = bks.slice(0, 4)
+          const assignCount = dayAssignments.filter((a: any) => a.assign_date === format(d, 'yyyy-MM-dd')).length
           return (
-            <div key={d.toISOString()} onClick={() => onDayClick(d)} style={{ minHeight: 100, borderRight: '1px solid #D4E8EA', borderBottom: '1px solid #D4E8EA', padding: 8, opacity: inMonth ? 1 : 0.35, cursor: 'pointer', background: isToday ? 'rgba(0,96,100,0.06)' : 'transparent' }}>
-              <div style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4, background: isToday ? '#006064' : 'transparent', fontSize: 12, fontWeight: 700, color: isToday ? '#fff' : '#006064' }}>
+            <div key={d.toISOString()} onClick={() => onDayClick(d)} style={{ minHeight: 100, borderRight: '1px solid #D4E8EA', borderBottom: '1px solid #D4E8EA', padding: 8, opacity: inMonth ? 1 : 0.35, cursor: 'pointer', background: assignCount > 0 ? 'rgba(254,243,199,0.35)' : isToday ? 'rgba(0,96,100,0.06)' : 'transparent' }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 2, background: isToday ? '#006064' : 'transparent', fontSize: 12, fontWeight: 700, color: isToday ? '#fff' : '#006064' }}>
                 {format(d, 'd')}
               </div>
+              {assignCount > 0 && <div style={{ fontSize: 9, fontWeight: 800, color: '#92400E', background: '#FEF3C7', borderRadius: 3, padding: '1px 4px', marginBottom: 3, border: '1px solid #FCD34D', display: 'inline-block' }}>★ {assignCount}</div>}
               {shown.map((b: any) => {
                 const color  = b.taxi_color || '#888'
                 const isPend = b.status.includes('pending')
