@@ -1065,7 +1065,7 @@ function StaffBookingSheet({ booking, currentUserId, onClose, onCancelled }: {
       onClick={onClose}
     >
       <div
-        style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px', maxHeight: '85vh', overflowY: 'auto' }}
+        style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px', maxHeight: '85vh', overflowY: 'auto', boxSizing: 'border-box' }}
         onClick={e => e.stopPropagation()}
       >
         <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.08)', margin: '0 auto 20px' }} />

@@ -31,6 +31,7 @@ export default function CoordinatorHomePage() {
 
   const [user,             setUser]             = useState<User | null>(null)
   const [bookings,         setBookings]         = useState<BookingDetail[]>([])
+  const [pendingAll,       setPendingAll]       = useState<BookingDetail[]>([])
   const [calendarBookings, setCalendarBookings] = useState<BookingDetail[]>([])
   const [taxis,            setTaxis]            = useState<TaxiRow[]>([])
   const [dayAssignments,   setDayAssignments]   = useState<{ taxi_id: string; assign_date: string }[]>([])
@@ -77,14 +78,14 @@ export default function CoordinatorHomePage() {
     const todayStart = parseDate(from); todayStart.setHours(0, 0, 0, 0)
     const todayEnd   = parseDate(to);   todayEnd.setHours(23, 59, 59, 999)
 
-    const [{ data: bks }, { data: allBks }, { data: txs }] = await Promise.all([
-      // Paginated list for the Bookings tab
+    const [{ data: bks }, { data: allBks }, { data: txs }, { data: pendingBks }] = await Promise.all([
+      // Paginated list for the Bookings tab (date-filtered)
       supabase
         .from('booking_details')
         .select('*')
         .gte('scheduled_at', todayStart.toISOString())
         .lt('scheduled_at', todayEnd.toISOString())
-        .not('status', 'in', '("cancelled","rejected")')
+        .not('status', 'in', '("cancelled","rejected","pending_coordinator_approval")')
         .order('scheduled_at', { ascending: true })
         .range(pageNum * 10, pageNum * 10 + 9),
       // Full list (no limit) for the Calendar tab
@@ -100,6 +101,12 @@ export default function CoordinatorHomePage() {
         .from('taxis')
         .select('*, users!driver_id(name)')
         .eq('is_active', true),
+      // All pending approvals — no date filter so future bookings show up
+      supabase
+        .from('booking_details')
+        .select('*')
+        .eq('status', 'pending_coordinator_approval')
+        .order('scheduled_at', { ascending: true }),
     ])
 
     // Get trips today + declines today per taxi
@@ -133,6 +140,7 @@ export default function CoordinatorHomePage() {
 
     const newBks = bks || []
     setBookings(prev => append ? [...prev, ...newBks] : newBks)
+    setPendingAll(pendingBks || [])
     setCalendarBookings(allBks || [])
     setHasMore(newBks.length === 10)
     setTaxis(enriched)
@@ -246,9 +254,9 @@ export default function CoordinatorHomePage() {
     </div>
   )
 
-  const pendingApproval = bookings.filter(b => b.status === 'pending_coordinator_approval')
-  // Exclude pending_coordinator_approval from main list — shown separately above
-  const mainBookings = bookings.filter(b => b.status !== 'pending_coordinator_approval')
+  const pendingApproval = pendingAll
+  // Main list already excludes pending_coordinator_approval from the query
+  const mainBookings = bookings
   const filtered = filter === 'all'       ? mainBookings
     : filter === 'pending'  ? mainBookings.filter(b => b.status === 'submitted')
     : filter === 'booked'   ? mainBookings.filter(b => ['booked','on_trip','waiting_trip'].includes(b.status))
