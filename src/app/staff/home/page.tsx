@@ -994,8 +994,13 @@ function staffBuildWaMessage(b: any): string {
   })
   const type = b.trip_type === 'DROP' ? 'Drop (antar saja)' : `Waiting ${b.wait_minutes} menit (tunggu penumpang)`
   const taxi = b.taxi_name ? `${b.taxi_name}${b.taxi_plate ? ` (${b.taxi_plate})` : ''}` : null
+  const isImminent = new Date(b.scheduled_at) <= new Date(Date.now() + 30 * 60 * 1000)
+  const header  = isImminent ? `📋 *TaxiBook – Perjalanan Segera*` : `📋 *TaxiBook – Penugasan Perjalanan*`
+  const closing = isImminent
+    ? `Perjalanan ini akan segera dimulai. Pastikan Anda sudah siap dan di lokasi penjemputan. 🙏`
+    : `Anda telah ditugaskan untuk perjalanan ini. Harap bersiap tepat waktu. 🙏`
   return [
-    `📋 *TaxiBook – Penugasan Perjalanan*`,
+    header,
     `━━━━━━━━━━━━━━━━━━`,
     `🔖 Kode Booking: *${b.booking_code}*`,
     ``,
@@ -1016,7 +1021,7 @@ function staffBuildWaMessage(b: any): string {
     ...(b.notes ? [`   Catatan : ${b.notes}`] : []),
     ``,
     `━━━━━━━━━━━━━━━━━━`,
-    `Mohon konfirmasi kesiapan Anda untuk perjalanan ini. Terima kasih! 🙏`,
+    closing,
   ].join('\n')
 }
 
@@ -1114,10 +1119,10 @@ function StaffBookingSheet({ booking, currentUserId, onClose, onCancelled }: {
         {/* Details */}
         <div style={{ background: '#F5F5F2', borderRadius: 16, padding: '12px 14px', marginBottom: '16px' }}>
           {[
-            { label: 'Booking ID',  value: booking.booking_code },
-            { label: 'Penumpang',   value: booking.passenger_name || '—' },
-            ...(booking.passenger_phone ? [{ label: 'No. HP penumpang', value: booking.passenger_phone }] : []),
-            { label: 'Pickup',      value: booking.pickup },
+            { label: 'Booking ID',       value: booking.booking_code },
+            { label: 'Passenger',        value: booking.passenger_name || '—' },
+            ...(booking.passenger_phone ? [{ label: 'Passenger phone', value: booking.passenger_phone }] : []),
+            { label: 'Pickup',           value: booking.pickup },
             { label: 'Status',      value: booking.status?.replace(/_/g,' ') },
             { label: 'Taxi',        value: booking.taxi_name ? `${booking.taxi_name} · ${booking.driver_name}` : 'Not assigned yet' },
             ...(booking.notes ? [{ label: 'Notes', value: booking.notes }] : []),
