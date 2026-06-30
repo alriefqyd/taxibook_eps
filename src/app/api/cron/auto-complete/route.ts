@@ -25,12 +25,13 @@ export async function GET(request: NextRequest) {
     const admin = createAdminClient()
     const now   = new Date()
     const results = {
-      auto_cancelled:   0,
-      auto_completed:   0,
-      reminded_15min:   0,
-      reminded_start:   0,
-      reminded_overdue: 0,
-      notified_coord:   0,
+      auto_cancelled:            0,
+      auto_completed:            0,
+      reminded_15min:            0,
+      reminded_start:            0,
+      reminded_overdue:          0,
+      notified_coord:            0,
+      reminded_pending_approval: 0,
     }
 
     // ── 0. AUTO-CANCEL bookings not started 15+ min after scheduled_at ──
@@ -377,6 +378,48 @@ export async function GET(request: NextRequest) {
       if (notifs.length) {
         await notify(notifs)
         results.reminded_overdue++
+      }
+    }
+
+    // ── 5. PENDING APPROVAL REMINDER (every 2 hours to coordinators) ──
+    const { data: pendingApprovals } = await admin
+      .from('bookings')
+      .select('id, destination, scheduled_at')
+      .eq('status', 'pending_coordinator_approval')
+      .order('scheduled_at', { ascending: true })
+
+    if (pendingApprovals?.length) {
+      // Throttle: skip if a reminder was already sent within the last 115 min
+      const { data: lastApprovalReminder } = await admin
+        .from('notifications')
+        .select('created_at')
+        .eq('type', 'pending_approval_reminder')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const minsSinceLast = lastApprovalReminder
+        ? (now.getTime() - new Date(lastApprovalReminder.created_at).getTime()) / 60000
+        : Infinity
+
+      if (minsSinceLast >= 115) {
+        const { data: coordinators } = await admin
+          .from('users').select('id').eq('role', 'coordinator').eq('is_active', true)
+
+        const count = pendingApprovals.length
+        const approvalNotifs: any[] = (coordinators || []).map((c: any) => ({
+          user_id:    c.id,
+          booking_id: pendingApprovals[0].id,
+          title:      `${count} booking${count > 1 ? 's' : ''} need your approval`,
+          body:       `There ${count > 1 ? 'are' : 'is'} ${count} pending booking${count > 1 ? 's' : ''} waiting for coordinator approval.`,
+          type:       'pending_approval_reminder',
+          url:        '/coordinator/home',
+        }))
+
+        if (approvalNotifs.length) {
+          await notify(approvalNotifs)
+          results.reminded_pending_approval = approvalNotifs.length
+        }
       }
     }
 
