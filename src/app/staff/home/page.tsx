@@ -63,11 +63,11 @@ export default function StaffHomePage() {
         .not('status', 'in', '("cancelled")')
         .order('scheduled_at', { ascending: false })
         .range(0, 9),
-      // All users' bookings — for the schedule/Gantt view
+      // All users' bookings — for the schedule/Gantt view (include completed so calendar shows history)
       supabase
         .from('booking_details')
         .select('*')
-        .not('status', 'in', '("cancelled","completed","rejected")')
+        .not('status', 'in', '("cancelled","rejected","submitted","pending_coordinator_approval")')
         .order('scheduled_at', { ascending: true })
         .limit(200),
       supabase
@@ -172,7 +172,7 @@ export default function StaffHomePage() {
   const today        = new Date()
   const ACTIVE_STATUSES    = ['booked','on_trip','waiting_trip']
   const activeBookings     = bookings.filter(b => ACTIVE_STATUSES.includes(b.status))
-  const allActiveBookings  = allBookings.filter(b => ACTIVE_STATUSES.includes(b.status))
+  const allActiveBookings  = allBookings.filter(b => [...ACTIVE_STATUSES, 'completed'].includes(b.status))
   const myBookings      = bookings.filter(b => {
     if (!dateFrom && !dateTo) return true
     const d = new Date(b.scheduled_at)
@@ -537,14 +537,18 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, current
                 const dt        = new Date(b.scheduled_at)
                 const startH    = dt.getHours() + dt.getMinutes() / 60
                 const left      = (startH - HOUR_START) * HOUR_W
-                const durH      = b.auto_complete_at
-                  ? Math.min(Math.max((new Date(b.auto_complete_at).getTime() - dt.getTime()) / 3_600_000, 0.3), HOUR_END - startH)
-                  : b.trip_type === 'WAITING'
-                    ? Math.min(b.wait_minutes / 60 + 2, HOUR_END - startH)
-                    : Math.min(2, HOUR_END - startH)
+                const isDone    = b.status === 'completed'
+                const durH      = isDone && b.completed_at
+                  ? Math.min(Math.max((new Date(b.completed_at).getTime() - dt.getTime()) / 3_600_000, 0.3), HOUR_END - startH)
+                  : b.auto_complete_at
+                    ? Math.min(Math.max((new Date(b.auto_complete_at).getTime() - dt.getTime()) / 3_600_000, 0.3), HOUR_END - startH)
+                    : b.trip_type === 'WAITING'
+                      ? Math.min(b.wait_minutes / 60 + 2, HOUR_END - startH)
+                      : Math.min(2, HOUR_END - startH)
                 const width     = Math.max(durH * HOUR_W - 4, 44)
                 const isPending = b.status.includes('pending')
                 const isOwner   = currentUserId && b.passenger_id === currentUserId
+                const blockColor = isDone ? '#94a3b8' : taxi.color
                 return (
                   <div
                     key={b.id}
@@ -552,18 +556,18 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, current
                     style={{
                       position:'absolute', left:left+2, top:5,
                       width, height:ROW_H - 10,
-                      background: taxi.color + '22',
-                      border:`1.5px ${isPending?'dashed':'solid'} ${taxi.color}`,
+                      background: isDone ? '#F1F5F9' : taxi.color + '22',
+                      border:`1.5px ${isPending?'dashed':'solid'} ${blockColor}`,
                       borderRadius:'7px', padding:'4px 6px', overflow:'hidden', zIndex:5,
                       cursor: isOwner ? 'pointer' : 'default',
-                      opacity: isOwner ? 1 : 0.6,
+                      opacity: isDone ? 0.75 : isOwner ? 1 : 0.6,
                     }}
                   >
-                    <p style={{ fontSize:'10px', fontWeight:800, color:taxi.color, margin:'0 0 1px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                    <p style={{ fontSize:'10px', fontWeight:800, color:blockColor, margin:'0 0 1px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
                       {b.passenger_name}
                     </p>
-                    <p style={{ fontSize:'9px', color:taxi.color, opacity:0.8, margin:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                      {format(dt,'HH:mm')} · {b.destination}
+                    <p style={{ fontSize:'9px', color:blockColor, opacity:0.8, margin:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                      {isDone && b.completed_at ? `✓ ${format(new Date(b.completed_at),'HH:mm')}` : format(dt,'HH:mm')} · {b.destination}
                     </p>
                   </div>
                 )

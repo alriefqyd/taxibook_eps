@@ -71,8 +71,17 @@ export async function POST(
       let assignedTaxi = null
 
       if (taxis?.length) {
+        // Exclude taxis with a full-day assignment on the booking's WITA date
+        const witaDate = new Date(new Date(booking.scheduled_at).getTime() + 8 * 3600000).toISOString().slice(0, 10)
+        const { data: dayAssigned } = await admin
+          .from('driver_day_assignments')
+          .select('taxi_id')
+          .eq('assign_date', witaDate)
+        const dayAssignedIds = new Set((dayAssigned || []).map((d: any) => d.taxi_id))
+        const eligibleTaxis = taxis.filter((t: any) => !dayAssignedIds.has(t.id))
+
         const avail = await Promise.all(
-          taxis.map(async (taxi: any) => {
+          eligibleTaxis.map(async (taxi: any) => {
             const { data: conflict } = await admin
               .from('bookings')
               .select('id')

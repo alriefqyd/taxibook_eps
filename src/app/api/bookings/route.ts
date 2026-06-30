@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
     // ── Pending approval — notify coordinator ──
     await notifyCoordinators(admin, booking, passengerId, destination,
       'Booking needs your approval',
-      `Waiting ${wait_minutes} min — over 60 min limit.`
+      `Waiting trip — ${wait_minutes} min wait time requires coordinator approval.`
     )
 
     return NextResponse.json({ booking, assigned: false }, { status: 201 })
