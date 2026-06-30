@@ -330,6 +330,8 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip, dayAssig
                 if (isDone && b.completed_at) {
                   const endH = new Date(b.completed_at).getHours() + new Date(b.completed_at).getMinutes() / 60
                   durH = Math.min(Math.max(endH - startH, 0.3), HOUR_E - startH)
+                } else if (b.auto_complete_at) {
+                  durH = Math.min(Math.max((new Date(b.auto_complete_at).getTime() - dt.getTime()) / 3_600_000, 0.3), HOUR_E - startH)
                 } else {
                   durH = b.trip_type === 'WAITING' ? Math.min(b.wait_minutes / 60 + 2, HOUR_E - startH) : Math.min(2, HOUR_E - startH)
                 }
@@ -419,6 +421,8 @@ function WeekView({ bookings, cursor, today, tooltip, setTooltip, dayAssignments
                 if (isDone && b.completed_at) {
                   const endH = new Date(b.completed_at).getHours() + new Date(b.completed_at).getMinutes() / 60
                   durH = Math.min(Math.max(endH - startH, 0.3), HOUR_E - startH)
+                } else if (b.auto_complete_at) {
+                  durH = Math.min(Math.max((new Date(b.auto_complete_at).getTime() - dt.getTime()) / 3_600_000, 0.3), HOUR_E - startH)
                 } else {
                   durH = b.trip_type === 'WAITING' ? Math.min(b.wait_minutes / 60 + 2, HOUR_E - startH) : Math.min(2, HOUR_E - startH)
                 }

@@ -537,9 +537,11 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, current
                 const dt        = new Date(b.scheduled_at)
                 const startH    = dt.getHours() + dt.getMinutes() / 60
                 const left      = (startH - HOUR_START) * HOUR_W
-                const durH      = b.trip_type === 'WAITING'
-                  ? Math.min(b.wait_minutes / 60 + 2, HOUR_END - startH)
-                  : Math.min(2, HOUR_END - startH)
+                const durH      = b.auto_complete_at
+                  ? Math.min(Math.max((new Date(b.auto_complete_at).getTime() - dt.getTime()) / 3_600_000, 0.3), HOUR_END - startH)
+                  : b.trip_type === 'WAITING'
+                    ? Math.min(b.wait_minutes / 60 + 2, HOUR_END - startH)
+                    : Math.min(2, HOUR_END - startH)
                 const width     = Math.max(durH * HOUR_W - 4, 44)
                 const isPending = b.status.includes('pending')
                 const isOwner   = currentUserId && b.passenger_id === currentUserId
