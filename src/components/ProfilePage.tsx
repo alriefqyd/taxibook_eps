@@ -49,6 +49,7 @@ const MSG = {
     notRegistered: 'Device not registered',
     testPush:         'Send test push',
     testingPush:      'Sending…',
+    howToUse:         'How to use',
     signOut:          'Sign out',
     signOutConfirm:   'Sign out of TaxiBook?',
     signOutBody:      "You'll need to log in again to use the app.",
@@ -101,6 +102,7 @@ const MSG = {
     notRegistered: 'Perangkat belum terdaftar',
     testPush:         'Kirim push test',
     testingPush:      'Mengirim…',
+    howToUse:         'Cara penggunaan',
     signOut:          'Keluar',
     signOutConfirm:   'Keluar dari TaxiBook?',
     signOutBody:      'Anda perlu masuk kembali untuk menggunakan aplikasi.',
@@ -755,6 +757,20 @@ export default function ProfilePage({ role }: Props) {
             </div>
           </>
         )}
+
+        {/* How to use */}
+        <button
+          onClick={() => {
+            localStorage.removeItem('taxibook-onboarding-tour-v1')
+            window.location.href = window.location.origin + (role === 'coordinator' ? '/coordinator/home' : role === 'driver' ? '/driver/home' : '/staff/home')
+          }}
+          style={{ width: '100%', padding: '13px', background: '#E0F2F1', color: '#006064', border: '1px solid rgba(0,96,100,0.15)', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          {t.howToUse}
+        </button>
 
         {/* Logout */}
         {!showConfirm ? (

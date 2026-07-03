@@ -19,23 +19,42 @@ function isAppInstalled() {
   return window.matchMedia('(display-mode: standalone)').matches
 }
 
-function getRoleStep(role: Role): TourStep {
+
+function getRoleSteps(role: Role): TourStep[] {
   if (role === 'coordinator') {
-    return {
-      title: 'Coordinator controls',
-      description: 'Approve bookings, manage saved locations, and review fleet status from your dashboard and menu.',
-    }
+    return [
+      {
+        title: 'Coordinator controls',
+        description: 'Approve bookings, manage saved locations, and review fleet status from your dashboard and menu.',
+      },
+    ]
   }
   if (role === 'driver') {
-    return {
-      title: 'Driver workflow',
-      description: 'See upcoming trips, active trips, and your taxi availability from the home screen.',
-    }
+    return [
+      {
+        title: 'Driver workflow',
+        description: 'See upcoming trips, active trips, and your taxi availability from the home screen.',
+      },
+    ]
   }
-  return {
-    title: 'Staff workflow',
-    description: 'View your active trips, request new bookings, and see today’s fleet activity from one screen.',
-  }
+  return [
+    {
+      title: 'Request a taxi',
+      description: 'Tap the yellow + New booking button on the home screen to create a booking. Fill in your pickup location, destination, date, and time.',
+    },
+    {
+      title: 'Schedule & map view',
+      description: 'The calendar icon shows the fleet schedule for all taxis. Switch to the map icon to see driver locations in real time.',
+    },
+    {
+      title: 'Track your bookings',
+      description: 'My bookings below the schedule lists your active and recent trips. Tap any card to view full details or cancel the booking.',
+    },
+    {
+      title: 'Notifications & profile menu',
+      description: 'The bell icon shows booking status updates and alerts. Tap your profile avatar at the top right to access trip history, settings, and sign out.',
+    },
+  ]
 }
 
 export default function OnboardingTour({ role }: { role: Role }) {
@@ -45,17 +64,9 @@ export default function OnboardingTour({ role }: { role: Role }) {
   const steps = useMemo<TourStep[]>(() => [
     {
       title: 'Install TaxiBook on your phone',
-      description: 'Open your browser menu and choose Add to Home screen to install TaxiBook as a phone app.',
+      description: 'Open your browser menu and choose Add to Home screen to install TaxiBook as a phone app for the best experience.',
     },
-    {
-      title: 'Open the app from your home screen',
-      description: 'Launch TaxiBook from your phone and sign in. The app works like a native mobile experience.',
-    },
-    {
-      title: 'Use the top menu',
-      description: 'Tap the notification bell and profile menu to access alerts, saved locations, and account settings.',
-    },
-    getRoleStep(role),
+    ...getRoleSteps(role),
   ], [role])
 
   useEffect(() => {
@@ -145,7 +156,7 @@ export default function OnboardingTour({ role }: { role: Role }) {
                 onClick={() => handleClose(false)}
                 style={{ marginTop: 14, width: '100%', border: 'none', background: 'transparent', color: '#64748b', fontSize: 12, cursor: 'pointer' }}
               >
-                Maybe later — don’t show again
+                Maybe later
               </button>
             </div>
           </div>

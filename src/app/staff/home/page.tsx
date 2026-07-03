@@ -314,7 +314,7 @@ export default function StaffHomePage() {
         {/* New booking CTA — amber pill like reference */}
         <div style={{ marginBottom:16 }}>
           <Link href="/staff/book" style={{ textDecoration:'none', display:'block' }}>
-            <button style={{ width:'100%', padding:'14px', background:'#feb300', color:'#3d2c00', border:'none', borderRadius:9999, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:"'Plus Jakarta Sans',sans-serif", display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+            <button style={{ width:'100%', padding:'14px', background:'#006064', color:'#ffffff', border:'none', borderRadius:9999, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:"'Plus Jakarta Sans',sans-serif", display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
               <span style={{ fontSize:18 }}>+</span> New booking
             </button>
           </Link>
