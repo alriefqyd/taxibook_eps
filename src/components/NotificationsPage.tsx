@@ -5,6 +5,29 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
+import { useLang } from '@/lib/language'
+import PageLoader from '@/components/PageLoader'
+
+const MSG = {
+  en: {
+    title:        'Notifications',
+    unread:       (n: number) => `${n} unread`,
+    allRead:      'All caught up',
+    markAllRead:  'Mark all read',
+    noTitle:      'No notifications yet',
+    noBody:       "You'll be notified about your bookings here",
+    close:        'Close',
+  },
+  id: {
+    title:        'Notifikasi',
+    unread:       (n: number) => `${n} belum dibaca`,
+    allRead:      'Semua sudah dibaca',
+    markAllRead:  'Tandai semua dibaca',
+    noTitle:      'Belum ada notifikasi',
+    noBody:       'Anda akan diberitahu tentang booking Anda di sini',
+    close:        'Tutup',
+  },
+}
 
 interface Notification {
   id:         string
@@ -53,6 +76,8 @@ interface Props {
 export default function NotificationsPage({ role }: Props) {
   const router   = useRouter()
   const supabase = createClient()
+  const lang     = useLang()
+  const t        = MSG[lang]
 
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading,       setLoading]       = useState(true)
@@ -123,12 +148,7 @@ export default function NotificationsPage({ role }: Props) {
     setNotifications(prev => prev.filter(n => n.id !== id))
   }
 
-  if (loading) return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'system-ui' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-      <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(0,96,100,0.15)', borderTop: '3px solid #006064', animation: 'spin 0.8s linear infinite' }} />
-    </div>
-  )
+  if (loading) return <PageLoader />
 
   const unreadCount = notifications.filter(n => !n.is_read).length
 
@@ -153,10 +173,10 @@ export default function NotificationsPage({ role }: Props) {
             </button>
             <div>
               <h1 style={{ fontSize:'18px', fontWeight:700, margin:'0 0 2px', letterSpacing:'-0.3px' }}>
-                Notifications
+                {t.title}
               </h1>
               <p style={{ fontSize:'12px', color:'#8A9BB0', margin:0 }}>
-                {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+                {unreadCount > 0 ? t.unread(unreadCount) : t.allRead}
               </p>
             </div>
           </div>
@@ -165,7 +185,7 @@ export default function NotificationsPage({ role }: Props) {
               onClick={markAllRead}
               style={{ fontSize:'12px', fontWeight:600, color:'#2563EB', background:'transparent', border:'none', cursor:'pointer', padding:'4px 8px' }}
             >
-              Mark all read
+              {t.markAllRead}
             </button>
           )}
         </div>
@@ -206,7 +226,7 @@ export default function NotificationsPage({ role }: Props) {
                 onClick={() => setSelectedNotif(null)}
                 style={{ width:'100%', padding:'14px', background:'#006064', color:'#fff', border:'none', borderRadius:16, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
               >
-                Close
+                {t.close}
               </button>
             </div>
           </>
@@ -218,9 +238,9 @@ export default function NotificationsPage({ role }: Props) {
         {notifications.length === 0 ? (
           <div style={{ textAlign:'center', padding:'60px 20px' }}>
             <p style={{ fontSize:'32px', margin:'0 0 12px' }}>🔔</p>
-            <p style={{ fontSize:'14px', fontWeight:600, color:'#006064', margin:'0 0 6px' }}>No notifications yet</p>
+            <p style={{ fontSize:'14px', fontWeight:600, color:'#006064', margin:'0 0 6px' }}>{t.noTitle}</p>
             <p style={{ fontSize:'13px', color:'#6B7C8F', margin:0 }}>
-              You'll be notified about your bookings here
+              {t.noBody}
             </p>
           </div>
         ) : (

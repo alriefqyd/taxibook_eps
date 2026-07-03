@@ -49,127 +49,127 @@ export async function POST(
     }
 
     if (action === 'approve') {
-      // Move to submitted so auto-assign runs
-      await admin.from('bookings')
-        .update({ status: 'submitted' })
-        .eq('id', bookingId)
+      await admin.from('bookings').update({ status: 'submitted' }).eq('id', bookingId)
 
-      // Auto-assign
-      const WITA_MS     = 8 * 60 * 60 * 1000
-      const nowWita     = new Date(Date.now() + WITA_MS)
+      const WITA_MS       = 8 * 60 * 60 * 1000
+      const nowWita       = new Date(Date.now() + WITA_MS)
       nowWita.setUTCHours(0, 0, 0, 0)
       const todayStart    = new Date(nowWita.getTime() - WITA_MS)
       const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
-      const { data: taxis } = await admin
-        .from('taxis')
-        .select('id, name, driver_id, users!driver_id(name)')
-        .eq('is_active',    true)
-        .eq('is_available', true)
-        .not('driver_id', 'is', null)
+      const scheduledWita     = new Date(new Date(booking.scheduled_at).getTime() + 8 * 3600000)
+      const scheduledHourWita = scheduledWita.getUTCHours()
+      const scheduledWitaDate = scheduledWita.toISOString().slice(0, 10)
+      const todayWitaDate     = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+      const isFutureDay       = scheduledWitaDate > todayWitaDate
+      const isLunchBreak      = scheduledHourWita >= 12 && scheduledHourWita < 13
 
       let assignedTaxi = null
 
-      if (taxis?.length) {
-        // Exclude taxis with a full-day assignment on the booking's WITA date
-        const witaDate = new Date(new Date(booking.scheduled_at).getTime() + 8 * 3600000).toISOString().slice(0, 10)
-        const { data: dayAssigned } = await admin
-          .from('driver_day_assignments')
-          .select('taxi_id')
-          .eq('assign_date', witaDate)
-        const dayAssignedIds = new Set((dayAssigned || []).map((d: any) => d.taxi_id))
-        const eligibleTaxis = taxis.filter((t: any) => !dayAssignedIds.has(t.id))
+      if (!isLunchBreak) {
+        let taxiQuery = admin
+          .from('taxis')
+          .select('id, name, driver_id, users!driver_id(name)')
+          .eq('is_active', true)
+          .not('driver_id', 'is', null)
+        if (!isFutureDay) taxiQuery = taxiQuery.eq('is_available', true)
 
-        const avail = await Promise.all(
-          eligibleTaxis.map(async (taxi: any) => {
-            const { data: conflict } = await admin
-              .from('bookings')
-              .select('id')
-              .eq('taxi_id', taxi.id)
-              .in('status', ['booked', 'on_trip', 'waiting_trip'])
-              .lt('scheduled_at', booking.auto_complete_at)
-              .gt('auto_complete_at', booking.scheduled_at)
-              .limit(1)
-              .maybeSingle()
+        const { data: taxis } = await taxiQuery
 
-            if (conflict) return null
+        if (taxis?.length) {
+          const witaDate = scheduledWitaDate
+          const { data: dayAssigned } = await admin
+            .from('driver_day_assignments')
+            .select('taxi_id')
+            .eq('assign_date', witaDate)
+          const dayAssignedIds = new Set((dayAssigned || []).map((d: any) => d.taxi_id))
+          const eligibleTaxis = taxis.filter((t: any) => !dayAssignedIds.has(t.id))
 
-            const { count: trips } = await admin
-              .from('bookings')
-              .select('id', { count: 'exact', head: true })
-              .eq('taxi_id', taxi.id)
-              .not('status', 'in', '(cancelled,rejected)')
-              .gte('scheduled_at', todayStart.toISOString())
-              .lt('scheduled_at', tomorrowStart.toISOString())
+          const avail = await Promise.all(
+            eligibleTaxis.map(async (taxi: any) => {
+              const { data: conflict } = await admin
+                .from('bookings')
+                .select('id')
+                .eq('taxi_id', taxi.id)
+                .in('status', ['booked', 'on_trip', 'waiting_trip'])
+                .lt('scheduled_at', booking.auto_complete_at)
+                .gt('auto_complete_at', booking.scheduled_at)
+                .limit(1)
+                .maybeSingle()
 
-            const { data: lastBooking } = await admin
-              .from('bookings')
-              .select('auto_complete_at')
-              .eq('taxi_id', taxi.id)
-              .in('status', ['completed', 'booked', 'on_trip', 'waiting_trip'])
-              .lte('auto_complete_at', booking.scheduled_at)
-              .order('auto_complete_at', { ascending: false })
-              .limit(1)
-              .maybeSingle()
+              if (conflict) return null
 
-            const idleSince = lastBooking ? new Date(lastBooking.auto_complete_at).getTime() : 0
+              const { count: trips } = await admin
+                .from('bookings')
+                .select('id', { count: 'exact', head: true })
+                .eq('taxi_id', taxi.id)
+                .not('status', 'in', '(cancelled,rejected)')
+                .gte('scheduled_at', todayStart.toISOString())
+                .lt('scheduled_at', tomorrowStart.toISOString())
 
-            return { taxi, tripsToday: trips || 0, idleSince }
-          })
-        )
+              const { data: lastBooking } = await admin
+                .from('bookings')
+                .select('auto_complete_at')
+                .eq('taxi_id', taxi.id)
+                .in('status', ['completed', 'booked', 'on_trip', 'waiting_trip'])
+                .lte('auto_complete_at', booking.scheduled_at)
+                .order('auto_complete_at', { ascending: false })
+                .limit(1)
+                .maybeSingle()
 
-        const candidates = avail
-          .filter(Boolean)
-          .sort((a: any, b: any) => {
-            if (a.tripsToday !== b.tripsToday) return a.tripsToday - b.tripsToday
-            return a.idleSince - b.idleSince
-          }) as any[]
-
-        if (candidates.length) {
-          assignedTaxi = candidates[0].taxi
-          const { error: assignErr } = await admin.from('bookings').update({
-            taxi_id:     assignedTaxi.id,
-            status:      'booked',
-            assigned_at: new Date().toISOString(),
-          }).eq('id', bookingId)
-
-          if (assignErr) {
-            console.warn('approve autoAssign conflict:', assignErr.code, assignErr.message)
-            assignedTaxi = null
-          }
-
-          if (assignedTaxi) {
-            // Notify driver
-            const { data: passenger } = await admin
-              .from('users').select('name').eq('id', booking.passenger_id).single()
-            const time = new Date(booking.scheduled_at).toLocaleTimeString('id-ID', {
-              hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar'
+              const idleSince = lastBooking ? new Date(lastBooking.auto_complete_at).getTime() : 0
+              return { taxi, tripsToday: trips || 0, idleSince }
             })
+          )
 
-            await notify({
-              user_id:    assignedTaxi.driver_id,
-              booking_id: bookingId,
-              title:      'New trip assigned',
-              body:       `${passenger?.name} → ${booking.destination} at ${time}`,
-              type:       'driver_assigned',
-            })
+          const candidates = avail
+            .filter(Boolean)
+            .sort((a: any, b: any) => {
+              if (a.tripsToday !== b.tripsToday) return a.tripsToday - b.tripsToday
+              return a.idleSince - b.idleSince
+            }) as any[]
 
-            // Notify passenger
-            await notify({
-              user_id:    booking.passenger_id,
-              booking_id: bookingId,
-              title:      '✅ Trip approved!',
-              body:       `Your trip to ${booking.destination} is approved and a driver has been assigned.`,
-              type:       'booking_confirmed',
-            })
+          if (candidates.length) {
+            assignedTaxi = candidates[0].taxi
+            const { error: assignErr } = await admin.from('bookings').update({
+              taxi_id:     assignedTaxi.id,
+              status:      'booked',
+              assigned_at: new Date().toISOString(),
+            }).eq('id', bookingId)
+
+            if (assignErr) {
+              console.warn('approve autoAssign conflict:', assignErr.code, assignErr.message)
+              assignedTaxi = null
+            }
+
+            if (assignedTaxi) {
+              const { data: passenger } = await admin
+                .from('users').select('name').eq('id', booking.passenger_id).single()
+              const time = new Date(booking.scheduled_at).toLocaleTimeString('id-ID', {
+                hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar',
+              })
+
+              await notify({
+                user_id:    assignedTaxi.driver_id,
+                booking_id: bookingId,
+                title:      'New trip assigned',
+                body:       `${passenger?.name} → ${booking.destination} at ${time}`,
+                type:       'driver_assigned',
+              })
+
+              await notify({
+                user_id:    booking.passenger_id,
+                booking_id: bookingId,
+                title:      '✅ Trip approved!',
+                body:       `Your trip to ${booking.destination} is approved and a driver has been assigned.`,
+                type:       'booking_confirmed',
+              })
+            }
           }
         }
       }
 
-      return NextResponse.json({
-        success:  true,
-        assigned: !!assignedTaxi,
-      })
+      return NextResponse.json({ success: true, assigned: !!assignedTaxi })
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })

@@ -5,6 +5,116 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
+import PageLoader from '@/components/PageLoader'
+import { useLang, setLang } from '@/lib/language'
+import type { Lang } from '@/lib/language'
+
+const MSG = {
+  en: {
+    profile:       'Profile',
+    account:       'Account',
+    fullName:      'Full name',
+    email:         'Email',
+    role:          'Role',
+    assignedTaxi:  'Assigned taxi',
+    memberSince:   'Member since',
+    phone:         'Phone',
+    notSet:        'Not set',
+    edit:          'Edit',
+    phoneNumber:   'Phone number',
+    cancel:        'Cancel',
+    save:          'Save',
+    saving:        'Saving…',
+    phoneUpdated:  'Phone number updated.',
+    security:      'Security',
+    changePw:      'Change password',
+    newPw:         'New password',
+    confirmPw:     'Confirm password',
+    min8:          'Min 8 characters',
+    repeatPw:      'Repeat new password',
+    updatePw:      'Update password',
+    savingPw:      'Saving…',
+    app:           'App',
+    appName:       'App name',
+    version:       'Version',
+    company:       'Company',
+    pushTitle:     'Push Notifications',
+    enableNotif:   'Enable notifications',
+    enableDesc:    'Get alerts for trip updates, driver assignments, and reminders.',
+    enabling:      'Enabling…',
+    enableBtn:     'Enable notifications',
+    installTip:    'Tip: install the app to your homescreen for reliable background alerts.',
+    registering:   'Registering device…',
+    registered:    'Device registered — notifications active',
+    notRegistered: 'Device not registered',
+    testPush:         'Send test push',
+    testingPush:      'Sending…',
+    signOut:          'Sign out',
+    signOutConfirm:   'Sign out of TaxiBook?',
+    signOutBody:      "You'll need to log in again to use the app.",
+    yesSignOut:       'Yes, sign out',
+    signingOut:       'Signing out…',
+    viewProfile:      'View profile',
+    statLabels: {
+      staff:       ['Total bookings', 'This month', 'This week'],
+      driver:      ['Trips completed', 'This month', 'This week'],
+      coordinator: ['Total bookings', 'This month', 'Pending approval'],
+    },
+    roleLabels: { staff: 'Staff', coordinator: 'Coordinator', driver: 'Driver' },
+  },
+  id: {
+    profile:       'Profil',
+    account:       'Akun',
+    fullName:      'Nama lengkap',
+    email:         'Email',
+    role:          'Peran',
+    assignedTaxi:  'Taksi yang ditugaskan',
+    memberSince:   'Bergabung sejak',
+    phone:         'Telepon',
+    notSet:        'Belum diatur',
+    edit:          'Ubah',
+    phoneNumber:   'Nomor telepon',
+    cancel:        'Batal',
+    save:          'Simpan',
+    saving:        'Menyimpan…',
+    phoneUpdated:  'Nomor telepon diperbarui.',
+    security:      'Keamanan',
+    changePw:      'Ganti kata sandi',
+    newPw:         'Kata sandi baru',
+    confirmPw:     'Konfirmasi kata sandi',
+    min8:          'Min 8 karakter',
+    repeatPw:      'Ulangi kata sandi baru',
+    updatePw:      'Perbarui kata sandi',
+    savingPw:      'Menyimpan…',
+    app:           'Aplikasi',
+    appName:       'Nama aplikasi',
+    version:       'Versi',
+    company:       'Perusahaan',
+    pushTitle:     'Notifikasi Push',
+    enableNotif:   'Aktifkan notifikasi',
+    enableDesc:    'Dapatkan notifikasi untuk pembaruan perjalanan, penugasan driver, dan pengingat.',
+    enabling:      'Mengaktifkan…',
+    enableBtn:     'Aktifkan notifikasi',
+    installTip:    'Tips: instal aplikasi ke layar utama untuk notifikasi latar belakang yang andal.',
+    registering:   'Mendaftarkan perangkat…',
+    registered:    'Perangkat terdaftar — notifikasi aktif',
+    notRegistered: 'Perangkat belum terdaftar',
+    testPush:         'Kirim push test',
+    testingPush:      'Mengirim…',
+    signOut:          'Keluar',
+    signOutConfirm:   'Keluar dari TaxiBook?',
+    signOutBody:      'Anda perlu masuk kembali untuk menggunakan aplikasi.',
+    yesSignOut:       'Ya, keluar',
+    signingOut:       'Keluar…',
+    viewProfile:      'Lihat profil',
+    statLabels: {
+      staff:       ['Total booking', 'Bulan ini', 'Minggu ini'],
+      driver:      ['Perjalanan selesai', 'Bulan ini', 'Minggu ini'],
+      coordinator: ['Total booking', 'Bulan ini', 'Menunggu persetujuan'],
+    },
+    roleLabels: { staff: 'Staff', coordinator: 'Koordinator', driver: 'Driver' },
+  },
+}
 
 const FONT = "var(--font-inter), 'Inter', sans-serif"
 
@@ -41,6 +151,14 @@ export default function ProfilePage({ role }: Props) {
   const [enablingNotif,  setEnablingNotif]  = useState(false)
   const [isPWA,          setIsPWA]          = useState(false)
   const [subStatus,      setSubStatus]      = useState<'idle' | 'checking' | 'registered' | 'failed'>('idle')
+
+  // ── Language preference ────────────────────────────────────
+  const lang = useLang()
+  const t    = MSG[lang]
+
+  function toggleLang(l: Lang) {
+    setLang(l)
+  }
 
   // ── Phone editing ──────────────────────────────────────────
   const [editPhone,   setEditPhone]   = useState(false)
@@ -276,23 +394,14 @@ export default function ProfilePage({ role }: Props) {
     router.push('/login')
   }
 
-  if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, background: '#F5F5F2' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-      <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(0,96,100,0.15)', borderTop: '3px solid #006064', animation: 'spin 0.8s linear infinite' }} />
-    </div>
-  )
+  if (loading) return <PageLoader />
 
-  const roleLabels: Record<string, string> = { staff: 'Staff', coordinator: 'Coordinator', driver: 'Driver' }
+  const roleLabels = t.roleLabels
   const roleBg:  Record<string, string> = { staff: '#DBEAFE', coordinator: '#FEF3C7', driver: '#D8F3DC' }
   const roleClr: Record<string, string> = { staff: '#1E3A5F', coordinator: '#92400E', driver: '#2D6A4F' }
   const initials = user?.name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') || '?'
 
-  const statLabels: Record<string, [string, string, string]> = {
-    staff:       ['Total bookings', 'This month', 'This week'],
-    driver:      ['Trips completed', 'This month', 'This week'],
-    coordinator: ['Total bookings', 'This month', 'Pending approval'],
-  }
+  const statLabels = t.statLabels
 
   const hasPhone = !!user?.phone
 
@@ -301,7 +410,7 @@ export default function ProfilePage({ role }: Props) {
 
       {/* Header */}
       <div style={{ background: '#ffffff', padding: '20px 20px 24px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-        <h1 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 20px', letterSpacing: '-0.2px' }}>Profile</h1>
+        <h1 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 20px', letterSpacing: '-0.2px' }}>{t.profile}</h1>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ width: 56, height: 56, borderRadius: '50%', background: roleBg[role], color: roleClr[role], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, flexShrink: 0 }}>
@@ -341,16 +450,16 @@ export default function ProfilePage({ role }: Props) {
         </div>
 
         {/* ── Account info ── */}
-        <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>Account</p>
+        <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>{t.account}</p>
         <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', marginBottom: 12 }}>
 
           {/* Static rows */}
           {[
-            { label: 'Full name',  value: user?.name },
-            { label: 'Email',      value: user?.email },
-            { label: 'Role',       value: roleLabels[role] },
-            ...(taxi ? [{ label: 'Assigned taxi', value: `${taxi.name} · ${taxi.plate_number || ''}` }] : []),
-            { label: 'Member since', value: user?.created_at ? format(new Date(user.created_at), 'd MMM yyyy', { locale: idLocale }) : '—' },
+            { label: t.fullName,     value: user?.name },
+            { label: t.email,        value: user?.email },
+            { label: t.role,         value: roleLabels[role] },
+            ...(taxi ? [{ label: t.assignedTaxi, value: `${taxi.name} · ${taxi.plate_number || ''}` }] : []),
+            { label: t.memberSince,  value: user?.created_at ? format(new Date(user.created_at), 'd MMM yyyy', { locale: idLocale }) : '—' },
           ].map(row => (
             <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
               <span style={{ fontSize: 13, color: '#6f7979' }}>{row.label}</span>
@@ -362,22 +471,22 @@ export default function ProfilePage({ role }: Props) {
           <div style={{ padding: '12px 16px' }}>
             {!editPhone ? (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, color: '#6f7979' }}>Phone</span>
+                <span style={{ fontSize: 13, color: '#6f7979' }}>{t.phone}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: hasPhone ? '#1a1c1b' : '#9ca3af' }}>
-                    {user?.phone || 'Not set'}
+                    {user?.phone || t.notSet}
                   </span>
                   <button
                     onClick={() => { setPhoneInput(user?.phone || ''); setEditPhone(true); setPhoneMsg(null) }}
                     style={{ fontSize: 12, fontWeight: 700, color: '#006064', background: 'rgba(0,96,100,0.08)', border: 'none', borderRadius: 8, padding: '3px 10px', cursor: 'pointer', fontFamily: FONT }}
                   >
-                    Edit
+                    {t.edit}
                   </button>
                 </div>
               </div>
             ) : (
               <div>
-                <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', margin: '0 0 8px' }}>Phone number</p>
+                <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', margin: '0 0 8px' }}>{t.phoneNumber}</p>
                 <input
                   type="tel"
                   inputMode="tel"
@@ -389,11 +498,11 @@ export default function ProfilePage({ role }: Props) {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => { setEditPhone(false); setPhoneMsg(null) }}
                     style={{ flex: 1, padding: '10px', background: '#F5F5F2', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT, color: '#006064' }}>
-                    Cancel
+                    {t.cancel}
                   </button>
                   <button onClick={savePhone} disabled={savingPhone}
                     style={{ flex: 1, padding: '10px', background: savingPhone ? '#9ca3af' : '#006064', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: savingPhone ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
-                    {savingPhone ? 'Saving…' : 'Save'}
+                    {savingPhone ? t.saving : t.save}
                   </button>
                 </div>
               </div>
@@ -433,7 +542,7 @@ export default function ProfilePage({ role }: Props) {
         )}
 
         {/* ── Security ── */}
-        <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>Security</p>
+        <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>{t.security}</p>
         <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', marginBottom: 20 }}>
           {!showChangePw ? (
             <button
@@ -444,23 +553,23 @@ export default function ProfilePage({ role }: Props) {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#006064' }}>Change password</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#006064' }}>{t.changePw}</span>
               </div>
               <span style={{ fontSize: 16, color: '#9ca3af' }}>›</span>
             </button>
           ) : (
             <div style={{ padding: '16px' }}>
-              <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 14px', color: '#006064' }}>Change password</p>
+              <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 14px', color: '#006064' }}>{t.changePw}</p>
 
               {/* New password */}
               <div style={{ marginBottom: 10 }}>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 6 }}>New password</label>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 6 }}>{t.newPw}</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showNewPw ? 'text' : 'password'}
                     value={pwForm.newPw}
                     onChange={e => setPwForm(f => ({ ...f, newPw: e.target.value }))}
-                    placeholder="Min 8 characters"
+                    placeholder={t.min8}
                     style={{ width: '100%', padding: '10px 40px 10px 12px', fontSize: 15, border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 10, outline: 'none', fontFamily: FONT, boxSizing: 'border-box' }}
                   />
                   <button
@@ -475,13 +584,13 @@ export default function ProfilePage({ role }: Props) {
 
               {/* Confirm password */}
               <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 6 }}>Confirm password</label>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af', marginBottom: 6 }}>{t.confirmPw}</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showConfirmPw ? 'text' : 'password'}
                     value={pwForm.confirmPw}
                     onChange={e => setPwForm(f => ({ ...f, confirmPw: e.target.value }))}
-                    placeholder="Repeat new password"
+                    placeholder={t.repeatPw}
                     style={{ width: '100%', padding: '10px 40px 10px 12px', fontSize: 15, border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 10, outline: 'none', fontFamily: FONT, boxSizing: 'border-box' }}
                   />
                   <button
@@ -503,11 +612,11 @@ export default function ProfilePage({ role }: Props) {
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => { setShowChangePw(false); setPwMsg(null) }}
                   style={{ flex: 1, padding: '11px', background: '#F5F5F2', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT, color: '#006064' }}>
-                  Cancel
+                  {t.cancel}
                 </button>
                 <button onClick={changePassword} disabled={savingPw}
                   style={{ flex: 1, padding: '11px', background: savingPw ? '#9ca3af' : '#006064', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: savingPw ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
-                  {savingPw ? 'Saving…' : 'Update password'}
+                  {savingPw ? t.savingPw : t.updatePw}
                 </button>
               </div>
             </div>
@@ -519,13 +628,27 @@ export default function ProfilePage({ role }: Props) {
           )}
         </div>
 
+        {/* ── Language ── */}
+        <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>Language / Bahasa</p>
+        <div style={{ background: '#ECEAE4', borderRadius: 16, padding: 4, display: 'flex', gap: 4, marginBottom: 20 }}>
+          {(['en', 'id'] as Lang[]).map(l => (
+            <button
+              key={l}
+              onClick={() => toggleLang(l)}
+              style={{ flex: 1, padding: '11px 8px', border: 'none', borderRadius: 11, cursor: 'pointer', fontFamily: FONT, fontWeight: 600, fontSize: 13, transition: 'all 0.15s', background: lang === l ? '#ffffff' : 'transparent', color: lang === l ? '#006064' : '#9ca3af', boxShadow: lang === l ? '0 1px 4px rgba(0,0,0,0.08)' : 'none' }}
+            >
+              {l === 'en' ? '🇬🇧 English' : '🇮🇩 Bahasa Indonesia'}
+            </button>
+          ))}
+        </div>
+
         {/* App info */}
-        <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>App</p>
+        <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>{t.app}</p>
         <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', marginBottom: 28 }}>
           {[
-            { label: 'App name', value: 'TaxiBook' },
-            { label: 'Version',  value: '1.0.0' },
-            { label: 'Company',  value: 'PT Vale Indonesia' },
+            { label: t.appName, value: 'TaxiBook' },
+            { label: t.version, value: '1.1.0' },
+            { label: t.company, value: 'PT Vale Indonesia' },
           ].map((row, i, arr) => (
             <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}>
               <span style={{ fontSize: 13, color: '#6f7979' }}>{row.label}</span>
@@ -537,7 +660,7 @@ export default function ProfilePage({ role }: Props) {
         {/* Push Notifications */}
         {notifPerm !== 'unsupported' && (
           <>
-            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>Push Notifications</p>
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>{t.pushTitle}</p>
             <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, padding: '14px 16px', marginBottom: 20 }}>
 
               {notifPerm === 'default' && (
@@ -545,9 +668,9 @@ export default function ProfilePage({ role }: Props) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                     <span style={{ fontSize: 22 }}>🔔</span>
                     <div>
-                      <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>Enable notifications</p>
+                      <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{t.enableNotif}</p>
                       <p style={{ fontSize: 12, color: '#6f7979', margin: '2px 0 0' }}>
-                        Get alerts for trip updates, driver assignments, and reminders.
+                        {t.enableDesc}
                       </p>
                     </div>
                   </div>
@@ -556,7 +679,7 @@ export default function ProfilePage({ role }: Props) {
                     disabled={enablingNotif}
                     style={{ width: '100%', padding: '11px', background: enablingNotif ? 'rgba(0,0,0,0.08)' : '#006064', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: enablingNotif ? 'not-allowed' : 'pointer', fontFamily: FONT, marginBottom: pushResult ? 10 : 0 }}
                   >
-                    {enablingNotif ? 'Enabling…' : 'Enable notifications'}
+                    {enablingNotif ? t.enabling : t.enableBtn}
                   </button>
                   {pushResult && (
                     <div style={{ background: pushResult.startsWith('✅') ? '#D8F3DC' : '#FEE2E2', borderRadius: 10, padding: '8px 12px' }}>
@@ -565,7 +688,7 @@ export default function ProfilePage({ role }: Props) {
                   )}
                   {!pushResult && !isPWA && (
                     <p style={{ fontSize: 11, color: '#9ca3af', margin: '8px 0 0', textAlign: 'center' }}>
-                      Tip: install the app to your homescreen for reliable background alerts.
+                      {t.installTip}
                     </p>
                   )}
                 </>
@@ -575,13 +698,13 @@ export default function ProfilePage({ role }: Props) {
                 <>
                   {subStatus === 'checking' && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '8px 12px', background: '#F3F4F6', borderRadius: 10 }}>
-                      <span style={{ fontSize: 13, color: '#6b7280' }}>Registering device…</span>
+                      <span style={{ fontSize: 13, color: '#6b7280' }}>{t.registering}</span>
                     </div>
                   )}
                   {subStatus === 'registered' && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '8px 12px', background: '#D8F3DC', borderRadius: 10 }}>
                       <span style={{ fontSize: 15 }}>✅</span>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: '#2D6A4F', margin: 0 }}>Device registered — notifications active</p>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: '#2D6A4F', margin: 0 }}>{t.registered}</p>
                     </div>
                   )}
                   {subStatus === 'failed' && (
@@ -589,7 +712,7 @@ export default function ProfilePage({ role }: Props) {
                       <div style={{ marginBottom: 8, padding: '8px 12px', background: '#FEE2E2', borderRadius: 10 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: pushResult ? 4 : 0 }}>
                           <span style={{ fontSize: 15 }}>⚠️</span>
-                          <p style={{ fontSize: 13, fontWeight: 600, color: '#991B1B', margin: 0 }}>Device not registered</p>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: '#991B1B', margin: 0 }}>{t.notRegistered}</p>
                         </div>
                         {pushResult && (
                           <p style={{ fontSize: 11, color: '#991B1B', margin: '0 0 0 23px', lineHeight: 1.4 }}>{pushResult.replace('❌ ', '')}</p>
@@ -608,7 +731,7 @@ export default function ProfilePage({ role }: Props) {
                     disabled={testingPush || subStatus === 'checking'}
                     style={{ width: '100%', padding: '10px', background: (testingPush || subStatus === 'checking') ? 'rgba(0,0,0,0.08)' : '#006064', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, marginBottom: pushResult ? 10 : 0 }}
                   >
-                    {testingPush ? 'Sending…' : 'Send test notification'}
+                    {testingPush ? t.testingPush : t.testPush}
                   </button>
                   {pushResult && (
                     <div style={{ background: pushResult.startsWith('✅') ? '#D8F3DC' : '#FEE2E2', borderRadius: 10, padding: '8px 12px' }}>
@@ -639,20 +762,20 @@ export default function ProfilePage({ role }: Props) {
             onClick={() => setShowConfirm(true)}
             style={{ width: '100%', padding: '13px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FECACA', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}
           >
-            Sign out
+            {t.signOut}
           </button>
         ) : (
           <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, padding: '16px', textAlign: 'center' }}>
-            <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>Sign out of TaxiBook?</p>
-            <p style={{ fontSize: 13, color: '#6f7979', margin: '0 0 14px' }}>You'll need to log in again to use the app.</p>
+            <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>{t.signOutConfirm}</p>
+            <p style={{ fontSize: 13, color: '#6f7979', margin: '0 0 14px' }}>{t.signOutBody}</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <button onClick={() => setShowConfirm(false)}
                 style={{ padding: '11px', background: '#F5F5F2', color: '#006064', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FONT }}>
-                Cancel
+                {t.cancel}
               </button>
               <button onClick={handleLogout} disabled={loggingOut}
                 style={{ padding: '11px', background: '#991B1B', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}>
-                {loggingOut ? 'Signing out...' : 'Yes, sign out'}
+                {loggingOut ? t.signingOut : t.yesSignOut}
               </button>
             </div>
           </div>

@@ -40,6 +40,14 @@ export async function POST(
       )
     }
 
+    // Cannot start before scheduled time
+    if (new Date() < new Date(booking.scheduled_at)) {
+      return NextResponse.json(
+        { error: `Trip is not yet scheduled to start. Scheduled at ${booking.scheduled_at}` },
+        { status: 400 }
+      )
+    }
+
     const newStatus = booking.trip_type === 'WAITING' ? 'waiting_trip' : 'on_trip'
 
     // auto_complete_at is fixed at booking creation (pickup→dest + dest→pickup + 30 min).

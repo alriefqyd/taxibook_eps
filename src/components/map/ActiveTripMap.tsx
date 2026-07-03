@@ -126,7 +126,7 @@ export default function ActiveTripMap({ pickup, destination, status, taxiColor, 
             <Popup>{targetAddress}</Popup>
           </Marker>
         )}
-        {route && route.length > 1 && (
+        {route && route.length > 1 && status !== 'booked' && (
           <Polyline positions={route} color={taxiColor || '#006064'} weight={4} opacity={0.8} />
         )}
       </MapContainer>

@@ -1,10 +1,30 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useNavRouter as useRouter } from '@/hooks/useNavRouter'
 import { createClient } from '@/lib/supabase/client'
+import { useLang } from '@/lib/language'
+
+const MSG = {
+  en: {
+    emailLabel:  'Work email',
+    pwdLabel:    'Password',
+    signingIn:   'Signing in...',
+    signIn:      'Sign in',
+    roleNote:    'Role is assigned by your admin',
+  },
+  id: {
+    emailLabel:  'Email kerja',
+    pwdLabel:    'Password',
+    signingIn:   'Masuk...',
+    signIn:      'Masuk',
+    roleNote:    'Peran Anda ditentukan oleh admin',
+  },
+}
 
 export default function LoginPage() {
+  const lang                    = useLang()
+  const t                       = MSG[lang]
   const router                  = useRouter()
   const supabase                = createClient()
   const [email, setEmail]       = useState('')
@@ -104,7 +124,7 @@ export default function LoginPage() {
                 letterSpacing: '0.08em', textTransform: 'uppercase',
                 color: '#9ca3af', marginBottom: '6px',
               }}>
-                Work email
+                {t.emailLabel}
               </label>
               <input
                 type="email"
@@ -126,7 +146,7 @@ export default function LoginPage() {
                 letterSpacing: '0.08em', textTransform: 'uppercase',
                 color: '#9ca3af', marginBottom: '6px',
               }}>
-                Password
+                {t.pwdLabel}
               </label>
               <div style={{ position: 'relative' }}>
                 <input
@@ -189,6 +209,7 @@ export default function LoginPage() {
               </div>
             )}
 
+            <style>{`@keyframes btn-spin { to { transform: rotate(360deg) } }`}</style>
             <button
               type="submit"
               disabled={loading}
@@ -196,10 +217,14 @@ export default function LoginPage() {
                 width: '100%', padding: '12px',
                 background: loading ? '#888' : '#006064',
                 color: 'white', border: 'none', borderRadius: '10px',
-                fontSize: '14px', fontWeight: '700', cursor: 'pointer',
+                fontSize: '14px', fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading && (
+                <span style={{ width: 15, height: 15, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.35)', borderTopColor: '#fff', display: 'inline-block', animation: 'btn-spin 0.7s linear infinite', flexShrink: 0 }} />
+              )}
+              {loading ? t.signingIn : t.signIn}
             </button>
           </form>
         </div>
@@ -208,7 +233,7 @@ export default function LoginPage() {
           textAlign: 'center', fontSize: '12px',
           color: '#9ca3af', marginTop: '16px',
         }}>
-          Role is assigned by your admin
+          {t.roleNote}
         </p>
       </div>
     </div>

@@ -2,7 +2,7 @@
 import React from 'react'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useNavRouter as useRouter } from '@/hooks/useNavRouter'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
@@ -11,6 +11,7 @@ import type { User } from '@/types'
 import GanttCalendar from '@/components/GanttCalendar'
 import { useGpsReporting } from '@/hooks/useGpsReporting'
 import OnboardingTour from '@/components/OnboardingTour'
+import PageLoader from '@/components/PageLoader'
 
 const ActiveTripMap = dynamic(() => import('@/components/map/ActiveTripMap'), { ssr: false })
 
@@ -209,12 +210,7 @@ export default function DriverHomePage() {
     if (hasActive) setTab('active')
   }, [hasActive])
 
-  if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, fontFamily: "'Inter',sans-serif", background: '#F5F5F2' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } } @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
-      <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(0,96,100,0.15)', borderTop: '3px solid #006064', animation: 'spin 0.8s linear infinite' }} />
-    </div>
-  )
+  if (loading) return <PageLoader />
 
   const initials = user?.name?.split(' ').map(n => n[0]).slice(0,2).join('') || '?'
 
@@ -228,12 +224,9 @@ export default function DriverHomePage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', height: 64 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <img src="/vale-logo.svg" alt="Vale" style={{ height: 30, display: 'block' }} />
-            <div>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#006064', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '0.3px', lineHeight: 1 }}>TaxiBook EPS</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: myTaxi?.is_available === false ? '#ba1a1a' : '#344500', display: 'inline-block' }} />
-                <span style={{ fontSize: 10, color: '#6f7979', fontWeight: 500 }}>{myTaxi?.is_available === false ? 'Offline' : 'On duty'}</span>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: myTaxi?.is_available === false ? '#ba1a1a' : '#344500', display: 'inline-block' }} />
+              <span style={{ fontSize: 10, color: '#6f7979', fontWeight: 500 }}>{myTaxi?.is_available === false ? 'Offline' : 'On duty'}</span>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -585,15 +578,19 @@ function TripDetailCard({ trip: t, processing, onStart, onComplete }: {
         ))}
       </div>
 
-      {t.status === 'booked' && onStart && (
-        <button
-          onClick={() => onStart(t.id)}
-          disabled={processing === t.id}
-          style={{ width: '100%', padding: '13px', background: processing === t.id ? 'rgba(0,0,0,0.08)' : '#006064', color: '#fff', border: 'none', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
-        >
-          {processing === t.id ? 'Starting...' : '🚗 Start trip — pick up passenger'}
-        </button>
-      )}
+      {t.status === 'booked' && onStart && (() => {
+        const tooEarly = new Date() < new Date(t.scheduled_at)
+        const isDisabled = processing === t.id || tooEarly
+        return (
+          <button
+            onClick={() => !tooEarly && onStart(t.id)}
+            disabled={isDisabled}
+            style={{ width: '100%', padding: '13px', background: isDisabled ? 'rgba(0,0,0,0.08)' : '#006064', color: isDisabled ? '#9ca3af' : '#fff', border: 'none', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: isDisabled ? 'not-allowed' : 'pointer', fontFamily: 'Inter, sans-serif' }}
+          >
+            {processing === t.id ? 'Starting...' : tooEarly ? `⏳ Scheduled at ${format(new Date(t.scheduled_at), 'HH:mm')} — not yet` : '🚗 Start trip — pick up passenger'}
+          </button>
+        )
+      })()}
 
       {['on_trip','waiting_trip'].includes(t.status) && onComplete && (
         <button

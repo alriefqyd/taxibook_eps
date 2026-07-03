@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useNavRouter as useRouter } from '@/hooks/useNavRouter'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { useDriverLocations, type DriverLocation } from '@/hooks/useDriverLocations'
@@ -9,6 +9,60 @@ import { getRoute } from '@/lib/routing'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import BottomNav from '@/components/BottomNav'
+import { useLang } from '@/lib/language'
+
+const MSG = {
+  en: {
+    loading:         'Loading map...',
+    pageTitle:       'Fleet Map',
+    online:          (n: number) => `${n} online`,
+    offline:         (n: number) => `${n} offline`,
+    gps:             (n: number) => `${n} GPS`,
+    boardTitle:      (n: number) => `Driver Board · ${n} unit${n !== 1 ? 's' : ''}`,
+    tripBadge:       'trip',
+    offBadge:        'off',
+    noDriver:        'No driver',
+    statusOffline:   'Offline',
+    statusOnTrip:    'On Trip',
+    statusWaiting:   'Waiting',
+    statusBooked:    'Booked',
+    statusAvailable: 'Available',
+    loadingBooking:  'Loading...',
+    passengerLabel:  'Passenger',
+    scheduledLabel:  'Scheduled',
+    routeLabel:      'Route',
+    noGps:           'Driver GPS location unavailable',
+    driverAvail:     'Driver available',
+    driverOffline:   'Driver offline',
+    noActiveTrip:    'No active trip',
+    close:           'Close',
+  },
+  id: {
+    loading:         'Memuat peta...',
+    pageTitle:       'Peta Armada',
+    online:          (n: number) => `${n} online`,
+    offline:         (n: number) => `${n} offline`,
+    gps:             (n: number) => `${n} GPS`,
+    boardTitle:      (n: number) => `Papan Driver · ${n} unit`,
+    tripBadge:       'jalan',
+    offBadge:        'off',
+    noDriver:        'Tanpa driver',
+    statusOffline:   'Offline',
+    statusOnTrip:    'Dalam Perjalanan',
+    statusWaiting:   'Menunggu',
+    statusBooked:    'Dipesan',
+    statusAvailable: 'Tersedia',
+    loadingBooking:  'Memuat...',
+    passengerLabel:  'Penumpang',
+    scheduledLabel:  'Dijadwalkan',
+    routeLabel:      'Rute',
+    noGps:           'Lokasi GPS driver tidak tersedia',
+    driverAvail:     'Driver tersedia',
+    driverOffline:   'Driver offline',
+    noActiveTrip:    'Tidak ada perjalanan aktif',
+    close:           'Tutup',
+  },
+}
 
 const DriverFleetMap   = dynamic(() => import('@/components/map/DriverFleetMap'),   { ssr: false })
 const DriverTripMiniMap = dynamic(() => import('@/components/map/DriverTripMiniMap'), { ssr: false })
@@ -59,6 +113,8 @@ interface BookingExtra {
 }
 
 export default function CoordinatorMapPage() {
+  const lang     = useLang()
+  const t        = MSG[lang]
   const router   = useRouter()
   const supabase = createClient()
   const [ready,          setReady]          = useState(false)
@@ -112,7 +168,7 @@ export default function CoordinatorMapPage() {
 
   if (!ready) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F5F2', fontFamily: "'Inter', sans-serif" }}>
-      <p style={{ color: '#9ca3af' }}>Loading map...</p>
+      <p style={{ color: '#9ca3af' }}>{t.loading}</p>
     </div>
   )
 
@@ -133,12 +189,12 @@ export default function CoordinatorMapPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={() => router.push('/coordinator/home')} style={{ width: 32, height: 32, borderRadius: '50%', background: '#F5F5F2', border: '1px solid rgba(0,0,0,0.08)', cursor: 'pointer', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
           <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.2px' }}>Fleet Map</h1>
+            <h1 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.2px' }}>{t.pageTitle}</h1>
             <div style={{ display: 'flex', gap: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#2D6A4F', background: '#D8F3DC', borderRadius: 6, padding: '1px 7px' }}>{onlineCount} online</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#EF4444', background: '#FEE2E2', borderRadius: 6, padding: '1px 7px' }}>{offlineCount} offline</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#2D6A4F', background: '#D8F3DC', borderRadius: 6, padding: '1px 7px' }}>{t.online(onlineCount)}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#EF4444', background: '#FEE2E2', borderRadius: 6, padding: '1px 7px' }}>{t.offline(offlineCount)}</span>
               <span style={{ fontSize: 11, fontWeight: 600, color: '#059669', background: '#ECFDF5', borderRadius: 6, padding: '1px 7px', display: 'flex', alignItems: 'center', gap: 3 }}>
-                <GpsIcon active={true} />{gpsCount} GPS
+                <GpsIcon active={true} />{t.gps(gpsCount)}
               </span>
             </div>
           </div>
@@ -163,7 +219,7 @@ export default function CoordinatorMapPage() {
             style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
           >
             <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: 0 }}>
-              Driver Board · {drivers.length} unit{drivers.length !== 1 ? 's' : ''}
+              {t.boardTitle(drivers.length)}
             </p>
             <span style={{ fontSize: 11, color: '#9ca3af' }}>{panelOpen ? '▼' : '▲'}</span>
           </div>
@@ -198,8 +254,8 @@ export default function CoordinatorMapPage() {
                     {relativeTime(d.location_updated_at)}
                   </p>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                    {onTrip && <span style={{ fontSize: 7, fontWeight: 700, color: d.color }}>trip</span>}
-                    {!isOnline && !onTrip && <span style={{ fontSize: 7, color: '#9ca3af' }}>off</span>}
+                    {onTrip && <span style={{ fontSize: 7, fontWeight: 700, color: d.color }}>{t.tripBadge}</span>}
+                    {!isOnline && !onTrip && <span style={{ fontSize: 7, color: '#9ca3af' }}>{t.offBadge}</span>}
                   </div>
                 </div>
               )
@@ -230,20 +286,22 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
   miniRoute: [number, number][] | undefined
   onClose: () => void
 }) {
+  const lang     = useLang()
+  const m        = MSG[lang]
   const bk       = d.active_booking
   const isOnline = d.is_available && !!d.driver_id
   const hasGps   = isGpsActive(d.location_updated_at)
   const hasMap   = d.latitude != null && d.longitude != null
 
   const statusLabel = !isOnline
-    ? { text: 'Offline', bg: '#FEE2E2', color: '#DC2626' }
+    ? { text: m.statusOffline,   bg: '#FEE2E2', color: '#DC2626' }
     : bk?.status === 'on_trip'
-    ? { text: 'On Trip', bg: `${d.color}20`, color: d.color }
+    ? { text: m.statusOnTrip,   bg: `${d.color}20`, color: d.color }
     : bk?.status === 'waiting_trip'
-    ? { text: 'Waiting', bg: '#FEF3C7', color: '#D97706' }
+    ? { text: m.statusWaiting,  bg: '#FEF3C7', color: '#D97706' }
     : bk?.status === 'booked'
-    ? { text: 'Booked', bg: '#EDE9FE', color: '#7C3AED' }
-    : { text: 'Available', bg: '#D1FAE5', color: '#059669' }
+    ? { text: m.statusBooked,   bg: '#EDE9FE', color: '#7C3AED' }
+    : { text: m.statusAvailable, bg: '#D1FAE5', color: '#059669' }
 
   return (
     <>
@@ -268,7 +326,7 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
             <div style={{ width: 40, height: 40, borderRadius: '50%', background: d.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🚗</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <p style={{ fontSize: 15, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.driver_name ?? 'No driver'}</p>
+                <p style={{ fontSize: 15, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.driver_name ?? m.noDriver}</p>
                 <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: statusLabel.bg, color: statusLabel.color, flexShrink: 0 }}>
                   {statusLabel.text}
                 </span>
@@ -296,12 +354,12 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
                 {bookingExtra ? (
                   <p style={{ fontSize: 11, fontWeight: 700, color: d.color, margin: '0 0 8px', letterSpacing: '0.04em' }}>{bookingExtra.booking_code}</p>
                 ) : (
-                  <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 8px' }}>Loading...</p>
+                  <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 8px' }}>{m.loadingBooking}</p>
                 )}
 
                 {/* Passenger */}
                 <div style={{ marginBottom: 8 }}>
-                  <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 2px' }}>Penumpang</p>
+                  <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 2px' }}>{m.passengerLabel}</p>
                   <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{bookingExtra?.passenger_name ?? '—'}</p>
                   {bookingExtra?.passenger_phone && (
                     <p style={{ fontSize: 11, color: '#6f7979', margin: 0 }}>{bookingExtra.passenger_phone}</p>
@@ -311,14 +369,14 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
                 {/* Scheduled */}
                 {bookingExtra?.scheduled_at && (
                   <div style={{ marginBottom: 8 }}>
-                    <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 2px' }}>Dijadwalkan</p>
+                    <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 2px' }}>{m.scheduledLabel}</p>
                     <p style={{ fontSize: 12, fontWeight: 600, margin: 0 }}>{format(new Date(bookingExtra.scheduled_at), 'EEEE, dd MMM · HH:mm', { locale: idLocale })}</p>
                   </div>
                 )}
 
                 {/* Route */}
                 <div>
-                  <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 4px' }}>Rute</p>
+                  <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 4px' }}>{m.routeLabel}</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                       <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>🟢</span>
@@ -345,13 +403,14 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
                     destLng={bk.destination_lng}
                     color={d.color}
                     route={miniRoute}
+                    status={bk.status}
                   />
                 </div>
               )}
 
               {!hasMap && (
                 <div style={{ background: '#F5F5F2', borderRadius: 12, padding: '20px', textAlign: 'center' }}>
-                  <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>Lokasi GPS driver tidak tersedia</p>
+                  <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>{m.noGps}</p>
                 </div>
               )}
             </>
@@ -359,9 +418,9 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
             /* No active trip */
             <div style={{ background: '#F5F5F2', borderRadius: 12, padding: '20px', textAlign: 'center' }}>
               <p style={{ fontSize: 13, fontWeight: 600, color: '#6f7979', margin: '0 0 4px' }}>
-                {isOnline ? 'Driver tersedia' : 'Driver offline'}
+                {isOnline ? m.driverAvail : m.driverOffline}
               </p>
-              <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>Tidak ada perjalanan aktif</p>
+              <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{m.noActiveTrip}</p>
               {hasMap && (
                 <div style={{ height: 160, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.08)', marginTop: 12 }}>
                   <DriverTripMiniMap
@@ -375,7 +434,7 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
           )}
 
           <button onClick={onClose} style={{ width: '100%', marginTop: 14, padding: '12px', background: '#006064', color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Tutup
+            {m.close}
           </button>
         </div>
       </div>

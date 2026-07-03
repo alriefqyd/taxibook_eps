@@ -176,13 +176,24 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string, au
   const todayStart    = new Date(nowWita.getTime() - WITA_MS)
   const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
-  // Active taxis with a driver on duty (is_available = driver manually set themselves online)
-  const { data: taxis } = await admin
+  // No auto-assignment for trips scheduled during 12:00–13:00 WITA (lunch & prayer break)
+  const scheduledWita     = new Date(new Date(scheduledAt).getTime() + 8 * 3600000)
+  const scheduledHourWita = scheduledWita.getUTCHours()
+  if (scheduledHourWita >= 12 && scheduledHourWita < 13) return { taxi: null }
+
+  // For future-day trips drivers may be offline (end of shift) — only check is_available for same-day trips
+  const scheduledWitaDate = scheduledWita.toISOString().slice(0, 10)
+  const todayWitaDate     = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+  const isFutureDay       = scheduledWitaDate > todayWitaDate
+
+  let taxiQuery = admin
     .from('taxis')
     .select('id, name, driver_id, users!driver_id(name, phone)')
-    .eq('is_active',    true)
-    .eq('is_available', true)
+    .eq('is_active', true)
     .not('driver_id', 'is', null)
+  if (!isFutureDay) taxiQuery = taxiQuery.eq('is_available', true)
+
+  const { data: taxis } = await taxiQuery
 
   if (!taxis?.length) return { taxi: null }
 

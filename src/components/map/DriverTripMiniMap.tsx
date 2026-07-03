@@ -32,16 +32,18 @@ interface Props {
   destLng?: number | null
   color: string
   route?: [number, number][]
+  status?: string
 }
 
-export default function DriverTripMiniMap({ driverLat, driverLng, pickupLat, pickupLng, destLat, destLng, color, route }: Props) {
+export default function DriverTripMiniMap({ driverLat, driverLng, pickupLat, pickupLng, destLat, destLng, color, route, status }: Props) {
   const positions: [number, number][] = [[driverLat, driverLng]]
   if (pickupLat && pickupLng) positions.push([pickupLat, pickupLng])
   if (destLat && destLng) positions.push([destLat, destLng])
 
-  const lineCoords: [number, number][] = route && route.length > 1
+  const tripStarted = status === 'on_trip' || status === 'waiting_trip'
+  const lineCoords: [number, number][] = tripStarted && route && route.length > 1
     ? route
-    : (destLat && destLng ? [[driverLat, driverLng], [destLat, destLng]] : [])
+    : (tripStarted && destLat && destLng ? [[driverLat, driverLng], [destLat, destLng]] : [])
 
   return (
     <MapContainer

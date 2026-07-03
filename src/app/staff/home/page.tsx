@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useNavRouter as useRouter } from '@/hooks/useNavRouter'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
@@ -13,6 +13,8 @@ import { id as idLocale } from 'date-fns/locale'
 import type { BookingDetail, User } from '@/types'
 import { STATUS_COLORS, STATUS_LABELS } from '@/types'
 import OnboardingTour from '@/components/OnboardingTour'
+import StaffBookingSheet from '@/components/StaffBookingSheet'
+import PageLoader from '@/components/PageLoader'
 
 const TrackingMap    = dynamic(() => import('@/components/map/TrackingMap'),    { ssr: false })
 const DriverFleetMap = dynamic(() => import('@/components/map/DriverFleetMap'), { ssr: false })
@@ -35,8 +37,6 @@ export default function StaffHomePage() {
   const [taxis,       setTaxis]       = useState<any[]>([])
   const [loading,  setLoading]  = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo,   setDateTo]   = useState('')
   const [bkPage,      setBkPage]      = useState(0)
   const [hasMoreBk,   setHasMoreBk]   = useState(false)
   const [loadingMore,  setLoadingMore]  = useState(false)
@@ -44,7 +44,7 @@ export default function StaffHomePage() {
   const [view,           setView]           = useState<ViewMode>('day')
   const [cursor,         setCursor]         = useState(new Date())
   const [dayAssignments, setDayAssignments] = useState<{ taxi_id: string; assign_date: string }[]>([])
-  const [selectedBk,   setSelectedBk]   = useState<any | null>(null)
+  const [selectedBk,   setSelectedBk]   = useState<BookingDetail | null>(null)
   const [refreshing,   setRefreshing]   = useState(false)
   const [pullY,        setPullY]        = useState(0)
   const dayScrollRef  = useRef<HTMLDivElement>(null)
@@ -62,7 +62,7 @@ export default function StaffHomePage() {
         .eq('passenger_id', userId)
         .not('status', 'in', '("cancelled")')
         .order('scheduled_at', { ascending: false })
-        .range(0, 9),
+        .range(0, 4),
       // All users' bookings — for the schedule/Gantt view (include completed so calendar shows history)
       supabase
         .from('booking_details')
@@ -83,7 +83,7 @@ export default function StaffHomePage() {
     const bkList = bks || []
     setBookings(bkList)
     setAllBookings(allBks || [])
-    setHasMoreBk(bkList.length === 10)
+    setHasMoreBk(bkList.length === 5)
     setBkPage(0)
     setTaxis((txs || []).map((t: any) => ({
       ...t,
@@ -162,24 +162,13 @@ export default function StaffHomePage() {
     }
   }, [loading, view])
 
-  if (loading) return (
-    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#F5F5F2', gap: 16, fontFamily:"'Inter',sans-serif" }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-      <div style={{ width: 44, height: 44, borderRadius: '50%', border: '4px solid rgba(0,96,100,0.15)', borderTop: '4px solid #006064', animation: 'spin 0.8s linear infinite' }} />
-    </div>
-  )
+  if (loading) return <PageLoader />
 
   const today        = new Date()
   const ACTIVE_STATUSES    = ['booked','on_trip','waiting_trip']
   const activeBookings     = bookings.filter(b => ACTIVE_STATUSES.includes(b.status))
   const allActiveBookings  = allBookings.filter(b => [...ACTIVE_STATUSES, 'completed'].includes(b.status))
-  const myBookings      = bookings.filter(b => {
-    if (!dateFrom && !dateTo) return true
-    const d = new Date(b.scheduled_at)
-    if (dateFrom && d < new Date(dateFrom + 'T00:00:00')) return false
-    if (dateTo   && d > new Date(dateTo   + 'T23:59:59')) return false
-    return true
-  })
+  const myBookings = bookings
   // Stats show today's fleet activity
   const todayBookings  = activeBookings.filter(b => isSameDay(new Date(b.scheduled_at), today))
   const pendingCount   = activeBookings.filter(b => b.status === 'pending_coordinator_approval').length
@@ -231,12 +220,9 @@ export default function StaffHomePage() {
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0 20px', height: 64 }}>
           <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
             <img src="/vale-logo.svg" alt="Vale" style={{ height: 30, display: 'block' }} />
-            <div>
-              <p style={{ fontSize:13, fontWeight:700, color:'#006064', margin:0, fontFamily:"'Plus Jakarta Sans',sans-serif", letterSpacing:'0.3px', lineHeight:1 }}>TaxiBook EPS</p>
-              <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:2 }}>
-                <span style={{ width:6, height:6, borderRadius:'50%', background:'#344500', display:'inline-block' }} />
-                <span style={{ fontSize:10, color:'#6f7979', fontWeight:500 }}>Staff</span>
-              </div>
+            <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+              <span style={{ width:6, height:6, borderRadius:'50%', background:'#344500', display:'inline-block' }} />
+              <span style={{ fontSize:10, color:'#6f7979', fontWeight:500 }}>Staff</span>
             </div>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:4 }}>
@@ -277,6 +263,10 @@ export default function StaffHomePage() {
                     <button onClick={() => { setMenuOpen(false); router.push('/staff/profile') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                       <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>View profile</p>
+                    </button>
+                    <button onClick={() => { setMenuOpen(false); router.push('/staff/trips') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>View all trips</p>
                     </button>
                     <button onClick={async () => { setMenuOpen(false); await supabase.auth.signOut(); router.push('/login') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ba1a1a" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -322,28 +312,58 @@ export default function StaffHomePage() {
         </div>
 
         {/* New booking CTA — amber pill like reference */}
-        <Link href="/staff/book" style={{ textDecoration:'none', display:'block', marginBottom:16 }}>
-          <button style={{ width:'100%', padding:'14px', background:'#feb300', color:'#3d2c00', border:'none', borderRadius:9999, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:"'Plus Jakarta Sans',sans-serif", display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-            <span style={{ fontSize:18 }}>+</span> New booking
-          </button>
-        </Link>
+        <div style={{ marginBottom:16 }}>
+          <Link href="/staff/book" style={{ textDecoration:'none', display:'block' }}>
+            <button style={{ width:'100%', padding:'14px', background:'#feb300', color:'#3d2c00', border:'none', borderRadius:9999, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:"'Plus Jakarta Sans',sans-serif", display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              <span style={{ fontSize:18 }}>+</span> New booking
+            </button>
+          </Link>
+        </div>
       </div>
 
       {/* ── View tabs + nav ── */}
       <div style={{ background:'#ffffff', borderBottom:'1px solid rgba(0,0,0,0.08)', padding:'12px 16px' }}>
-        {/* Tabs */}
-        <div style={{ display:'flex', background:'#F5F5F2', borderRadius:10, padding:'3px', gap:'2px', marginBottom: view === 'map' ? 0 : '10px' }}>
-          {(['day','week','month','map'] as ViewMode[]).map(v => (
-            <button key={v} onClick={() => { setView(v); if (v !== 'map') setCursor(new Date()) }} style={{
-              flex:1, padding:'6px 4px', fontSize:'12px', fontWeight:600,
-              border:'none', borderRadius:'999px', cursor:'pointer',
-              background: view === v ? '#ffffff' : 'transparent',
-              color: view === v ? '#006064' : '#9ca3af',
-              textTransform:'capitalize',
+        {/* Icon toggle + Day/Week/Month pill — same row */}
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom: view === 'map' ? 0 : 10 }}>
+          <div style={{ display:'flex', background:'#F5F5F2', borderRadius:8, padding:'2px', gap:'2px', flexShrink:0 }}>
+            <button onClick={() => { if (view === 'map') setView('day') }} style={{
+              background: view !== 'map' ? '#ffffff' : 'transparent',
+              border:'none', borderRadius:6, padding:'5px 7px', cursor:'pointer',
+              color: view !== 'map' ? '#006064' : '#9ca3af',
+              display:'flex', alignItems:'center',
+              boxShadow: view !== 'map' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
             }}>
-              {v}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
             </button>
-          ))}
+            <button onClick={() => setView('map')} style={{
+              background: view === 'map' ? '#ffffff' : 'transparent',
+              border:'none', borderRadius:6, padding:'5px 7px', cursor:'pointer',
+              color: view === 'map' ? '#006064' : '#9ca3af',
+              display:'flex', alignItems:'center',
+              boxShadow: view === 'map' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+              </svg>
+            </button>
+          </div>
+          {view !== 'map' && (
+            <div style={{ flex:1, display:'flex', background:'#F5F5F2', borderRadius:9999, padding:'3px', gap:'2px' }}>
+              {(['day','week','month'] as const).map(v => (
+                <button key={v} onClick={() => { setView(v); setCursor(new Date()) }} style={{
+                  flex:1, padding:'6px 4px', fontSize:'12px', fontWeight:600,
+                  border:'none', borderRadius:9999, cursor:'pointer',
+                  background: view === v ? '#ffffff' : 'transparent',
+                  color: view === v ? '#0F1923' : '#9ca3af',
+                  textTransform:'capitalize',
+                }}>
+                  {v}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Nav row — hidden on map tab */}
@@ -374,20 +394,6 @@ export default function StaffHomePage() {
           <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: 0 }}>
             My bookings {myBookings.length > 0 && `· ${myBookings.length}`}
           </p>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, padding: '5px 10px' }}>
-            <span style={{ fontSize: 11, flexShrink: 0 }}>📅</span>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              style={{ width: 120, border: 'none', outline: 'none', fontSize: 12, fontFamily: 'inherit', background: 'transparent', color: '#006064' }} />
-            <span style={{ fontSize: 10, color: '#9ca3af' }}>→</span>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              style={{ width: 120, border: 'none', outline: 'none', fontSize: 12, fontFamily: 'inherit', background: 'transparent', color: '#006064' }} />
-            {(dateFrom || dateTo) && (
-              <button onClick={() => { setDateFrom(''); setDateTo('') }}
-                style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 9999, border: '1px solid rgba(0,0,0,0.08)', background: '#F5F5F2', color: '#6f7979', cursor: 'pointer', fontFamily: 'inherit' }}>
-                ✕
-              </button>
-            )}
-          </div>
         </div>
         {myBookings.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '24px', color: '#9ca3af', background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)' }}>
@@ -402,29 +408,34 @@ export default function StaffHomePage() {
               <div
                 key={b.id}
                 onClick={() => setSelectedBk(b)}
-                style={{ background: isPast ? '#F9FAFB' : '#ffffff', borderRadius: 16, padding: '16px', marginBottom: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.05)', borderLeft: `3px solid ${isPast ? '#D1D5DB' : '#006064'}`, cursor: 'pointer', opacity: isPast ? 0.72 : 1 }}
+                style={{ background: '#ffffff', borderRadius: 14, padding: '12px 14px', marginBottom: 8, border: '1px solid rgba(0,0,0,0.07)', borderLeft: `3px solid ${isPast ? '#D1D5DB' : '#006064'}`, boxShadow: '0 1px 3px rgba(0,0,0,0.04)', cursor: 'pointer', opacity: isPast ? 0.72 : 1 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                  <div style={{ flex: 1, minWidth: 0, marginRight: '8px' }}>
-                    <p style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {b.destination}
                     </p>
-                    <p style={{ fontSize: '12px', color: '#6f7979', margin: 0 }}>
-                      {new Date(b.scheduled_at).toLocaleString('id-ID', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}
+                    <p style={{ fontSize: 11, color: '#6f7979', margin: '0 0 2px' }}>
+                      {format(new Date(b.scheduled_at), 'EEE d MMM · HH:mm', { locale: idLocale })}
                     </p>
+                    {b.pickup && (
+                      <p style={{ fontSize: 11, color: '#9ca3af', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {b.pickup} → {b.destination}
+                      </p>
+                    )}
                   </div>
-                  {sc && <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: 9999, flexShrink: 0, background: sc.bg, color: sc.text }}>{(STATUS_LABELS as any)[b.status]}</span>}
+                  {sc && <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 9999, background: sc.bg, color: sc.text, flexShrink: 0, marginTop: 1 }}>{(STATUS_LABELS as any)[b.status]}</span>}
                 </div>
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: '8px' }}>
-                  <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: b.trip_type === 'DROP' ? '#DBEAFE' : '#EDE9FE', color: b.trip_type === 'DROP' ? '#1E3A5F' : '#4C1D95' }}>
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: b.trip_type === 'DROP' ? '#DBEAFE' : '#EDE9FE', color: b.trip_type === 'DROP' ? '#1E3A5F' : '#4C1D95' }}>
                     {b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}min`}
                   </span>
                   {b.taxi_name
-                    ? <span style={{ fontSize: '11px', color: '#6f7979', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: b.taxi_color || '#888', display: 'inline-block' }} />
+                    ? <span style={{ fontSize: 10, color: '#6f7979', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: b.taxi_color || '#888', display: 'inline-block' }} />
                         {b.taxi_name} · {b.driver_name}
                       </span>
-                    : <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>
+                    : <span style={{ fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>
                         {b.status === 'pending_coordinator_approval' ? 'Awaiting approval' : 'Unassigned'}
                       </span>
                   }
@@ -433,32 +444,13 @@ export default function StaffHomePage() {
             )
           })}
           {hasMoreBk && (
-            <button
-              disabled={loadingMore}
-              onClick={async () => {
-                setLoadingMore(true)
-                const nextPage = bkPage + 1
-                const { data: { user: au } } = await supabase.auth.getUser()
-                if (au) {
-                  const { data } = await supabase
-                    .from('bookings')
-                    .select('*, taxis(name,color), users!passenger_id(name)')
-                    .eq('passenger_id', au.id)
-                    .not('status', 'in', '("cancelled")')
-                    .order('scheduled_at', { ascending: false })
-                    .range(nextPage * 10, nextPage * 10 + 9)
-                  if (data) {
-                    setBookings(prev => [...prev, ...data])
-                    setHasMoreBk(data.length === 10)
-                    setBkPage(nextPage)
-                  }
-                }
-                setLoadingMore(false)
-              }}
-              style={{ width: '100%', padding: '13px', marginTop: 10, background: '#ffffff', boxShadow: '0 2px 8px rgba(0,96,100,0.06)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, fontSize: 13, fontWeight: 700, color: loadingMore ? '#9ca3af' : '#006064', cursor: loadingMore ? 'not-allowed' : 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-            >
-              {loadingMore ? 'Loading...' : 'Load more'}
-            </button>
+            <Link href="/staff/trips" style={{ textDecoration: 'none', display: 'block' }}>
+              <button
+                style={{ width: '100%', padding: '13px', marginTop: 10, background: '#ffffff', boxShadow: '0 2px 8px rgba(0,96,100,0.06)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, fontSize: 13, fontWeight: 700, color: '#006064', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+              >
+                Load more
+              </button>
+            </Link>
           )}
           </>
         )}
@@ -980,235 +972,3 @@ function WeekView({ bookings, cursor, onSelectBooking, dayAssignments = [] }: { 
   )
 }
 
-// ── Contact helpers ─────────────────────────────────────────
-function staffToWaNumber(phone: string): string {
-  let n = phone.replace(/\D/g, '')
-  if (n.startsWith('0')) n = '62' + n.slice(1)
-  return n
-}
-
-function staffBuildWaMessage(b: any): string {
-  const time = new Date(b.scheduled_at).toLocaleString('id-ID', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-  const type = b.trip_type === 'DROP' ? 'Drop (antar saja)' : `Waiting ${b.wait_minutes} menit (tunggu penumpang)`
-  const taxi = b.taxi_name ? `${b.taxi_name}${b.taxi_plate ? ` (${b.taxi_plate})` : ''}` : null
-  const isImminent = new Date(b.scheduled_at) <= new Date(Date.now() + 30 * 60 * 1000)
-  const header  = isImminent ? `📋 *TaxiBook – Perjalanan Segera*` : `📋 *TaxiBook – Penugasan Perjalanan*`
-  const closing = isImminent
-    ? `Perjalanan ini akan segera dimulai. Pastikan Anda sudah siap dan di lokasi penjemputan. 🙏`
-    : `Anda telah ditugaskan untuk perjalanan ini. Harap bersiap tepat waktu. 🙏`
-  return [
-    header,
-    `━━━━━━━━━━━━━━━━━━`,
-    `🔖 Kode Booking: *${b.booking_code}*`,
-    ``,
-    `👤 *Penumpang*`,
-    `   Nama : ${b.passenger_name || 'Anda'}`,
-    ...(b.passenger_phone ? [`   HP   : ${b.passenger_phone}`] : []),
-    ``,
-    `📍 *Rute Perjalanan*`,
-    `   Dari    : ${b.pickup}`,
-    `   Tujuan  : ${b.destination}`,
-    ``,
-    `🕐 *Jadwal*`,
-    `   ${time}`,
-    ``,
-    `🚗 *Detail Trip*`,
-    `   Jenis : ${type}`,
-    ...(taxi ? [`   Taksi : ${taxi}`] : []),
-    ...(b.notes ? [`   Catatan : ${b.notes}`] : []),
-    ``,
-    `━━━━━━━━━━━━━━━━━━`,
-    closing,
-  ].join('\n')
-}
-
-// ── Staff booking detail + cancel sheet ─────────────────────
-function StaffBookingSheet({ booking, currentUserId, onClose, onCancelled }: {
-  booking: any
-  currentUserId?: string
-  onClose: () => void
-  onCancelled: () => void
-}) {
-  const supabase = createClient()
-  const [cancelling,   setCancelling]   = React.useState(false)
-  const [showCancel,   setShowCancel]   = React.useState(false)
-  const [cancelReason, setCancelReason] = React.useState('')
-  const [error,        setError]        = React.useState('')
-
-  async function handleCancel() {
-    setCancelling(true)
-    setError('')
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { setError('Session expired'); setCancelling(false); return }
-
-    const res = await fetch(`/api/bookings/${booking.id}/cancel`, {
-      method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ reason: cancelReason }),
-    })
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      setError(data.error || 'Failed to cancel')
-      setCancelling(false)
-      return
-    }
-
-    onCancelled()
-    onClose()
-  }
-
-  const isCreator = !!currentUserId && (
-    booking.created_by === currentUserId || booking.passenger_id === currentUserId
-  )
-  const canCancel = isCreator && ['submitted','pending_coordinator_approval','booked'].includes(booking.status)
-
-  return (
-    <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 100 }}
-      onClick={onClose}
-    >
-      <div
-        style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px', maxHeight: '85vh', overflowY: 'auto', boxSizing: 'border-box' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.08)', margin: '0 auto 20px' }} />
-
-        {/* Booking header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-          <div>
-            <p style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.3px' }}>
-              {booking.destination}
-            </p>
-            <p style={{ fontSize: '13px', color: '#6f7979', margin: 0 }}>
-              {booking.scheduled_at && new Date(booking.scheduled_at).toLocaleString('id-ID', {
-                weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'
-              })}
-            </p>
-          </div>
-          <span style={{
-            fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: 9999,
-            background: booking.trip_type === 'DROP' ? '#DBEAFE' : '#EDE9FE',
-            color: booking.trip_type === 'DROP' ? '#1E3A5F' : '#4C1D95',
-          }}>
-            {booking.trip_type === 'DROP' ? 'Drop' : `Wait ${booking.wait_minutes}min`}
-          </span>
-        </div>
-
-        {/* Driver tracking map — shown when driver is confirmed/active */}
-        {['booked', 'on_trip', 'waiting_trip'].includes(booking.status) && booking.taxi_id && (
-          <TrackingMap
-            taxiId={booking.taxi_id}
-            taxiColor={booking.taxi_color || '#006064'}
-            pickup={booking.pickup}
-            destination={booking.destination}
-            status={booking.status}
-            pickupLat={booking.pickup_lat}
-            pickupLng={booking.pickup_lng}
-            destLat={booking.destination_lat}
-            destLng={booking.destination_lng}
-          />
-        )}
-
-        {/* Details */}
-        <div style={{ background: '#F5F5F2', borderRadius: 16, padding: '12px 14px', marginBottom: '16px' }}>
-          {[
-            { label: 'Booking ID',       value: booking.booking_code },
-            { label: 'Passenger',        value: booking.passenger_name || '—' },
-            ...(booking.passenger_phone ? [{ label: 'Passenger phone', value: booking.passenger_phone }] : []),
-            { label: 'Pickup',           value: booking.pickup },
-            { label: 'Status',      value: booking.status?.replace(/_/g,' ') },
-            { label: 'Taxi',        value: booking.taxi_name ? `${booking.taxi_name} · ${booking.driver_name}` : 'Not assigned yet' },
-            ...(booking.notes ? [{ label: 'Notes', value: booking.notes }] : []),
-          ].map((row, i, arr) => (
-            <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: i < arr.length - 1 ? '8px' : '0', marginBottom: i < arr.length - 1 ? '8px' : '0', borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.08)' : 'none' }}>
-              <span style={{ fontSize: '12px', color: '#6f7979' }}>{row.label}</span>
-              <span style={{ fontSize: '12px', fontWeight: 600, textAlign: 'right', maxWidth: '60%', textTransform: 'capitalize' }}>{row.value}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Action buttons — only shown to the booking creator */}
-        {isCreator && booking.driver_phone && !showCancel && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: canCancel ? 8 : 0 }}>
-            <a
-              href={`tel:${booking.driver_phone}`}
-              style={{ padding: '12px 8px', background: '#EFF6FF', color: '#0369A1', border: '1px solid #BAE6FD', borderRadius: 16, fontSize: '13px', fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxSizing: 'border-box' }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.63 4.35 2 2 0 0 1 3.6 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.16 6.16l.97-.97a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
-              </svg>
-              Call Driver
-            </a>
-            <a
-              href={`https://wa.me/${staffToWaNumber(booking.driver_phone)}?text=${encodeURIComponent(staffBuildWaMessage(booking))}`}
-              target="_blank" rel="noopener noreferrer"
-              style={{ padding: '12px 8px', background: '#25D366', color: '#ffffff', border: 'none', borderRadius: 16, fontSize: '13px', fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxSizing: 'border-box' }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/>
-              </svg>
-              WhatsApp Driver
-            </a>
-          </div>
-        )}
-
-        {/* Cancel section */}
-        {canCancel && !showCancel && (
-          <button
-            onClick={() => setShowCancel(true)}
-            style={{ width: '100%', padding: '12px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: 16, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
-          >
-            Cancel this booking
-          </button>
-        )}
-
-        {canCancel && showCancel && (
-          <div>
-            <div style={{ marginBottom: 10 }}>
-              <label style={{ display: 'block', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: '6px' }}>
-                Reason for cancellation
-              </label>
-              <input
-                type="text"
-                value={cancelReason}
-                onChange={e => setCancelReason(e.target.value)}
-                placeholder="e.g. I no longer need the taxi"
-                style={{ width: '100%', padding: '11px 14px', fontSize: '14px', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: '10px', boxSizing: 'border-box', outline: 'none' }}
-              />
-            </div>
-            {error && (
-              <p style={{ fontSize: '12px', color: '#991B1B', margin: '0 0 10px', background: '#ffdad6', padding: '8px 12px', borderRadius: '8px' }}>{error}</p>
-            )}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button onClick={() => setShowCancel(false)} style={{ padding: '12px', background: 'transparent', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-                Go back
-              </button>
-              <button
-                onClick={handleCancel}
-                disabled={cancelling}
-                style={{ padding: '12px', background: '#991B1B', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
-              >
-                {cancelling ? 'Cancelling...' : 'Confirm cancel'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!canCancel && (
-          <div style={{ background: '#F5F5F2', borderRadius: '10px', padding: '10px 14px', textAlign: 'center' }}>
-            <p style={{ fontSize: '12px', color: '#6f7979', margin: 0 }}>
-              {booking.status === 'completed' ? 'This trip has been completed.' : 'This booking cannot be cancelled.'}
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}

@@ -2,18 +2,21 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useLang } from '@/lib/language'
 
 const PRIMARY = '#006064'
 
 const ICONS: Record<string, { outline: string; filled: string }> = {
-  home:         { outline: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10', filled: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' },
-  taxi:         { outline: 'M5 17H3v-5l2-5h14l2 5v5h-2 M7.5 17a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z M16.5 17a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z', filled: 'M5 17H3v-5l2-5h14l2 5v5h-2 M7.5 17a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z M16.5 17a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z' },
-  bell:         { outline: 'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9 M13.73 21a2 2 0 0 1-3.46 0', filled: 'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9 M13.73 21a2 2 0 0 1-3.46 0' },
-  person:       { outline: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', filled: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
-  dashboard:    { outline: 'M3 3h7v7H3z M3 14h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z', filled: 'M3 3h7v7H3z M3 14h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z' },
-  group:        { outline: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M23 21v-2a4 4 0 0 0-3-3.87 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M16 3.13a4 4 0 0 1 0 7.75', filled: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
-  users:        { outline: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M19 8v6 M22 11h-6', filled: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
-  map:          { outline: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z M8 2v16 M16 6v16', filled: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z' },
+  home:      { outline: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10', filled: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' },
+  taxi:      { outline: 'M5 17H3v-5l2-5h14l2 5v5h-2 M7.5 17a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z M16.5 17a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z', filled: 'M5 17H3v-5l2-5h14l2 5v5h-2 M7.5 17a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z M16.5 17a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z' },
+  bell:      { outline: 'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9 M13.73 21a2 2 0 0 1-3.46 0', filled: 'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9 M13.73 21a2 2 0 0 1-3.46 0' },
+  person:    { outline: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', filled: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
+  dashboard: { outline: 'M3 3h7v7H3z M3 14h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z', filled: 'M3 3h7v7H3z M3 14h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z' },
+  group:     { outline: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M23 21v-2a4 4 0 0 0-3-3.87 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M16 3.13a4 4 0 0 1 0 7.75', filled: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
+  steering:  { outline: 'M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0 M9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0 M12 9V2 M9.4 13.5L3.3 17 M14.6 13.5L20.7 17', filled: 'M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0 M9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0 M12 9V2 M9.4 13.5L3.3 17 M14.6 13.5L20.7 17' },
+  users:     { outline: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M19 8v6 M22 11h-6', filled: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
+  map:       { outline: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z M8 2v16 M16 6v16', filled: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z' },
+  list:      { outline: 'M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01', filled: 'M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01' },
 }
 
 const SvgIcon = ({ d, size = 22, color = 'currentColor', fill = 'none', strokeWidth = 2 }: {
@@ -26,30 +29,69 @@ const SvgIcon = ({ d, size = 22, color = 'currentColor', fill = 'none', strokeWi
   </svg>
 )
 
-type NavItem = { href: string; label: string; iconKey: string }
+type NavItem = { href: string; labelEn: string; labelId: string; iconKey: string }
 
 const NAV: Record<string, NavItem[]> = {
   staff: [
-    { href: '/staff/home',    label: 'Home',    iconKey: 'home'   },
-    { href: '/staff/book',    label: 'Book',    iconKey: 'taxi'   },
-    { href: '/staff/profile', label: 'Profile', iconKey: 'person' },
+    { href: '/staff/home',    labelEn: 'Home',    labelId: 'Beranda', iconKey: 'home'   },
+    { href: '/staff/profile', labelEn: 'Profile', labelId: 'Profil',  iconKey: 'person' },
   ],
   coordinator: [
-    { href: '/coordinator/home',    label: 'Home',    iconKey: 'dashboard' },
-    { href: '/coordinator/drivers', label: 'Drivers', iconKey: 'group'     },
-    { href: '/coordinator/users',   label: 'Users',   iconKey: 'users'     },
-    { href: '/coordinator/map',     label: 'Map',     iconKey: 'map'       },
-    { href: '/coordinator/profile', label: 'Profile', iconKey: 'person'    },
+    { href: '/coordinator/home',    labelEn: 'Home',     labelId: 'Beranda', iconKey: 'dashboard' },
+    { href: '/coordinator/report',  labelEn: 'Bookings', labelId: 'Booking', iconKey: 'list'      },
+    { href: '/coordinator/drivers', labelEn: 'Drivers',  labelId: 'Driver',  iconKey: 'taxi'      },
+    { href: '/coordinator/profile', labelEn: 'Profile',  labelId: 'Profil',  iconKey: 'person'    },
   ],
   driver: [
-    { href: '/driver/home',    label: 'Trips',   iconKey: 'home'   },
-    { href: '/driver/profile', label: 'Profile', iconKey: 'person' },
+    { href: '/driver/home',    labelEn: 'Home',    labelId: 'Beranda',    iconKey: 'home'   },
+    { href: '/driver/trips',   labelEn: 'History', labelId: 'Riwayat',   iconKey: 'list'   },
+    { href: '/driver/profile', labelEn: 'Profile', labelId: 'Profil',     iconKey: 'person' },
   ],
+}
+
+// Roles that get a center FAB (href to navigate to on tap)
+const CENTER_FAB_HREF: Partial<Record<string, string>> = {
+  staff:       '/staff/book',
+  coordinator: '/coordinator/book',
 }
 
 export function BottomNav({ role }: { role: 'staff' | 'coordinator' | 'driver' }) {
   const pathname = usePathname()
-  const items = NAV[role] || []
+  const lang     = useLang()
+  const items    = NAV[role] || []
+  const fabHref  = CENTER_FAB_HREF[role]
+
+  const half       = fabHref ? Math.floor(items.length / 2) : items.length
+  const leftItems  = fabHref ? items.slice(0, half) : items
+  const rightItems = fabHref ? items.slice(half)    : []
+
+  const renderItem = (item: NavItem) => {
+    const active = pathname.startsWith(item.href)
+    const icon   = ICONS[item.iconKey]
+    return (
+      <Link key={item.href} href={item.href} style={{ textDecoration: 'none', flex: 1 }}>
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          gap: 3, padding: '6px 4px', borderRadius: 12,
+          background: active ? 'rgba(0,96,100,0.08)' : 'transparent',
+        }}>
+          <SvgIcon
+            d={icon?.outline || ''}
+            color={active ? PRIMARY : '#9ca3af'}
+            fill={active ? 'rgba(0,96,100,0.15)' : 'none'}
+            strokeWidth={active ? 2.5 : 1.8}
+          />
+          <span style={{
+            fontSize: 11, fontWeight: active ? 700 : 500,
+            color: active ? PRIMARY : '#9ca3af',
+            letterSpacing: '0.01em',
+          }}>
+            {lang === 'id' ? item.labelId : item.labelEn}
+          </span>
+        </div>
+      </Link>
+    )
+  }
 
   return (
     <>
@@ -62,36 +104,41 @@ export function BottomNav({ role }: { role: 'staff' | 'coordinator' | 'driver' }
         display: 'flex', justifyContent: 'space-around', alignItems: 'center',
         padding: '8px 8px 14px',
         fontFamily: "'Plus Jakarta Sans', sans-serif",
+        overflow: 'visible',
       }}>
-        {items.map(item => {
-          const active = pathname.startsWith(item.href)
-          const icon   = ICONS[item.iconKey]
-          return (
-            <Link key={item.href} href={item.href} style={{ textDecoration: 'none', flex: 1 }}>
+        {leftItems.map(renderItem)}
+
+        {fabHref && (
+          <div style={{ position: 'relative', flex: '0 0 72px', display: 'flex', justifyContent: 'center' }}>
+            {/* White disc — masks the borderTop line behind the FAB */}
+            <div style={{
+              position: 'absolute',
+              width: 60, height: 60,
+              borderRadius: '50%',
+              background: '#ffffff',
+              top: -30,
+              zIndex: 1,
+            }} />
+            {/* FAB circle */}
+            <Link href={fabHref} style={{ textDecoration: 'none', position: 'relative', zIndex: 2 }}>
               <div style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                gap: 3, padding: '6px 4px', borderRadius: 12,
-                background: active ? 'rgba(0,96,100,0.08)' : 'transparent',
+                width: 52, height: 52,
+                borderRadius: '50%',
+                background: PRIMARY,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginTop: -26,
+                boxShadow: '0 4px 18px rgba(0,96,100,0.45)',
               }}>
-                <div style={{ position: 'relative', color: active ? PRIMARY : '#9ca3af' }}>
-                  <SvgIcon
-                    d={icon?.outline || ''}
-                    color={active ? PRIMARY : '#9ca3af'}
-                    fill={active ? 'rgba(0,96,100,0.15)' : 'none'}
-                    strokeWidth={active ? 2.5 : 1.8}
-                  />
-                </div>
-                <span style={{
-                  fontSize: 11, fontWeight: active ? 700 : 500,
-                  color: active ? PRIMARY : '#9ca3af',
-                  letterSpacing: '0.01em',
-                }}>
-                  {item.label}
-                </span>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                  <rect x="10.5" y="4" width="3" height="16" rx="1.5"/>
+                  <rect x="4" y="10.5" width="16" height="3" rx="1.5"/>
+                </svg>
               </div>
             </Link>
-          )
-        })}
+          </div>
+        )}
+
+        {rightItems.map(renderItem)}
       </nav>
     </>
   )

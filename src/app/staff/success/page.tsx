@@ -3,6 +3,38 @@
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense } from 'react'
+import { useLang } from '@/lib/language'
+
+const MSG = {
+  en: {
+    title:          'Booking submitted!',
+    assignedSub:    'A driver has been automatically assigned.',
+    pendingSub:     'The coordinator will assign a driver shortly.',
+    bookingId:      'Booking ID',
+    status:         'Status',
+    assignedTo:     'Assigned to',
+    statusBooked:   'Booked',
+    statusSubmit:   'Submitted',
+    infoAssigned:   'A driver has been assigned to your trip. You will be notified when the trip starts.',
+    infoPending:    'Coordinator will review and assign a driver. You will be notified once confirmed.',
+    backBtn:        'Back to schedule',
+    bookAgainBtn:   '+ Book another trip',
+  },
+  id: {
+    title:          'Booking terkirim!',
+    assignedSub:    'Driver telah otomatis ditugaskan.',
+    pendingSub:     'Koordinator akan segera menugaskan driver.',
+    bookingId:      'ID Booking',
+    status:         'Status',
+    assignedTo:     'Ditugaskan ke',
+    statusBooked:   'Dipesan',
+    statusSubmit:   'Terkirim',
+    infoAssigned:   'Driver telah ditugaskan untuk perjalanan Anda. Anda akan diberitahu saat perjalanan dimulai.',
+    infoPending:    'Koordinator akan meninjau dan menugaskan driver. Anda akan diberitahu setelah dikonfirmasi.',
+    backBtn:        'Kembali ke jadwal',
+    bookAgainBtn:   '+ Pesan perjalanan lain',
+  },
+}
 
 function toWaNumber(phone: string): string {
   let n = phone.replace(/\D/g, '')
@@ -34,6 +66,8 @@ function buildWaMessage(params: {
 }
 
 function SuccessContent() {
+  const lang       = useLang()
+  const t          = MSG[lang]
   const params     = useSearchParams()
   const code       = params.get('code')   || ''
   const taxiName   = params.get('taxi')   || ''
@@ -63,30 +97,28 @@ function SuccessContent() {
             </svg>
           </div>
           <h1 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.3px' }}>
-            Booking submitted!
+            {t.title}
           </h1>
           <p style={{ fontSize: '13px', color: '#3f4949', margin: 0 }}>
-            {isAssigned
-              ? 'A driver has been automatically assigned.'
-              : 'The coordinator will assign a driver shortly.'}
+            {isAssigned ? t.assignedSub : t.pendingSub}
           </p>
         </div>
 
         {/* Booking details */}
         <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', marginBottom: '12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid #F0EEE8' }}>
-            <span style={{ fontSize: '12px', color: '#3f4949' }}>Booking ID</span>
+            <span style={{ fontSize: '12px', color: '#3f4949' }}>{t.bookingId}</span>
             <span style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'monospace' }}>{code}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px', borderBottom: isAssigned ? '1px solid #F0EEE8' : 'none' }}>
-            <span style={{ fontSize: '12px', color: '#3f4949' }}>Status</span>
+            <span style={{ fontSize: '12px', color: '#3f4949' }}>{t.status}</span>
             <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: isAssigned ? '#D1FAE5' : '#DBEAFE', color: isAssigned ? '#065F46' : '#1E3A5F' }}>
-              {isAssigned ? 'Booked' : 'Submitted'}
+              {isAssigned ? t.statusBooked : t.statusSubmit}
             </span>
           </div>
           {isAssigned && (
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px' }}>
-              <span style={{ fontSize: '12px', color: '#3f4949' }}>Assigned to</span>
+              <span style={{ fontSize: '12px', color: '#3f4949' }}>{t.assignedTo}</span>
               <span style={{ fontSize: '12px', fontWeight: 600 }}>{taxiName} · {driverName}</span>
             </div>
           )}
@@ -96,13 +128,13 @@ function SuccessContent() {
         {isAssigned ? (
           <div style={{ background: '#D1FAE5', border: '1px solid #6EE7B7', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
             <p style={{ fontSize: '12px', color: '#065F46', margin: 0 }}>
-              A driver has been assigned to your trip. You will be notified when the trip starts.
+              {t.infoAssigned}
             </p>
           </div>
         ) : (
           <div style={{ background: '#DBEAFE', border: '1px solid #93C5FD', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px' }}>
             <p style={{ fontSize: '12px', color: '#1E3A5F', margin: 0 }}>
-              Coordinator will review and assign a driver. You will be notified once confirmed.
+              {t.infoPending}
             </p>
           </div>
         )}
@@ -123,13 +155,13 @@ function SuccessContent() {
 
         <Link href="/staff/home" style={{ textDecoration: 'none', display: 'block', marginBottom: 10 }}>
           <button style={{ width: '100%', padding: '14px', background: '#006064', color: '#fff', border: 'none', borderRadius: 16, fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
-            Back to schedule
+            {t.backBtn}
           </button>
         </Link>
 
         <Link href="/staff/book" style={{ textDecoration: 'none', display: 'block' }}>
           <button style={{ width: '100%', padding: '12px', background: 'transparent', color: '#006064', border: '1.5px solid rgba(0,0,0,0.08)', borderRadius: 16, fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-            + Book another trip
+            {t.bookAgainBtn}
           </button>
         </Link>
 

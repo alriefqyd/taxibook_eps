@@ -1,16 +1,70 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useNavRouter as useRouter } from '@/hooks/useNavRouter'
 import { createClient } from '@/lib/supabase/client'
 import type { User, Role } from '@/types'
+import { useLang } from '@/lib/language'
 
 const PRIMARY = '#006064'
 
-const ROLE_LABELS: Record<Role, string> = {
-  staff:       'Staff',
-  coordinator: 'Coordinator',
-  driver:      'Driver',
+const MSG = {
+  en: {
+    title:          'Users',
+    totalActive:    (total: number, active: number) => `${total} total · ${active} active`,
+    addUser:        'Add User',
+    searchPlaceholder: 'Search name or email...',
+    allRoles:       'All roles',
+    noUsers:        'No users found',
+    edit:           'Edit',
+    deactivate:     'Deactivate',
+    activate:       'Activate',
+    inactive:       'Inactive',
+    editTitle:      'Edit User',
+    addTitle:       'Add New User',
+    fieldName:      'Full Name',
+    fieldEmail:     'Work Email',
+    fieldPassword:  'Temporary Password',
+    fieldRole:      'Role',
+    fieldPhone:     'Phone (optional)',
+    minPassword:    'Password must be at least 6 characters',
+    saving:         'Saving...',
+    saveChanges:    'Save Changes',
+    createUser:     'Create User',
+    updateFailed:   'Update failed',
+    createFailed:   'Create failed',
+    roleStaff:      'Staff',
+    roleCoord:      'Coordinator',
+    roleDriver:     'Driver',
+  },
+  id: {
+    title:          'Pengguna',
+    totalActive:    (total: number, active: number) => `${total} total · ${active} aktif`,
+    addUser:        'Tambah Pengguna',
+    searchPlaceholder: 'Cari nama atau email...',
+    allRoles:       'Semua peran',
+    noUsers:        'Tidak ada pengguna',
+    edit:           'Edit',
+    deactivate:     'Nonaktifkan',
+    activate:       'Aktifkan',
+    inactive:       'Tidak Aktif',
+    editTitle:      'Edit Pengguna',
+    addTitle:       'Tambah Pengguna Baru',
+    fieldName:      'Nama Lengkap',
+    fieldEmail:     'Email Kerja',
+    fieldPassword:  'Password Sementara',
+    fieldRole:      'Peran',
+    fieldPhone:     'Telepon (opsional)',
+    minPassword:    'Password minimal 6 karakter',
+    saving:         'Menyimpan...',
+    saveChanges:    'Simpan Perubahan',
+    createUser:     'Buat Pengguna',
+    updateFailed:   'Gagal memperbarui',
+    createFailed:   'Gagal membuat pengguna',
+    roleStaff:      'Staff',
+    roleCoord:      'Koordinator',
+    roleDriver:     'Driver',
+  },
 }
 
 const ROLE_COLORS: Record<Role, { bg: string; text: string }> = {
@@ -32,6 +86,8 @@ const EMPTY_FORM: FormState = { name: '', email: '', password: '', role: 'staff'
 export default function CoordinatorUsersPage() {
   const router   = useRouter()
   const supabase = createClient()
+  const lang     = useLang()
+  const t        = MSG[lang]
 
   const [token,       setToken]       = useState<string | null>(null)
   const [users,       setUsers]       = useState<User[]>([])
@@ -103,13 +159,13 @@ export default function CoordinatorUsersPage() {
         body: JSON.stringify(body),
       })
       const json = await res.json()
-      if (!res.ok) { setError(json.error || 'Update failed'); setSubmitting(false); return }
-      setSuccess('User updated.')
+      if (!res.ok) { setError(json.error || t.updateFailed); setSubmitting(false); return }
+      setSuccess(editUser.name)
       setShowModal(false)
       loadUsers()
     } else {
       if (form.password.length < 6) {
-        setError('Password must be at least 6 characters')
+        setError(t.minPassword)
         setSubmitting(false)
         return
       }
@@ -119,8 +175,8 @@ export default function CoordinatorUsersPage() {
         body: JSON.stringify(form),
       })
       const json = await res.json()
-      if (!res.ok) { setError(json.error || 'Create failed'); setSubmitting(false); return }
-      setSuccess(`User "${form.name}" created.`)
+      if (!res.ok) { setError(json.error || t.createFailed); setSubmitting(false); return }
+      setSuccess(form.name)
       setShowModal(false)
       loadUsers()
     }
@@ -135,6 +191,12 @@ export default function CoordinatorUsersPage() {
       body: JSON.stringify({ is_active: !u.is_active }),
     })
     loadUsers()
+  }
+
+  const roleLabels: Record<Role, string> = {
+    staff:       t.roleStaff,
+    coordinator: t.roleCoord,
+    driver:      t.roleDriver,
   }
 
   const filtered = users.filter(u => {
@@ -156,9 +218,9 @@ export default function CoordinatorUsersPage() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#1a1a1a' }}>Users</h1>
+            <h1 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#1a1a1a' }}>{t.title}</h1>
             <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>
-              {users.length} total · {users.filter(u => u.is_active).length} active
+              {t.totalActive(users.length, users.filter(u => u.is_active).length)}
             </p>
           </div>
           <button
@@ -173,7 +235,7 @@ export default function CoordinatorUsersPage() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            Add User
+            {t.addUser}
           </button>
         </div>
 
@@ -182,7 +244,7 @@ export default function CoordinatorUsersPage() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search name or email..."
+            placeholder={t.searchPlaceholder}
             style={{
               flex: 1, padding: '8px 12px', fontSize: '13px',
               border: '1.5px solid rgba(0,0,0,0.08)', borderRadius: '8px',
@@ -198,10 +260,10 @@ export default function CoordinatorUsersPage() {
               outline: 'none', background: '#f9fafb', color: '#374151',
             }}
           >
-            <option value="all">All roles</option>
-            <option value="staff">Staff</option>
-            <option value="coordinator">Coordinator</option>
-            <option value="driver">Driver</option>
+            <option value="all">{t.allRoles}</option>
+            <option value="staff">{t.roleStaff}</option>
+            <option value="coordinator">{t.roleCoord}</option>
+            <option value="driver">{t.roleDriver}</option>
           </select>
         </div>
       </div>
@@ -225,7 +287,7 @@ export default function CoordinatorUsersPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af', fontSize: '14px' }}>
-            No users found
+            {t.noUsers}
           </div>
         ) : filtered.map(u => {
           const rc = ROLE_COLORS[u.role]
@@ -245,7 +307,7 @@ export default function CoordinatorUsersPage() {
                     borderRadius: '20px', background: rc.bg, color: rc.text,
                     textTransform: 'uppercase', letterSpacing: '0.04em',
                   }}>
-                    {ROLE_LABELS[u.role]}
+                    {roleLabels[u.role]}
                   </span>
                   {!u.is_active && (
                     <span style={{
@@ -253,7 +315,7 @@ export default function CoordinatorUsersPage() {
                       borderRadius: '20px', background: '#F1F5F9', color: '#64748b',
                       textTransform: 'uppercase', letterSpacing: '0.04em',
                     }}>
-                      Inactive
+                      {t.inactive}
                     </span>
                   )}
                 </div>
@@ -270,7 +332,7 @@ export default function CoordinatorUsersPage() {
                     background: 'white', color: PRIMARY, cursor: 'pointer',
                   }}
                 >
-                  Edit
+                  {t.edit}
                 </button>
                 <button
                   onClick={() => toggleActive(u)}
@@ -282,7 +344,7 @@ export default function CoordinatorUsersPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  {u.is_active ? 'Deactivate' : 'Activate'}
+                  {u.is_active ? t.deactivate : t.activate}
                 </button>
               </div>
             </div>
@@ -304,7 +366,7 @@ export default function CoordinatorUsersPage() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1a1a1a' }}>
-                {editUser ? 'Edit User' : 'Add New User'}
+                {editUser ? t.editTitle : t.addTitle}
               </h2>
               <button onClick={() => setShowModal(false)} style={{
                 background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px',
@@ -316,7 +378,7 @@ export default function CoordinatorUsersPage() {
             </div>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <Field label="Full Name">
+              <Field label={t.fieldName}>
                 <input
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -326,7 +388,7 @@ export default function CoordinatorUsersPage() {
                 />
               </Field>
 
-              <Field label="Work Email">
+              <Field label={t.fieldEmail}>
                 <input
                   type="email"
                   value={form.email}
@@ -339,7 +401,7 @@ export default function CoordinatorUsersPage() {
               </Field>
 
               {!editUser && (
-                <Field label="Temporary Password">
+                <Field label={t.fieldPassword}>
                   <input
                     type="password"
                     value={form.password}
@@ -351,19 +413,19 @@ export default function CoordinatorUsersPage() {
                 </Field>
               )}
 
-              <Field label="Role">
+              <Field label={t.fieldRole}>
                 <select
                   value={form.role}
                   onChange={e => setForm(f => ({ ...f, role: e.target.value as Role }))}
                   style={inputStyle}
                 >
-                  <option value="staff">Staff</option>
-                  <option value="coordinator">Coordinator</option>
-                  <option value="driver">Driver</option>
+                  <option value="staff">{t.roleStaff}</option>
+                  <option value="coordinator">{t.roleCoord}</option>
+                  <option value="driver">{t.roleDriver}</option>
                 </select>
               </Field>
 
-              <Field label="Phone (optional)">
+              <Field label={t.fieldPhone}>
                 <input
                   value={form.phone}
                   onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
@@ -393,7 +455,7 @@ export default function CoordinatorUsersPage() {
                   marginTop: '4px',
                 }}
               >
-                {submitting ? 'Saving...' : editUser ? 'Save Changes' : 'Create User'}
+                {submitting ? t.saving : editUser ? t.saveChanges : t.createUser}
               </button>
             </form>
           </div>

@@ -23,9 +23,11 @@ interface GanttCalendarProps {
   showCompleted?:  boolean
   onRefresh?:      () => void
   dayAssignments?: { taxi_id: string; assign_date: string }[]
+  onMapClick?:     () => void
+  mapActive?:      boolean
 }
 
-export default function GanttCalendar({ bookings, taxis, showCompleted = false, dayAssignments = [] }: GanttCalendarProps) {
+export default function GanttCalendar({ bookings, taxis, showCompleted = false, dayAssignments = [], onMapClick, mapActive = false }: GanttCalendarProps) {
   const [view,            setView]            = useState<ViewMode>('day')
   const [cursor,          setCursor]          = useState(new Date())
   const [selectedBooking, setSelectedBooking] = useState<BookingDetail | null>(null)
@@ -74,32 +76,65 @@ export default function GanttCalendar({ bookings, taxis, showCompleted = false, 
     <div>
       {/* ── View tabs + nav ── */}
       <div style={{ background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.08)', padding: '12px 16px' }}>
-        <div style={{ display: 'flex', background: '#F5F5F2', borderRadius: 9999, padding: '3px', gap: '2px', marginBottom: 10 }}>
-          {(['day', 'week', 'month'] as ViewMode[]).map(v => (
-            <button key={v} onClick={() => { setView(v); setCursor(new Date()) }} style={{
-              flex: 1, padding: '6px 4px', fontSize: '12px', fontWeight: 600,
-              border: 'none', borderRadius: 9999, cursor: 'pointer',
-              background: view === v ? '#ffffff' : 'transparent',
-              color: view === v ? '#0F1923' : '#9ca3af',
-              textTransform: 'capitalize',
-            }}>
-              {v}
-            </button>
-          ))}
+        {/* Icon toggle + Day/Week/Month pill — same row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: mapActive ? 0 : 10 }}>
+          {onMapClick && (
+            <div style={{ display: 'flex', background: '#F5F5F2', borderRadius: 8, padding: '2px', gap: '2px', flexShrink: 0 }}>
+              <button onClick={() => { if (mapActive) onMapClick() }} style={{
+                background: !mapActive ? '#ffffff' : 'transparent',
+                border: 'none', borderRadius: 6, padding: '5px 7px', cursor: 'pointer',
+                color: !mapActive ? '#006064' : '#9ca3af',
+                display: 'flex', alignItems: 'center',
+                boxShadow: !mapActive ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              </button>
+              <button onClick={() => { if (!mapActive) onMapClick() }} style={{
+                background: mapActive ? '#ffffff' : 'transparent',
+                border: 'none', borderRadius: 6, padding: '5px 7px', cursor: 'pointer',
+                color: mapActive ? '#006064' : '#9ca3af',
+                display: 'flex', alignItems: 'center',
+                boxShadow: mapActive ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+                </svg>
+              </button>
+            </div>
+          )}
+          {!mapActive && (
+            <div style={{ flex: 1, display: 'flex', background: '#F5F5F2', borderRadius: 9999, padding: '3px', gap: '2px' }}>
+              {(['day', 'week', 'month'] as ViewMode[]).map(v => (
+                <button key={v} onClick={() => { setView(v); setCursor(new Date()) }} style={{
+                  flex: 1, padding: '6px 4px', fontSize: '12px', fontWeight: 600,
+                  border: 'none', borderRadius: 9999, cursor: 'pointer',
+                  background: view === v ? '#ffffff' : 'transparent',
+                  color: view === v ? '#0F1923' : '#9ca3af',
+                  textTransform: 'capitalize',
+                }}>
+                  {v}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <button onClick={() => navigate(-1)} style={navBtn}>←</button>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: '#006064', textAlign: 'center', flex: 1, padding: '0 8px' }}>
-            {getNavLabel()}
-          </span>
-          <button onClick={() => navigate(1)} style={navBtn}>→</button>
-        </div>
+        {!mapActive && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button onClick={() => navigate(-1)} style={navBtn}>←</button>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: '#006064', textAlign: 'center', flex: 1, padding: '0 8px' }}>
+              {getNavLabel()}
+            </span>
+            <button onClick={() => navigate(1)} style={navBtn}>→</button>
+          </div>
+        )}
       </div>
 
       {/* ── Views ── */}
-      {view === 'day'   && <DayGantt   bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={dayRef}  onSelectBooking={setSelectedBooking} dayAssignments={dayAssignments} />}
-      {view === 'week'  && <WeekGantt  bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={weekRef} onSelectBooking={setSelectedBooking} dayAssignments={dayAssignments} />}
-      {view === 'month' && <MonthView  bookings={ganttBookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} dayAssignments={dayAssignments} />}
+      {!mapActive && view === 'day'   && <DayGantt   bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={dayRef}  onSelectBooking={setSelectedBooking} dayAssignments={dayAssignments} />}
+      {!mapActive && view === 'week'  && <WeekGantt  bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={weekRef} onSelectBooking={setSelectedBooking} dayAssignments={dayAssignments} />}
+      {!mapActive && view === 'month' && <MonthView  bookings={ganttBookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} dayAssignments={dayAssignments} />}
 
       {/* ── Booking detail sheet ── */}
       {selectedBooking && (

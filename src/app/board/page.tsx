@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useNavRouter as useRouter } from '@/hooks/useNavRouter'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -9,6 +9,67 @@ import {
   isSameDay, isSameMonth, startOfMonth,
 } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
+import { useLang } from '@/lib/language'
+import PageLoader from '@/components/PageLoader'
+
+const MSG = {
+  en: {
+    loading:        'Loading dispatch board...',
+    boardSubtitle:  'Dispatch Board',
+    statActive:     'Active trips',
+    statConfirmed:  'Confirmed',
+    statPending:    'Pending',
+    statAvail:      'Available',
+    free:           'Free',
+    unavailable:    'Unavailable',
+    noDriver:       'No driver',
+    todayBtn:       'Today',
+    viewDay:        'Day',
+    viewWeek:       'Week',
+    viewMonth:      'Month',
+    viewMap:        'Map',
+    fullDayBadge:   '★ Full Day',
+    fullDayOverlay: '★ FULL DAY DUTY',
+    done:           (time: string) => `Done ${time}`,
+    drop:           'Drop',
+    waitMin:        (m: number) => `Wait ${m}m`,
+    waitMinLong:    (m: number) => `Wait ${m}min`,
+    fullDayCount:   (n: number) => `★ ${n} full day`,
+    dayHeaders:     ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] as string[],
+    moreBookings:   (n: number) => `+${n} more`,
+    nowLabel:       'Now',
+    pendingLabel:   'Pending',
+    doneLabel:      '✓ Done',
+  },
+  id: {
+    loading:        'Memuat papan dispatch...',
+    boardSubtitle:  'Papan Dispatch',
+    statActive:     'Perjalanan Aktif',
+    statConfirmed:  'Dikonfirmasi',
+    statPending:    'Menunggu',
+    statAvail:      'Tersedia',
+    free:           'Bebas',
+    unavailable:    'Tidak Tersedia',
+    noDriver:       'Tanpa driver',
+    todayBtn:       'Hari Ini',
+    viewDay:        'Hari',
+    viewWeek:       'Minggu',
+    viewMonth:      'Bulan',
+    viewMap:        'Peta',
+    fullDayBadge:   '★ Full Day',
+    fullDayOverlay: '★ TUGAS PENUH',
+    done:           (time: string) => `Selesai ${time}`,
+    drop:           'Drop',
+    waitMin:        (m: number) => `Tunggu ${m}m`,
+    waitMinLong:    (m: number) => `Tunggu ${m}m`,
+    fullDayCount:   (n: number) => `★ ${n} full day`,
+    dayHeaders:     ['Sen','Sel','Rab','Kam','Jum','Sab','Min'] as string[],
+    moreBookings:   (n: number) => `+${n} lagi`,
+    nowLabel:       'Sekarang',
+    pendingLabel:   'Menunggu',
+    doneLabel:      '✓ Selesai',
+  },
+}
 
 const DriverFleetMap = dynamic(() => import('@/components/map/DriverFleetMap'), { ssr: false })
 
@@ -23,6 +84,8 @@ const TIME_ZONE_LABEL = 'SGT / WITA'
 type View = 'day' | 'week' | 'month' | 'map'
 
 export default function BoardPage() {
+  const lang     = useLang()
+  const t        = MSG[lang]
   const router   = useRouter()
   const supabase = createClient()
 
@@ -48,7 +111,7 @@ export default function BoardPage() {
     const { data: dayAssign } = await supabase
       .from('driver_day_assignments').select('taxi_id, assign_date').gte('assign_date', witaToday)
     setBookings(bks || [])
-    setTaxis((txs || []).map((t: any) => ({ ...t, driver_name: t.users?.name || 'No driver' })))
+    setTaxis((txs || []).map((taxi: any) => ({ ...taxi, driver_name: taxi.users?.name || null })))
     setDayAssignments(dayAssign || [])
   }, [supabase])
 
@@ -124,13 +187,7 @@ export default function BoardPage() {
   const pendingCount  = bookings.filter((b: any) => b.status.includes('pending')).length
   const availTaxis    = taxis.filter((t: any) => t.is_available && t.driver_id).length
 
-  if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT, background: '#F5F5F2' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } } @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} } @keyframes fadeInUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }`}</style>
-      <div style={{ width: 48, height: 48, borderRadius: '50%', border: '4px solid rgba(0,96,100,0.15)', borderTop: '4px solid #006064', animation: 'spin 0.8s linear infinite' }} />
-      <p style={{ color: '#9ca3af', fontSize: 14, marginTop: 16 }}>Loading dispatch board...</p>
-    </div>
-  )
+  if (loading) return <PageLoader />
 
   return (
     <div style={{ fontFamily: FONT, minHeight: '100vh', height: '100vh', maxHeight: '100vh', overflow: 'hidden', background: '#F5F5F2', display: 'flex', flexDirection: 'column', WebkitFontSmoothing: 'antialiased' }}>
@@ -138,21 +195,22 @@ export default function BoardPage() {
       {/* ── Top bar ── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #D4E8EA', padding: '0 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            onClick={() => router.push('/coordinator/home')}
+            title="Back"
+            style={{ width: 32, height: 32, borderRadius: '50%', background: '#F5F5F2', border: '1px solid #D4E8EA', cursor: 'pointer', fontSize: 15, color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+          >←</button>
           <img src="/vale-logo.svg" alt="PT Vale" style={{ height: 32, display: 'block' }} />
-          <div style={{ width: 1, height: 22, background: 'rgba(0,0,0,0.1)' }} />
-          <div>
-            <p style={{ fontSize: 15, fontWeight: 700, margin: 0, letterSpacing: '-0.2px' }}>TaxiBook EPS</p>
-            <p style={{ fontSize: 11, color: '#9CA3AF', margin: 0 }}>Dispatch Board</p>
-          </div>
+          <p style={{ fontSize: 11, color: '#9CA3AF', margin: 0 }}>{t.boardSubtitle}</p>
         </div>
 
         {/* Stats row */}
         <div style={{ display: 'flex', gap: 8 }}>
           {[
-            { label: 'Active trips', value: activeCount,  bg: '#D8F3DC', color: '#2D7A5C' },
-            { label: 'Confirmed',    value: bookedCount,  bg: '#DBEAFE', color: '#007B8A' },
-            { label: 'Pending',      value: pendingCount, bg: '#FEF3C7', color: '#A16207' },
-            { label: 'Available',    value: availTaxis,   bg: 'rgba(0,0,0,0.04)', color: '#6B7280' },
+            { label: t.statActive,    value: activeCount,  bg: '#D8F3DC', color: '#2D7A5C' },
+            { label: t.statConfirmed, value: bookedCount,  bg: '#DBEAFE', color: '#007B8A' },
+            { label: t.statPending,   value: pendingCount, bg: '#FEF3C7', color: '#A16207' },
+            { label: t.statAvail,     value: availTaxis,   bg: 'rgba(0,0,0,0.04)', color: '#6B7280' },
           ].map(s => (
             <div key={s.label} style={{ background: s.bg, borderRadius: 8, padding: '5px 12px', textAlign: 'center' }}>
               <p style={{ fontSize: 18, fontWeight: 700, margin: '0 0 1px', letterSpacing: '-0.5px', color: s.color }}>{s.value}</p>
@@ -183,40 +241,40 @@ export default function BoardPage() {
 
       {/* ── Fleet strip ── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #D4E8EA', padding: '10px 28px', display: 'flex', gap: 10, flexShrink: 0 }}>
-        {taxis.map(t => {
-          const activeBk = bookings.find(b => b.taxi_id === t.id && ['on_trip','waiting_trip'].includes(b.status))
-          const nextBk   = bookings.find(b => b.taxi_id === t.id && b.status === 'booked')
-          const statusText = activeBk ? `🚗 ${activeBk.destination}` : nextBk ? `⏱ ${format(new Date(nextBk.scheduled_at), 'HH:mm')}` : t.is_available ? 'Free' : 'Unavailable'
-          const statusBg   = activeBk ? '#D8F3DC' : nextBk ? '#DBEAFE' : t.is_available ? 'rgba(0,0,0,0.04)' : '#FEE2E2'
-          const statusClr  = activeBk ? '#2D6A4F' : nextBk ? '#1E3A5F' : t.is_available ? '#3f4949' : '#991B1B'
+        {taxis.map(taxi => {
+          const activeBk = bookings.find((b: any) => b.taxi_id === taxi.id && ['on_trip','waiting_trip'].includes(b.status))
+          const nextBk   = bookings.find((b: any) => b.taxi_id === taxi.id && b.status === 'booked')
+          const statusText = activeBk ? `🚗 ${activeBk.destination}` : nextBk ? `⏱ ${format(new Date(nextBk.scheduled_at), 'HH:mm')}` : taxi.is_available ? t.free : t.unavailable
+          const statusBg   = activeBk ? '#D8F3DC' : nextBk ? '#DBEAFE' : taxi.is_available ? 'rgba(0,0,0,0.04)' : '#FEE2E2'
+          const statusClr  = activeBk ? '#2D6A4F' : nextBk ? '#1E3A5F' : taxi.is_available ? '#3f4949' : '#991B1B'
           return (
-            <div key={t.id} style={{ flex: 1, background: '#F5F5F2', borderRadius: 10, padding: '8px 12px', borderLeft: `3px solid ${t.color || '#888'}` }}>
+            <div key={taxi.id} style={{ flex: 1, background: '#F5F5F2', borderRadius: 10, padding: '8px 12px', borderLeft: `3px solid ${taxi.color || '#888'}` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.is_available ? t.color : '#D1D5DB', flexShrink: 0, display: 'inline-block' }} />
-                <p style={{ fontSize: 12, fontWeight: 700, margin: 0 }}>{t.name}</p>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: taxi.is_available ? taxi.color : '#D1D5DB', flexShrink: 0, display: 'inline-block' }} />
+                <p style={{ fontSize: 12, fontWeight: 700, margin: 0 }}>{taxi.name}</p>
               </div>
-              <p style={{ fontSize: 11, color: '#6B7280', margin: '0 0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.driver_name}</p>
+              <p style={{ fontSize: 11, color: '#6B7280', margin: '0 0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{taxi.driver_name ?? t.noDriver}</p>
               <div style={{ background: statusBg, borderRadius: 5, padding: '2px 8px', display: 'inline-block' }}>
                 <p style={{ fontSize: 10, fontWeight: 700, color: statusClr, margin: 0 }}>{statusText}</p>
               </div>
             </div>
           )
         })}
+
       </div>
 
       {/* ── Controls ── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #D4E8EA', padding: '10px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         {/* View tabs */}
         <div style={{ background: '#ECEAE4', borderRadius: 999, padding: 3, display: 'flex', gap: 2 }}>
-          {(['day','week','month','map'] as View[]).map(v => (
+          {([['day', t.viewDay], ['week', t.viewWeek], ['month', t.viewMonth], ['map', t.viewMap]] as [View, string][]).map(([v, label]) => (
             <button key={v} onClick={() => { setView(v); setCursor(new Date()) }} style={{
               padding: '6px 18px', fontSize: 12, fontWeight: 600, border: 'none',
               borderRadius: 999, cursor: 'pointer', fontFamily: FONT,
               background: view === v ? '#ffffff' : 'transparent',
               color: view === v ? '#006064' : '#9ca3af',
               boxShadow: view === v ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-              textTransform: 'capitalize',
-            }}>{v}</button>
+            }}>{label}</button>
           ))}
         </div>
 
@@ -230,7 +288,7 @@ export default function BoardPage() {
         </div>
 
         <button onClick={() => setCursor(new Date())} style={{ padding: '6px 16px', fontSize: 12, fontWeight: 600, border: '1px solid #D4E8EA', borderRadius: 999, cursor: 'pointer', background: '#fff', fontFamily: FONT, color: '#6B7280' }}>
-          Today
+          {t.todayBtn}
         </button>
       </div>
 
@@ -262,7 +320,9 @@ export default function BoardPage() {
 const HOUR_W = 80 // px per hour in Gantt
 
 function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip, dayAssignments = [] }: any) {
-  const dayBks     = bookings.filter((b: any) => isSameDay(new Date(b.scheduled_at), cursor))
+  const lang    = useLang()
+  const m       = MSG[lang]
+  const dayBks  = bookings.filter((b: any) => isSameDay(new Date(b.scheduled_at), cursor))
   const cursorDateStr = format(cursor, 'yyyy-MM-dd')
   const isToday = isSameDay(cursor, today)
   const nowLeft = isToday ? (today.getHours() + today.getMinutes() / 60 - HOUR_S) * HOUR_W : null
@@ -281,21 +341,21 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip, dayAssig
       </div>
 
       {/* Taxi rows */}
-      {taxis.map((t: any, idx: number) => {
-        const txBks     = dayBks.filter((b: any) => b.taxi_id === t.id)
-        const isFullDay = dayAssignments.some((a: any) => a.taxi_id === t.id && a.assign_date === cursorDateStr)
+      {taxis.map((taxi: any, idx: number) => {
+        const txBks     = dayBks.filter((b: any) => b.taxi_id === taxi.id)
+        const isFullDay = dayAssignments.some((a: any) => a.taxi_id === taxi.id && a.assign_date === cursorDateStr)
         return (
-          <div key={t.id} style={{ display: 'flex', borderBottom: '1px solid #D4E8EA', background: idx % 2 === 0 ? '#fff' : '#f9f9f6' }}>
+          <div key={taxi.id} style={{ display: 'flex', borderBottom: '1px solid #D4E8EA', background: idx % 2 === 0 ? '#fff' : '#f9f9f6' }}>
             {/* Taxi label */}
             <div style={{ width: 140, flexShrink: 0, padding: '10px 14px', borderRight: '1px solid #D4E8EA', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.is_available ? t.color : '#D1D5DB', flexShrink: 0, display: 'inline-block' }} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: t.is_available ? '#006064' : '#9ca3af' }}>{t.name}</span>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: taxi.is_available ? taxi.color : '#D1D5DB', flexShrink: 0, display: 'inline-block' }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: taxi.is_available ? '#006064' : '#9ca3af' }}>{taxi.name}</span>
               </div>
               <span style={{ fontSize: 10, color: '#9CA3AF', paddingLeft: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {t.is_available ? t.driver_name : 'Unavailable'}
+                {taxi.is_available ? (taxi.driver_name ?? m.noDriver) : m.unavailable}
               </span>
-              {isFullDay && <span style={{ fontSize: 9, fontWeight: 800, color: '#92400E', background: '#FEF3C7', padding: '1px 5px', borderRadius: 4, border: '1px solid #FCD34D', marginTop: 2, display: 'inline-block' }}>★ Full Day</span>}
+              {isFullDay && <span style={{ fontSize: 9, fontWeight: 800, color: '#92400E', background: '#FEF3C7', padding: '1px 5px', borderRadius: 4, border: '1px solid #FCD34D', marginTop: 2, display: 'inline-block' }}>{m.fullDayBadge}</span>}
             </div>
 
             {/* Timeline */}
@@ -305,13 +365,13 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip, dayAssig
                 <div key={h} style={{ position: 'absolute', left: (h - HOUR_S) * HOUR_W, top: 0, bottom: 0, width: 1, background: '#EAF4F5' }} />
               ))}
               {/* Unavailable hatch */}
-              {!t.is_available && (
+              {!taxi.is_available && (
                 <div style={{ position: 'absolute', inset: 0, background: 'repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(0,0,0,0.03) 5px,rgba(0,0,0,0.03) 10px)' }} />
               )}
               {/* Full day duty overlay */}
               {isFullDay && (
                 <div style={{ position: 'absolute', inset: 0, background: 'rgba(254,243,199,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderTop: '2px solid #FCD34D', borderBottom: '2px solid #FCD34D' }}>
-                  <span style={{ fontSize: 11, fontWeight: 800, color: '#92400E', letterSpacing: '0.05em' }}>★ FULL DAY DUTY</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: '#92400E', letterSpacing: '0.05em' }}>{m.fullDayOverlay}</span>
                 </div>
               )}
               {/* Now line */}
@@ -342,19 +402,19 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip, dayAssig
                     key={b.id}
                     onMouseEnter={e => setTooltip({ b, x: (e.target as HTMLElement).getBoundingClientRect().right + 8, y: (e.target as HTMLElement).getBoundingClientRect().top })}
                     onMouseLeave={() => setTooltip(null)}
-                    style={{ position: 'absolute', left: left + 2, top: 6, width, height: ROW_H - 12, background: isDone ? '#F1F5F9' : t.color + '22', border: `1.5px ${isPend ? 'dashed' : 'solid'} ${isDone ? '#CBD5E1' : t.color}`, borderRadius: 7, padding: '4px 7px', overflow: 'hidden', zIndex: 5, cursor: 'pointer', opacity: isDone ? 0.85 : 1 }}
+                    style={{ position: 'absolute', left: left + 2, top: 6, width, height: ROW_H - 12, background: isDone ? '#F1F5F9' : taxi.color + '22', border: `1.5px ${isPend ? 'dashed' : 'solid'} ${isDone ? '#CBD5E1' : taxi.color}`, borderRadius: 7, padding: '4px 7px', overflow: 'hidden', zIndex: 5, cursor: 'pointer', opacity: isDone ? 0.85 : 1 }}
                   >
-                    <p style={{ fontSize: 11, fontWeight: 700, color: isDone ? '#64748B' : t.color, margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isDone ? '✓ ' : ''}{b.passenger_name}</p>
-                    <p style={{ fontSize: 10, color: isDone ? '#94a3b8' : t.color, opacity: isDone ? 1 : 0.8, margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.destination}</p>
-                    <p style={{ fontSize: 9, color: isDone ? '#94a3b8' : t.color, opacity: isDone ? 1 : 0.6, margin: 0 }}>
-                      {isDone && b.completed_at ? `Done ${format(new Date(b.completed_at), 'HH:mm')}` : `${format(dt, 'HH:mm')} · ${b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}m`}`}
+                    <p style={{ fontSize: 11, fontWeight: 700, color: isDone ? '#64748B' : taxi.color, margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isDone ? '✓ ' : ''}{b.passenger_name}</p>
+                    <p style={{ fontSize: 10, color: isDone ? '#94a3b8' : taxi.color, opacity: isDone ? 1 : 0.8, margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.destination}</p>
+                    <p style={{ fontSize: 9, color: isDone ? '#94a3b8' : taxi.color, opacity: isDone ? 1 : 0.6, margin: 0 }}>
+                      {isDone && b.completed_at ? m.done(format(new Date(b.completed_at), 'HH:mm')) : `${format(dt, 'HH:mm')} · ${b.trip_type === 'DROP' ? m.drop : m.waitMin(b.wait_minutes)}`}
                     </p>
                   </div>
                 )
               })}
-              {txBks.length === 0 && t.is_available && (
+              {txBks.length === 0 && taxi.is_available && (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', paddingLeft: 12 }}>
-                  <span style={{ fontSize: 11, color: '#D1D5DB', fontWeight: 600 }}>Free</span>
+                  <span style={{ fontSize: 11, color: '#D1D5DB', fontWeight: 600 }}>{m.free}</span>
                 </div>
               )}
             </div>
@@ -370,6 +430,8 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip, dayAssig
 
 // ── WEEK VIEW ───────────────────────────────────────────────
 function WeekView({ bookings, cursor, today, tooltip, setTooltip, dayAssignments = [] }: any) {
+  const lang   = useLang()
+  const m      = MSG[lang]
   const monday = startOfWeek(cursor, { weekStartsOn: 1 })
   const days   = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
   const nowPct = (today.getHours() + today.getMinutes() / 60 - HOUR_S) * H_PX
@@ -410,7 +472,7 @@ function WeekView({ bookings, cursor, today, tooltip, setTooltip, dayAssignments
           return (
             <div key={d.toISOString()} style={{ position: 'relative', borderRight: '1px solid #D4E8EA', background: dayAssignCount > 0 ? 'rgba(254,243,199,0.18)' : undefined }}>
               {HOURS.map(h => <div key={h} style={{ height: H_PX, borderBottom: '1px solid #EAF4F5' }} />)}
-              {dayAssignCount > 0 && <div style={{ position: 'absolute', top: 4, left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 6, pointerEvents: 'none' }}><span style={{ fontSize: 9, fontWeight: 800, color: '#92400E', background: '#FEF3C7', padding: '2px 6px', borderRadius: 4, border: '1px solid #FCD34D' }}>★ {dayAssignCount} full day</span></div>}
+              {dayAssignCount > 0 && <div style={{ position: 'absolute', top: 4, left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 6, pointerEvents: 'none' }}><span style={{ fontSize: 9, fontWeight: 800, color: '#92400E', background: '#FEF3C7', padding: '2px 6px', borderRadius: 4, border: '1px solid #FCD34D' }}>{m.fullDayCount(dayAssignCount)}</span></div>}
               {isToday && <div style={{ position: 'absolute', left: 0, right: 0, top: nowPct, height: 2, background: '#EF4444', zIndex: 10, pointerEvents: 'none' }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444', position: 'absolute', top: -3, left: -4 }} /></div>}
               {dayBks.map((b: any) => {
                 const dt     = new Date(b.scheduled_at)
@@ -438,7 +500,7 @@ function WeekView({ bookings, cursor, today, tooltip, setTooltip, dayAssignments
                   >
                     <p style={{ fontSize: 10, fontWeight: 700, color: isDone ? '#64748B' : color, margin: '0 0 1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isDone ? '✓ ' : ''}{b.passenger_name}</p>
                     <p style={{ fontSize: 9, color: isDone ? '#94a3b8' : color, opacity: isDone ? 1 : 0.8, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {isDone && b.completed_at ? `Done ${format(new Date(b.completed_at), 'HH:mm')}` : b.destination}
+                      {isDone && b.completed_at ? m.done(format(new Date(b.completed_at), 'HH:mm')) : b.destination}
                     </p>
                   </div>
                 )
@@ -454,13 +516,15 @@ function WeekView({ bookings, cursor, today, tooltip, setTooltip, dayAssignments
 
 // ── MONTH VIEW ──────────────────────────────────────────────
 function MonthView({ bookings, cursor, today, onDayClick, dayAssignments = [] }: any) {
+  const lang  = useLang()
+  const m     = MSG[lang]
   const start = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 })
   const days  = Array.from({ length: 42 }, (_, i) => addDays(start, i))
 
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid #D4E8EA' }}>
-        {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(n => (
+        {m.dayHeaders.map(n => (
           <div key={n} style={{ textAlign: 'center', padding: '10px 0', fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', borderRight: '1px solid #D4E8EA' }}>{n}</div>
         ))}
       </div>
@@ -486,7 +550,7 @@ function MonthView({ bookings, cursor, today, onDayClick, dayAssignments = [] }:
                   </div>
                 )
               })}
-              {bks.length > 4 && <p style={{ fontSize: 9, color: '#9CA3AF', fontWeight: 600, margin: '2px 0 0' }}>+{bks.length - 4} more</p>}
+              {bks.length > 4 && <p style={{ fontSize: 9, color: '#9CA3AF', fontWeight: 600, margin: '2px 0 0' }}>{m.moreBookings(bks.length - 4)}</p>}
             </div>
           )
         })}
@@ -497,26 +561,28 @@ function MonthView({ bookings, cursor, today, onDayClick, dayAssignments = [] }:
 
 // ── Legend ──────────────────────────────────────────────────
 function Legend({ taxis }: { taxis: any[] }) {
+  const lang = useLang()
+  const m    = MSG[lang]
   return (
     <div style={{ padding: '10px 16px', borderTop: '1px solid #D4E8EA', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', background: '#F0F7F8' }}>
       {taxis.map(t => (
         <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: t.color, display: 'inline-block' }} />
-          <span style={{ fontSize: 11, color: '#6B7280' }}>{t.name} · {t.driver_name}</span>
+          <span style={{ fontSize: 11, color: '#6B7280' }}>{t.name} · {t.driver_name ?? m.noDriver}</span>
         </div>
       ))}
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ display: 'inline-block', width: 16, height: 2, background: '#EF4444' }} />
-          <span style={{ fontSize: 11, color: '#9CA3AF' }}>Now</span>
+          <span style={{ fontSize: 11, color: '#9CA3AF' }}>{m.nowLabel}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px dashed #9ca3af', borderRadius: 2 }} />
-          <span style={{ fontSize: 11, color: '#9CA3AF' }}>Pending</span>
+          <span style={{ fontSize: 11, color: '#9CA3AF' }}>{m.pendingLabel}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px solid #CBD5E1', borderRadius: 2, background: '#F1F5F9' }} />
-          <span style={{ fontSize: 11, color: '#9CA3AF' }}>✓ Done</span>
+          <span style={{ fontSize: 11, color: '#9CA3AF' }}>{m.doneLabel}</span>
         </div>
       </div>
     </div>
@@ -525,12 +591,14 @@ function Legend({ taxis }: { taxis: any[] }) {
 
 // ── Tooltip ─────────────────────────────────────────────────
 function Tooltip({ data }: { data: any }) {
+  const lang  = useLang()
+  const m     = MSG[lang]
   const { b } = data
   return (
     <div style={{ position: 'fixed', left: data.x + 8, top: data.y, background: '#007B8A', color: '#fff', borderRadius: 10, padding: '10px 14px', fontSize: 12, zIndex: 999, pointerEvents: 'none', lineHeight: 1.7, maxWidth: 220, boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}>
       <p style={{ fontWeight: 700, margin: '0 0 4px', fontSize: 13 }}>{b.passenger_name}</p>
       <p style={{ margin: 0, opacity: 0.8 }}>{format(new Date(b.scheduled_at), 'HH:mm')} · {b.destination}</p>
-      <p style={{ margin: 0, opacity: 0.7 }}>{b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}min`}</p>
+      <p style={{ margin: 0, opacity: 0.7 }}>{b.trip_type === 'DROP' ? m.drop : m.waitMinLong(b.wait_minutes)}</p>
       <p style={{ margin: '4px 0 0', opacity: 0.6, fontSize: 11 }}>{b.taxi_name} · {b.status.replace(/_/g, ' ')}</p>
     </div>
   )

@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
       reminded_overdue:          0,
       notified_coord:            0,
       reminded_pending_approval: 0,
+      driver_offline_warned:     0,
     }
 
     // ── 0. AUTO-CANCEL bookings not started 15+ min after scheduled_at ──
@@ -419,6 +420,58 @@ export async function GET(request: NextRequest) {
         if (approvalNotifs.length) {
           await notify(approvalNotifs)
           results.reminded_pending_approval = approvalNotifs.length
+        }
+      }
+    }
+
+    // ── 6. DRIVER OFFLINE WARNING — H-30 ──────────────────────────
+    // Fires once per booking when trip is 25–35 min away and assigned driver is offline.
+    // Notifies coordinators only — passenger is notified only if trip is actually reassigned.
+    const warnStart = new Date(now.getTime() + 25 * 60 * 1000)
+    const warnEnd   = new Date(now.getTime() + 35 * 60 * 1000)
+
+    const { data: upcomingBooked } = await admin
+      .from('bookings')
+      .select('id, destination, scheduled_at, passenger_id, taxi_id, taxis!taxi_id(name, is_available, driver_id, users!driver_id(name))')
+      .eq('status', 'booked')
+      .not('taxi_id', 'is', null)
+      .gte('scheduled_at', warnStart.toISOString())
+      .lte('scheduled_at', warnEnd.toISOString())
+
+    const offlineBookings = (upcomingBooked || []).filter(
+      (b: any) => b.taxis && b.taxis.is_available === false
+    )
+
+    if (offlineBookings.length) {
+      const { data: coordinators } = await admin
+        .from('users').select('id').eq('role', 'coordinator').eq('is_active', true)
+
+      for (const b of offlineBookings as any[]) {
+        // Dedup — only send once per booking
+        const { count } = await admin
+          .from('notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('booking_id', b.id)
+          .eq('type', 'driver_offline_warning')
+        if ((count || 0) > 0) continue
+
+        const driverName = b.taxis?.users?.name || b.taxis?.name || 'Driver'
+        const tripTime   = new Date(b.scheduled_at).toLocaleTimeString('id-ID', {
+          hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar',
+        })
+
+        const coordNotifs = (coordinators || []).map((c: any) => ({
+          user_id:    c.id,
+          booking_id: b.id,
+          title:      '⚠️ Driver offline — trip in 30 min',
+          body:       `${driverName} is offline but has a trip to ${b.destination} at ${tripTime}. Please check or reassign.`,
+          type:       'driver_offline_warning',
+          url:        '/coordinator/home',
+        }))
+
+        if (coordNotifs.length) {
+          await notify(coordNotifs)
+          results.driver_offline_warned++
         }
       }
     }

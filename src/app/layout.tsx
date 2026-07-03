@@ -30,6 +30,7 @@ export const viewport: Viewport = {
 
 import AuthProvider from '@/components/AuthProvider'
 import AppInitializer from '@/components/AppInitializer'
+import NavigationLoader from '@/components/NavigationLoader'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ fontFamily: "var(--font-inter), sans-serif", background: '#F5F5F2', margin: 0, padding: 0 }}>
         <AuthProvider>
           <AppInitializer />
+          <NavigationLoader />
           {children}
         </AuthProvider>
       </body>

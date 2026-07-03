@@ -1,10 +1,112 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useNavRouter as useRouter } from '@/hooks/useNavRouter'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import type { Coords } from '@/lib/geocode'
+import { useLang } from '@/lib/language'
+
+const MSG = {
+  en: {
+    title:          'New booking',
+    step:           (n: number) => `Step ${n} of 3`,
+    now:            '⚡  Now',
+    schedule:       '📅  Schedule',
+    taxiAssigned:   'Taxi will be assigned immediately after submission',
+    noTaxiNow:      '⚠ No taxi available right now',
+    dateTime:       'Date & time',
+    pickupLoc:      'Pickup location',
+    destination:    'Destination',
+    notes:          'Notes (optional)',
+    tapMap:         'Tap to pick on map...',
+    change:         'Change',
+    specialReq:     'Any special requests...',
+    pickup:         'Pickup',
+    dest:           'Destination',
+    selectTrip:     'Select trip type',
+    drop:           'Drop',
+    dropSub:        'One-way, driver leaves',
+    waiting:        'Waiting',
+    waitSub:        'Driver waits for you',
+    waitDuration:   'Waiting duration (minutes)',
+    needsApproval:  '⚠ Coordinator approval required',
+    autoAssigned:   '✓ Auto-assigned',
+    over60:         'Waiting trips over 60 min need approval first.',
+    bestDriver:     'Best available driver will be assigned automatically.',
+    reviewConfirm:  'Review & confirm',
+    when:           'When',
+    rightNow:       '⚡ Right now',
+    driverLock:     '🔒 Driver can start trip only from this time',
+    tripType:       'Trip type',
+    dropOneWay:     'Drop — one way',
+    waitMin:        (n: number) => `Waiting — ${n} min`,
+    sentCoord:      '⏳ Sent to coordinator for approval first.',
+    assignedNow:    '⚡ Driver will be assigned immediately.',
+    assignedAuto:   '✓ Driver will be assigned automatically.',
+    nextTripType:   'Next — Trip type →',
+    nextReview:     'Next — Review →',
+    checkingAvail:  'Checking availability...',
+    confirmBook:    'Confirm booking',
+    findingDriver:  'Finding a Driver',
+    pleaseWait:     'Please wait a moment...',
+    errPickup:      'Please pick a pickup location on the map',
+    errDest:        'Please pick a destination on the map',
+    errDateTime:    'Please select date and time',
+    errFuture:      'Booking time must be in the future.',
+    noTaxiAll:      'No taxis available. All drivers are off duty.',
+    checkFailed:    'Failed to check availability.',
+  },
+  id: {
+    title:          'Booking Baru',
+    step:           (n: number) => `Langkah ${n} dari 3`,
+    now:            '⚡  Sekarang',
+    schedule:       '📅  Jadwalkan',
+    taxiAssigned:   'Taksi akan langsung ditugaskan setelah dikirim',
+    noTaxiNow:      '⚠ Tidak ada taksi tersedia saat ini',
+    dateTime:       'Tanggal & waktu',
+    pickupLoc:      'Lokasi Penjemputan',
+    destination:    'Tujuan',
+    notes:          'Catatan (opsional)',
+    tapMap:         'Ketuk untuk pilih di peta...',
+    change:         'Ubah',
+    specialReq:     'Permintaan khusus...',
+    pickup:         'Penjemputan',
+    dest:           'Tujuan',
+    selectTrip:     'Pilih jenis perjalanan',
+    drop:           'Drop',
+    dropSub:        'Satu arah, driver langsung pergi',
+    waiting:        'Tunggu',
+    waitSub:        'Driver menunggu Anda',
+    waitDuration:   'Durasi tunggu (menit)',
+    needsApproval:  '⚠ Perlu persetujuan koordinator',
+    autoAssigned:   '✓ Otomatis ditugaskan',
+    over60:         'Perjalanan tunggu lebih dari 60 menit perlu persetujuan.',
+    bestDriver:     'Driver terbaik yang tersedia akan ditugaskan secara otomatis.',
+    reviewConfirm:  'Tinjau & konfirmasi',
+    when:           'Kapan',
+    rightNow:       '⚡ Sekarang juga',
+    driverLock:     '🔒 Driver hanya bisa mulai perjalanan dari waktu ini',
+    tripType:       'Jenis perjalanan',
+    dropOneWay:     'Drop — satu arah',
+    waitMin:        (n: number) => `Tunggu — ${n} menit`,
+    sentCoord:      '⏳ Dikirim ke koordinator untuk persetujuan terlebih dahulu.',
+    assignedNow:    '⚡ Driver akan langsung ditugaskan.',
+    assignedAuto:   '✓ Driver akan ditugaskan otomatis.',
+    nextTripType:   'Lanjut — Jenis Perjalanan →',
+    nextReview:     'Lanjut — Tinjau →',
+    checkingAvail:  'Memeriksa ketersediaan...',
+    confirmBook:    'Konfirmasi Booking',
+    findingDriver:  'Mencari Driver',
+    pleaseWait:     'Mohon tunggu sebentar...',
+    errPickup:      'Pilih lokasi penjemputan di peta',
+    errDest:        'Pilih tujuan di peta',
+    errDateTime:    'Pilih tanggal dan waktu',
+    errFuture:      'Waktu booking harus di masa mendatang.',
+    noTaxiAll:      'Tidak ada taksi tersedia. Semua driver sedang tidak bertugas.',
+    checkFailed:    'Gagal memeriksa ketersediaan.',
+  },
+}
 
 const LocationPickerMap = dynamic(() => import('@/components/map/LocationPickerMap'), { ssr: false })
 
@@ -49,6 +151,9 @@ export default function BookPage() {
   const router   = useRouter()
   const supabase = createClient()
 
+  const lang = useLang()
+  const t    = MSG[lang]
+
   const [step,        setStep]        = useState<Step>(1)
   const [loading,     setLoading]     = useState(false)
   const [checkingNow, setCheckingNow] = useState(false)
@@ -83,7 +188,7 @@ export default function BookPage() {
         .not('driver_id', 'is', null)
 
       if (!taxis?.length) {
-        setNoTaxiMsg('No taxis available. All drivers are off duty.')
+        setNoTaxiMsg(t.noTaxiAll)
         setCheckingNow(false); return false
       }
 
@@ -117,10 +222,10 @@ export default function BookPage() {
       const nextTime = nextFreeAt
         ? nextFreeAt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
         : ''
-      setNoTaxiMsg(`No taxi available right now.${nextTime ? ` Next: ${nextName} at ${nextTime}.` : ''}`)
+      setNoTaxiMsg(`${t.noTaxiNow.replace('⚠ ', '')}${nextTime ? ` Next: ${nextName} at ${nextTime}.` : ''}`)
       return false
     } catch {
-      setNoTaxiMsg('Failed to check availability.')
+      setNoTaxiMsg(t.checkFailed)
       setCheckingNow(false); return false
     }
   }
@@ -128,13 +233,13 @@ export default function BookPage() {
   async function handleNext() {
     setError('')
     if (step === 1) {
-      if (!pickupCoords) { setError('Please pick a pickup location on the map'); return }
-      if (!destCoords)   { setError('Please pick a destination on the map'); return }
+      if (!pickupCoords) { setError(t.errPickup); return }
+      if (!destCoords)   { setError(t.errDest); return }
       if (form.mode === 'now') {
         const ok = await checkNowAvailability()
         if (!ok) return
       } else {
-        if (!form.scheduled_at) { setError('Please select date and time'); return }
+        if (!form.scheduled_at) { setError(t.errDateTime); return }
       }
     }
     setStep(prev => (prev + 1) as Step)
@@ -151,7 +256,7 @@ export default function BookPage() {
         : new Date(form.scheduled_at)
 
       if (form.mode === 'schedule' && scheduledDate <= new Date(Date.now() - 3 * 60000)) {
-        setError('Booking time must be in the future.'); setLoading(false); return
+        setError(t.errFuture); setLoading(false); return
       }
 
       // Use 3hr as a conservative estimate for the new booking's end time.
@@ -277,10 +382,10 @@ export default function BookPage() {
           </div>
 
           <p style={{ fontSize: 20, fontWeight: 700, color: '#1a1c1b', margin: '0 0 6px', letterSpacing: '-0.3px' }}>
-            Finding a Driver
+            {t.findingDriver}
           </p>
           <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>
-            Please wait a moment...
+            {t.pleaseWait}
           </p>
         </div>
       )}
@@ -288,7 +393,7 @@ export default function BookPage() {
       {/* Location picker modal */}
       {pickerField && (
         <LocationPickerMap
-          title={pickerField === 'pickup' ? 'Select pickup location' : 'Select destination'}
+          title={pickerField === 'pickup' ? t.pickupLoc : t.destination}
           autoGps={pickerField === 'pickup'}
           onClose={() => setPickerField(null)}
           onConfirm={(address, coords) => {
@@ -312,8 +417,8 @@ export default function BookPage() {
             style={{ width: 34, height: 34, borderRadius: '50%', background: C.surface, border: `1px solid ${C.border}`, cursor: 'pointer', fontSize: 16, color: C.textSecond, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
           >←</button>
           <div style={{ flex: 1 }}>
-            <p style={{ fontSize: 17, fontWeight: 600, margin: 0, letterSpacing: '-0.2px', color: C.textPrimary }}>New booking</p>
-            <p style={{ fontSize: 12, color: C.textTert, margin: 0 }}>Step {step} of 3</p>
+            <p style={{ fontSize: 17, fontWeight: 600, margin: 0, letterSpacing: '-0.2px', color: C.textPrimary }}>{t.title}</p>
+            <p style={{ fontSize: 12, color: C.textTert, margin: 0 }}>{t.step(step)}</p>
           </div>
         </div>
 
@@ -345,7 +450,7 @@ export default function BookPage() {
                     boxShadow: form.mode === m ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
                   }}
                 >
-                  {m === 'now' ? '⚡  Now' : '📅  Schedule'}
+                  {m === 'now' ? t.now : t.schedule}
                 </button>
               ))}
             </div>
@@ -355,7 +460,7 @@ export default function BookPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: C.greenBg, border: `1px solid #B7E4C7`, borderRadius: 12, marginBottom: 20 }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.greenMid, flexShrink: 0, display: 'inline-block' }} />
                 <p style={{ fontSize: 12, color: C.green, margin: 0, fontWeight: 500 }}>
-                  Taxi will be assigned immediately after submission
+                  {t.taxiAssigned}
                 </p>
               </div>
             )}
@@ -363,14 +468,14 @@ export default function BookPage() {
             {/* No taxi error */}
             {noTaxiMsg && (
               <div style={{ padding: '10px 14px', background: C.redBg, border: `1px solid #FECACA`, borderRadius: 12, marginBottom: 20 }}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: C.red, margin: '0 0 2px' }}>⚠ No taxi available right now</p>
+                <p style={{ fontSize: 12, fontWeight: 600, color: C.red, margin: '0 0 2px' }}>{t.noTaxiNow}</p>
                 <p style={{ fontSize: 12, color: C.red, margin: 0 }}>{noTaxiMsg}</p>
               </div>
             )}
 
             {/* DateTime — only for schedule */}
             {form.mode === 'schedule' && (
-              <FG label="Date & time">
+              <FG label={t.dateTime}>
                 <input
                   type="datetime-local"
                   value={form.scheduled_at}
@@ -382,7 +487,7 @@ export default function BookPage() {
             )}
 
             {/* Route fields — map picker only */}
-            <FG label="Pickup location">
+            <FG label={t.pickupLoc}>
               <button
                 type="button"
                 onClick={() => setPickerField('pickup')}
@@ -392,18 +497,18 @@ export default function BookPage() {
                 <div style={{ flex: 1 }}>
                   {pickupCoords ? (
                     <>
-                      <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pickup</p>
+                      <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.pickup}</p>
                       <p style={{ fontSize: 13, color: C.textPrimary, margin: 0, fontWeight: 600 }}>{form.pickup}</p>
                     </>
                   ) : (
-                    <p style={{ fontSize: 14, color: C.textTert, margin: 0 }}>Tap to pick on map...</p>
+                    <p style={{ fontSize: 14, color: C.textTert, margin: 0 }}>{t.tapMap}</p>
                   )}
                 </div>
-                {pickupCoords && <span style={{ fontSize: 11, color: C.textTert, flexShrink: 0 }}>Change</span>}
+                {pickupCoords && <span style={{ fontSize: 11, color: C.textTert, flexShrink: 0 }}>{t.change}</span>}
               </button>
             </FG>
 
-            <FG label="Destination">
+            <FG label={t.destination}>
               <button
                 type="button"
                 onClick={() => setPickerField('destination')}
@@ -413,21 +518,21 @@ export default function BookPage() {
                 <div style={{ flex: 1 }}>
                   {destCoords ? (
                     <>
-                      <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Destination</p>
+                      <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.dest}</p>
                       <p style={{ fontSize: 13, color: C.textPrimary, margin: 0, fontWeight: 600 }}>{form.destination}</p>
                     </>
                   ) : (
-                    <p style={{ fontSize: 14, color: C.textTert, margin: 0 }}>Tap to pick on map...</p>
+                    <p style={{ fontSize: 14, color: C.textTert, margin: 0 }}>{t.tapMap}</p>
                   )}
                 </div>
-                {destCoords && <span style={{ fontSize: 11, color: C.textTert, flexShrink: 0 }}>Change</span>}
+                {destCoords && <span style={{ fontSize: 11, color: C.textTert, flexShrink: 0 }}>{t.change}</span>}
               </button>
             </FG>
 
-            <FG label="Notes (optional)">
+            <FG label={t.notes}>
               <input type="text" value={form.notes}
                 onChange={e => update('notes', e.target.value)}
-                placeholder="Any special requests..."
+                placeholder={t.specialReq}
                 style={inputSt} />
             </FG>
           </div>
@@ -436,12 +541,12 @@ export default function BookPage() {
         {/* ── STEP 2 ── */}
         {step === 2 && (
           <div>
-            <p style={{ fontSize: 12, color: C.textTert, margin: '0 0 20px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Select trip type</p>
+            <p style={{ fontSize: 12, color: C.textTert, margin: '0 0 20px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.selectTrip}</p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
               {[
-                { val: 'DROP'    as TripType, icon: '→', title: 'Drop',    sub: 'One-way, driver leaves' },
-                { val: 'WAITING' as TripType, icon: '⏱', title: 'Waiting', sub: 'Driver waits for you'  },
+                { val: 'DROP'    as TripType, icon: '→', title: t.drop,    sub: t.dropSub },
+                { val: 'WAITING' as TripType, icon: '⏱', title: t.waiting, sub: t.waitSub },
               ].map(({ val, icon, title, sub }) => {
                 const sel = form.trip_type === val
                 return (
@@ -464,7 +569,7 @@ export default function BookPage() {
             </div>
 
             {form.trip_type === 'WAITING' && (
-              <FG label="Waiting duration (minutes)">
+              <FG label={t.waitDuration}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <button onClick={() => update('wait_minutes', Math.max(15, form.wait_minutes - 15))}
                     style={{ width: 40, height: 40, borderRadius: '50%', border: `1.5px solid ${C.border}`, background: C.white, fontSize: 18, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.textPrimary }}>−</button>
@@ -479,10 +584,10 @@ export default function BookPage() {
 
             <div style={{ padding: '12px 14px', borderRadius: 12, border: `1px solid ${needsApproval ? '#FDE68A' : '#B7E4C7'}`, background: needsApproval ? C.amberBg : C.greenBg }}>
               <p style={{ fontSize: 12, fontWeight: 600, color: needsApproval ? C.amber : C.green, margin: '0 0 2px' }}>
-                {needsApproval ? '⚠ Coordinator approval required' : '✓ Auto-assigned'}
+                {needsApproval ? t.needsApproval : t.autoAssigned}
               </p>
               <p style={{ fontSize: 11, color: needsApproval ? C.amber : C.green, margin: 0 }}>
-                {needsApproval ? 'Waiting trips over 60 min need approval first.' : 'Best available driver will be assigned automatically.'}
+                {needsApproval ? t.over60 : t.bestDriver}
               </p>
             </div>
           </div>
@@ -491,16 +596,21 @@ export default function BookPage() {
         {/* ── STEP 3 ── */}
         {step === 3 && (
           <div>
-            <p style={{ fontSize: 12, color: C.textTert, margin: '0 0 16px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Review & confirm</p>
+            <p style={{ fontSize: 12, color: C.textTert, margin: '0 0 16px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.reviewConfirm}</p>
 
             {/* Summary card */}
             <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', marginBottom: 16 }}>
               {/* When row — highlighted */}
               <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}`, background: C.surface }}>
-                <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.textTert, margin: '0 0 4px' }}>When</p>
-                <p style={{ fontSize: 15, fontWeight: 700, color: C.textPrimary, margin: 0, letterSpacing: '-0.2px' }}>
-                  {form.mode === 'now' ? '⚡ Right now' : formatDateTime(form.scheduled_at)}
+                <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.textTert, margin: '0 0 4px' }}>{t.when}</p>
+                <p style={{ fontSize: 15, fontWeight: 700, color: C.textPrimary, margin: '0 0 3px', letterSpacing: '-0.2px' }}>
+                  {form.mode === 'now' ? t.rightNow : formatDateTime(form.scheduled_at)}
                 </p>
+                {form.mode === 'schedule' && (
+                  <p style={{ fontSize: 11, color: C.textTert, margin: 0 }}>
+                    {t.driverLock}
+                  </p>
+                )}
               </div>
 
               {/* Route */}
@@ -508,7 +618,7 @@ export default function BookPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.black, flexShrink: 0 }} />
                   <div>
-                    <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pickup</p>
+                    <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.pickup}</p>
                     <p style={{ fontSize: 14, fontWeight: 600, color: C.textPrimary, margin: 0 }}>{form.pickup}</p>
                   </div>
                 </div>
@@ -516,7 +626,7 @@ export default function BookPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.greenMid, flexShrink: 0 }} />
                   <div>
-                    <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Destination</p>
+                    <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.dest}</p>
                     <p style={{ fontSize: 14, fontWeight: 600, color: C.textPrimary, margin: 0 }}>{form.destination}</p>
                   </div>
                 </div>
@@ -524,7 +634,7 @@ export default function BookPage() {
 
               {/* Meta rows */}
               {[
-                { label: 'Trip type', value: form.trip_type === 'DROP' ? 'Drop — one way' : `Waiting — ${form.wait_minutes} min` },
+                { label: t.tripType, value: form.trip_type === 'DROP' ? t.dropOneWay : t.waitMin(form.wait_minutes) },
                 ...(form.notes ? [{ label: 'Notes', value: form.notes }] : []),
               ].map((row, i, arr) => (
                 <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 16px', borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : 'none' }}>
@@ -538,10 +648,10 @@ export default function BookPage() {
             <div style={{ padding: '12px 14px', borderRadius: 12, border: `1px solid ${needsApproval ? '#FDE68A' : '#B7E4C7'}`, background: needsApproval ? C.amberBg : C.greenBg, marginBottom: 4 }}>
               <p style={{ fontSize: 12, color: needsApproval ? C.amber : C.green, margin: 0 }}>
                 {needsApproval
-                  ? '⏳ Sent to coordinator for approval first.'
+                  ? t.sentCoord
                   : form.mode === 'now'
-                    ? '⚡ Driver will be assigned immediately.'
-                    : '✓ Driver will be assigned automatically.'}
+                    ? t.assignedNow
+                    : t.assignedAuto}
               </p>
             </div>
           </div>
@@ -562,7 +672,7 @@ export default function BookPage() {
               disabled={checkingNow}
               style={{ width: '100%', padding: '14px 20px', background: checkingNow ? C.border2 : C.black, color: C.white, border: 'none', borderRadius: 16, fontSize: 15, fontWeight: 600, cursor: checkingNow ? 'not-allowed' : 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif", letterSpacing: '-0.1px', transition: 'opacity 0.15s' }}
             >
-              {checkingNow ? 'Checking availability...' : step === 1 ? 'Next — Trip type →' : 'Next — Review →'}
+              {checkingNow ? t.checkingAvail : step === 1 ? t.nextTripType : t.nextReview}
             </button>
           ) : (
             <button
@@ -570,7 +680,7 @@ export default function BookPage() {
               disabled={loading}
               style={{ width: '100%', padding: '14px 20px', background: loading ? C.border2 : C.black, color: C.white, border: 'none', borderRadius: 16, fontSize: 15, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif", letterSpacing: '-0.1px' }}
             >
-              Confirm booking
+              {t.confirmBook}
             </button>
           )}
         </div>

@@ -1,14 +1,71 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useNavRouter as useRouter } from '@/hooks/useNavRouter'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import type { RegisteredLocation } from '@/types'
 import type { Coords } from '@/lib/geocode'
+import { useLang } from '@/lib/language'
+import PageLoader from '@/components/PageLoader'
 
 const LocationPickerMap = dynamic(() => import('@/components/map/LocationPickerMap'), { ssr: false })
 const SavedLocationsMap  = dynamic(() => import('@/components/map/SavedLocationsMap'),  { ssr: false })
+
+const MSG = {
+  en: {
+    title:            'Saved Locations',
+    placesCount:      (n: number) => `${n} place${n !== 1 ? 's' : ''} registered`,
+    addBtn:           '+ Add',
+    noPins:           'No pins yet',
+    addHint:          'Add a location to see it here',
+    noLocations:      'No saved locations yet',
+    emptyHint:        'Tap + Add to register offices, gates, or spots inside the plant site.',
+    locationsLabel:   'Locations',
+    loadMore:         (n: number) => `Load more · ${n} remaining`,
+    edit:             'Edit',
+    delete:           'Delete',
+    nameThisLocation: 'Name This Location',
+    cancel:           'Cancel',
+    saving:           'Saving...',
+    saveLocation:     'Save Location',
+    editLocation:     'Edit Location',
+    nameLabel:        'Name',
+    pinLabel:         'Pin',
+    noAddress:        '(no address)',
+    changePinMap:     'Change Pin on Map',
+    saveChanges:      'Save Changes',
+    deleteTitle:      'Delete Location?',
+    deleteBodySuffix: 'will be removed from the map and can no longer be selected during booking.',
+    deleteConfirm:    'Delete',
+  },
+  id: {
+    title:            'Lokasi Tersimpan',
+    placesCount:      (n: number) => `${n} lokasi terdaftar`,
+    addBtn:           '+ Tambah',
+    noPins:           'Belum ada pin',
+    addHint:          'Tambahkan lokasi untuk melihatnya di sini',
+    noLocations:      'Belum ada lokasi tersimpan',
+    emptyHint:        'Ketuk + Tambah untuk mendaftarkan kantor, gerbang, atau titik di dalam plant.',
+    locationsLabel:   'Lokasi',
+    loadMore:         (n: number) => `Muat lebih · ${n} tersisa`,
+    edit:             'Edit',
+    delete:           'Hapus',
+    nameThisLocation: 'Beri Nama Lokasi Ini',
+    cancel:           'Batal',
+    saving:           'Menyimpan...',
+    saveLocation:     'Simpan Lokasi',
+    editLocation:     'Edit Lokasi',
+    nameLabel:        'Nama',
+    pinLabel:         'Pin',
+    noAddress:        '(tidak ada alamat)',
+    changePinMap:     'Ubah Pin di Peta',
+    saveChanges:      'Simpan Perubahan',
+    deleteTitle:      'Hapus Lokasi?',
+    deleteBodySuffix: 'akan dihapus dari peta dan tidak bisa dipilih saat booking.',
+    deleteConfirm:    'Hapus',
+  },
+}
 
 interface PendingPin {
   address: string
@@ -20,8 +77,10 @@ const FONT = "var(--font-inter), 'Inter', sans-serif"
 const PRIMARY = '#006064'
 
 export default function RegisteredLocationsPage() {
-  const router  = useRouter()
+  const router   = useRouter()
   const supabase = createClient()
+  const lang     = useLang()
+  const t        = MSG[lang]
 
   const [locations,     setLocations]     = useState<RegisteredLocation[]>([])
   const [loading,       setLoading]       = useState(true)
@@ -144,12 +203,7 @@ export default function RegisteredLocationsPage() {
   const visible = locations.slice(0, visibleCount)
   const hasMore = visibleCount < locations.length
 
-  if (loading) return (
-    <div style={{ height: 'calc(100dvh - 68px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-      <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(0,96,100,0.15)', borderTop: `3px solid ${PRIMARY}`, animation: 'spin 0.8s linear infinite' }} />
-    </div>
-  )
+  if (loading) return <PageLoader />
 
   return (
     <>
@@ -175,9 +229,9 @@ export default function RegisteredLocationsPage() {
                 }}
               >←</button>
               <div>
-                <h1 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 2px', letterSpacing: '-0.3px', color: '#1a1c1b' }}>Saved Locations</h1>
+                <h1 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 2px', letterSpacing: '-0.3px', color: '#1a1c1b' }}>{t.title}</h1>
                 <p style={{ fontSize: 12, color: '#8A9BB0', margin: 0 }}>
-                  {locations.length} place{locations.length !== 1 ? 's' : ''} registered
+                  {t.placesCount(locations.length)}
                 </p>
               </div>
             </div>
@@ -190,7 +244,7 @@ export default function RegisteredLocationsPage() {
                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                 fontFamily: FONT,
               }}
-            >+ Add</button>
+            >{t.addBtn}</button>
           </div>
         </header>
 
@@ -213,8 +267,8 @@ export default function RegisteredLocationsPage() {
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 background: 'rgba(245,245,242,0.75)', gap: 6,
               }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', margin: 0 }}>No pins yet</p>
-                <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>Add a location to see it here</p>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', margin: 0 }}>{t.noPins}</p>
+                <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{t.addHint}</p>
               </div>
             )}
           </div>
@@ -229,9 +283,9 @@ export default function RegisteredLocationsPage() {
             {locations.length === 0 ? (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 20px', textAlign: 'center' }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>📍</div>
-                <p style={{ fontSize: 14, fontWeight: 600, color: '#6b7280', margin: '0 0 6px' }}>No saved locations yet</p>
+                <p style={{ fontSize: 14, fontWeight: 600, color: '#6b7280', margin: '0 0 6px' }}>{t.noLocations}</p>
                 <p style={{ fontSize: 12, color: '#9ca3af', margin: 0, lineHeight: 1.5 }}>
-                  Tap <strong>+ Add</strong> to register offices, gates, or spots inside the plant site.
+                  {t.emptyHint}
                 </p>
               </div>
             ) : (
@@ -243,7 +297,7 @@ export default function RegisteredLocationsPage() {
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 }}>
                   <p style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>
-                    Locations
+                    {t.locationsLabel}
                   </p>
                   <span style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', background: 'rgba(0,0,0,0.05)', borderRadius: 20, padding: '2px 8px' }}>
                     {locations.length}
@@ -339,7 +393,7 @@ export default function RegisteredLocationsPage() {
                                 }}
                               >
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                Edit
+                                {t.edit}
                               </button>
                               <button
                                 onClick={e => { e.stopPropagation(); setMenuOpenId(null); openDelete(loc) }}
@@ -353,7 +407,7 @@ export default function RegisteredLocationsPage() {
                                 }}
                               >
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ba1a1a" strokeWidth="2.2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                                Delete
+                                {t.delete}
                               </button>
                             </div>
                           </>
@@ -374,7 +428,7 @@ export default function RegisteredLocationsPage() {
                         color: PRIMARY, cursor: 'pointer', fontFamily: FONT,
                       }}
                     >
-                      Load more · {locations.length - visibleCount} remaining
+                      {t.loadMore(locations.length - visibleCount)}
                     </button>
                   )}
                 </div>
@@ -414,7 +468,7 @@ export default function RegisteredLocationsPage() {
             borderRadius: '20px 20px 0 0',
             padding: '24px 20px 40px',
           }}>
-            <p style={{ fontSize: 17, fontWeight: 700, color: '#1a1c1b', margin: '0 0 4px' }}>Name This Location</p>
+            <p style={{ fontSize: 17, fontWeight: 700, color: '#1a1c1b', margin: '0 0 4px' }}>{t.nameThisLocation}</p>
             <p style={{ fontSize: 12, color: '#9ca3af', margin: '0 0 16px', lineHeight: 1.4 }}>{pendingPin.address}</p>
             <input
               type="text"
@@ -440,7 +494,7 @@ export default function RegisteredLocationsPage() {
                   border: 'none', borderRadius: 14, fontSize: 14, fontWeight: 600,
                   cursor: 'pointer', color: '#6b7280', fontFamily: FONT,
                 }}
-              >Cancel</button>
+              >{t.cancel}</button>
               <button
                 onClick={saveNew}
                 disabled={!newName.trim() || saving}
@@ -451,7 +505,7 @@ export default function RegisteredLocationsPage() {
                   cursor: !newName.trim() || saving ? 'not-allowed' : 'pointer',
                   color: '#fff', fontFamily: FONT,
                 }}
-              >{saving ? 'Saving...' : 'Save Location'}</button>
+              >{saving ? t.saving : t.saveLocation}</button>
             </div>
           </div>
         </div>
@@ -469,9 +523,9 @@ export default function RegisteredLocationsPage() {
             borderRadius: '20px 20px 0 0',
             padding: '24px 20px 40px',
           }}>
-            <p style={{ fontSize: 17, fontWeight: 700, color: '#1a1c1b', margin: '0 0 16px' }}>Edit Location</p>
+            <p style={{ fontSize: 17, fontWeight: 700, color: '#1a1c1b', margin: '0 0 16px' }}>{t.editLocation}</p>
 
-            <p style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 6px' }}>Name</p>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 6px' }}>{t.nameLabel}</p>
             <input
               type="text"
               value={editName}
@@ -486,12 +540,12 @@ export default function RegisteredLocationsPage() {
               onBlur={e => { e.target.style.borderColor = 'rgba(0,96,100,0.2)' }}
             />
 
-            <p style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 6px' }}>Pin</p>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 6px' }}>{t.pinLabel}</p>
             <div style={{
               background: '#F5F5F2', borderRadius: 10, padding: '10px 12px', marginBottom: 10,
             }}>
               <p style={{ fontSize: 13, fontWeight: 600, color: '#1a1c1b', margin: '0 0 2px' }}>
-                {editPin?.address || '(no address)'}
+                {editPin?.address || t.noAddress}
               </p>
               <p style={{ fontSize: 10, color: '#d1d5db', margin: 0, fontFamily: 'monospace' }}>
                 {editPin ? `${editPin.lat.toFixed(5)}, ${editPin.lng.toFixed(5)}` : ''}
@@ -504,7 +558,7 @@ export default function RegisteredLocationsPage() {
                 background: 'rgba(0,96,100,0.08)', border: 'none', borderRadius: 12,
                 fontSize: 13, fontWeight: 600, cursor: 'pointer', color: PRIMARY, fontFamily: FONT,
               }}
-            >Change Pin on Map</button>
+            >{t.changePinMap}</button>
 
             <div style={{ display: 'flex', gap: 10 }}>
               <button
@@ -514,7 +568,7 @@ export default function RegisteredLocationsPage() {
                   border: 'none', borderRadius: 14, fontSize: 14, fontWeight: 600,
                   cursor: 'pointer', color: '#6b7280', fontFamily: FONT,
                 }}
-              >Cancel</button>
+              >{t.cancel}</button>
               <button
                 onClick={saveEdit}
                 disabled={!editName.trim() || saving}
@@ -525,7 +579,7 @@ export default function RegisteredLocationsPage() {
                   cursor: !editName.trim() || saving ? 'not-allowed' : 'pointer',
                   color: '#fff', fontFamily: FONT,
                 }}
-              >{saving ? 'Saving...' : 'Save Changes'}</button>
+              >{saving ? t.saving : t.saveChanges}</button>
             </div>
           </div>
         </div>
@@ -543,9 +597,9 @@ export default function RegisteredLocationsPage() {
             background: '#fff', borderRadius: 20,
             padding: '24px 20px', width: '100%', maxWidth: 360,
           }}>
-            <p style={{ fontSize: 16, fontWeight: 700, color: '#1a1c1b', margin: '0 0 8px' }}>Delete Location?</p>
+            <p style={{ fontSize: 16, fontWeight: 700, color: '#1a1c1b', margin: '0 0 8px' }}>{t.deleteTitle}</p>
             <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 20px', lineHeight: 1.5 }}>
-              "<strong>{deleteName}</strong>" will be removed from the map and can no longer be selected during booking.
+              "<strong>{deleteName}</strong>" {t.deleteBodySuffix}
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button
@@ -555,7 +609,7 @@ export default function RegisteredLocationsPage() {
                   border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 600,
                   cursor: 'pointer', color: '#6b7280', fontFamily: FONT,
                 }}
-              >Cancel</button>
+              >{t.cancel}</button>
               <button
                 onClick={confirmDelete}
                 style={{
@@ -563,7 +617,7 @@ export default function RegisteredLocationsPage() {
                   border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700,
                   cursor: 'pointer', color: '#fff', fontFamily: FONT,
                 }}
-              >Delete</button>
+              >{t.deleteConfirm}</button>
             </div>
           </div>
         </div>
