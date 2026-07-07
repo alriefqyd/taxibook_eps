@@ -171,13 +171,16 @@ export default function CoordinatorHomePage() {
   const [latestTrips,      setLatestTrips]      = useState<BookingDetail[]>([])
   const [tripsToday,       setTripsToday]       = useState(0)
   const [taxis,            setTaxis]            = useState<TaxiRow[]>([])
-  const [dayAssignments,   setDayAssignments]   = useState<{ taxi_id: string; assign_date: string }[]>([])
+  const [dayAssignments,   setDayAssignments]   = useState<import('@/components/GanttCalendar').DayAssignment[]>([])
   const [loading,          setLoading]          = useState(true)
   const [view,        setView]        = useState<'calendar' | 'map'>('calendar')
   const [rejectId,   setRejectId]   = useState<string | null>(null)
   const [rejectNote, setRejectNote] = useState('')
   const [processing, setProcessing] = useState<string | null>(null)
   const [processingAction, setProcessingAction] = useState<'approve' | 'reject' | 'cancel' | null>(null)
+  const [cancelConfirmId,  setCancelConfirmId]  = useState<string | null>(null)
+  const [cancelNote,       setCancelNote]       = useState('')
+  const [cancellingModal,  setCancellingModal]  = useState(false)
   const [unreadCount,  setUnreadCount]  = useState(0)
   const [menuOpen,    setMenuOpen]    = useState(false)
   const [bookingToast, setBookingToast] = useState<{ code: string; taxi?: string; driver?: string; pending?: boolean } | null>(null)
@@ -261,15 +264,31 @@ export default function CoordinatorHomePage() {
     const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
     const { data: dayAssign } = await supabase
       .from('driver_day_assignments')
-      .select('taxi_id, assign_date')
+      .select('taxi_id, assign_date, reason, passenger_name_other, passenger_id, taxis(name, plate, users!driver_id(name))')
       .gte('assign_date', witaToday)
+
+    // Resolve registered passenger names in one batch query
+    const passengerIds = Array.from(new Set((dayAssign || []).filter((a: any) => a.passenger_id).map((a: any) => a.passenger_id as string)))
+    let passengerNames: Record<string, string> = {}
+    if (passengerIds.length > 0) {
+      const { data: pUsers } = await supabase.from('users').select('id, name').in('id', passengerIds)
+      if (pUsers) pUsers.forEach((u: any) => { passengerNames[u.id] = u.name })
+    }
 
     setPendingAll(pendingBks || [])
     setCalendarBookings(allBks || [])
     setLatestTrips(latestBks || [])
     setTripsToday(todayCount || 0)
     setTaxis(enriched)
-    setDayAssignments(dayAssign || [])
+    setDayAssignments((dayAssign || []).map((a: any) => ({
+      taxi_id:        a.taxi_id,
+      assign_date:    a.assign_date,
+      reason:         a.reason ?? null,
+      taxi_name:      a.taxis?.name ?? null,
+      taxi_plate:     a.taxis?.plate ?? null,
+      driver_name:    (a.taxis as any)?.users?.name ?? null,
+      passenger_name: a.passenger_id ? (passengerNames[a.passenger_id] ?? null) : (a.passenger_name_other ?? null),
+    })))
   }, [supabase])
 
   useEffect(() => {
@@ -350,15 +369,22 @@ export default function CoordinatorHomePage() {
     setProcessing(null); setProcessingAction(null)
   }
 
-  async function handleCancel(bookingId: string) {
-    if (!confirm('Cancel this booking?')) return
-    setProcessing(bookingId); setProcessingAction('cancel')
+  function handleCancel(bookingId: string) {
+    setCancelConfirmId(bookingId)
+    setCancelNote('')
+  }
+
+  async function confirmCancel() {
+    if (!cancelConfirmId) return
+    setCancellingModal(true)
+    setProcessing(cancelConfirmId); setProcessingAction('cancel')
     const token = await getToken()
-    await fetch(`/api/bookings/${bookingId}/cancel`, {
+    await fetch(`/api/bookings/${cancelConfirmId}/cancel`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ reason: '' }),
+      body: JSON.stringify({ reason: cancelNote }),
     })
+    setCancelConfirmId(null); setCancelNote(''); setCancellingModal(false)
     await loadData()
     setProcessing(null); setProcessingAction(null)
   }
@@ -375,7 +401,7 @@ export default function CoordinatorHomePage() {
   const initials = user?.name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') || 'C'
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif", minHeight: '100vh', background: '#F5F5F2' }}>
+    <div style={{ fontFamily: "'Inter', sans-serif", height: '100dvh', background: '#F5F5F2', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       {/* ── Booking success toast ── */}
       {bookingToast && (
@@ -395,12 +421,12 @@ export default function CoordinatorHomePage() {
         </div>
       )}
 
-      {/* ── TopAppBar — matches reference design ── */}
+      {/* ── TopAppBar — in normal flow; flex layout keeps it above the scroll area ── */}
       <header style={{
         background: '#F5F5F2',
         borderBottom: '1px solid rgba(0,0,0,0.08)',
         boxShadow: '0 1px 4px rgba(0,96,100,0.06)',
-        position: 'sticky', top: 0, zIndex: 40,
+        flexShrink: 0, position: 'relative', zIndex: 1000,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', height: 64 }}>
           {/* Logo */}
@@ -423,8 +449,8 @@ export default function CoordinatorHomePage() {
               </div>
               {menuOpen && (
                 <>
-                  <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 98 }} />
-                  <div style={{ position: 'absolute', top: 44, right: 0, background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 99, minWidth: 220, overflow: 'hidden' }}>
+                  <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 999 }} />
+                  <div style={{ position: 'absolute', top: 44, right: 0, background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 1099, minWidth: 220, overflow: 'hidden' }}>
                     <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: '#F5F5F2' }}>
                       <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 2px', color: '#1a1c1b' }}>{user?.name}</p>
                       <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{t.role}</p>
@@ -460,6 +486,9 @@ export default function CoordinatorHomePage() {
           </div>
         </div>
       </header>
+
+      {/* ── Scrollable content below header ── */}
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingBottom: 72 }}>
       <OnboardingTour role="coordinator" />
 
       {/* ── Greeting hero ── */}
@@ -512,7 +541,7 @@ export default function CoordinatorHomePage() {
         )}
 
         {/* ── CALENDAR / MAP ── */}
-        <div style={{ margin: '0 -16px', background: '#fff', borderTop: '1px solid rgba(0,0,0,0.08)', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+        <div style={{ margin: '0 -16px', background: '#fff', borderTop: '1px solid rgba(0,0,0,0.08)', borderBottom: '1px solid rgba(0,0,0,0.08)', position: 'relative', zIndex: 0 }}>
           <GanttCalendar
             bookings={calendarBookings} taxis={taxis} showCompleted dayAssignments={dayAssignments}
             onMapClick={() => setView(view === 'map' ? 'calendar' : 'map')}
@@ -541,33 +570,17 @@ export default function CoordinatorHomePage() {
                     {t.viewAllBookings}
                   </button>
                 </div>
-                {latestTrips.map(b => {
-                  const sc = STATUS_COLORS[b.status]
-                  return (
-                    <div key={b.id} style={{ background: '#ffffff', borderRadius: 14, padding: '12px 14px', marginBottom: 8, border: '1px solid rgba(0,0,0,0.07)', borderLeft: `3px solid ${PRIMARY}`, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.passenger_name}</p>
-                          <p style={{ fontSize: 11, color: '#6f7979', margin: '0 0 2px' }}>
-                            {format(new Date(b.scheduled_at), 'EEE d MMM · HH:mm', { locale: idLocale })}
-                          </p>
-                          <p style={{ fontSize: 11, color: '#9ca3af', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {b.pickup} → {b.destination}
-                          </p>
-                        </div>
-                        <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 9999, background: sc.bg, color: sc.text, flexShrink: 0, marginTop: 1 }}>
-                          {STATUS_LABELS[b.status]}
-                        </span>
-                      </div>
-                      {b.taxi_name && (
-                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: b.taxi_color || '#888', display: 'inline-block' }} />
-                          <span style={{ fontSize: 10, color: '#6f7979' }}>{b.taxi_name} · {b.driver_name}</span>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+                {latestTrips.map(b => (
+                  <BookingCard
+                    key={b.id}
+                    booking={b}
+                    isProcessing={processing === b.id}
+                    processingAction={processing === b.id ? processingAction : null}
+                    onApprove={() => handleApprove(b.id)}
+                    onReject={() => setRejectId(b.id)}
+                    onCancel={b.created_by === user?.id && ['submitted','booked','pending_coordinator_approval'].includes(b.status) ? () => handleCancel(b.id) : undefined}
+                  />
+                ))}
               </div>
             )}
           </>
@@ -613,10 +626,11 @@ export default function CoordinatorHomePage() {
           </div>
         )}
       </div>
+      </div>{/* end scrollable content */}
 
       {/* Reject modal */}
       {rejectId && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 100 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}>
           <style>{`@keyframes card-spin { to { transform: rotate(360deg) } }`}</style>
           <div style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 14px' }}>{t.rejectBooking}</h2>
@@ -641,6 +655,40 @@ export default function CoordinatorHomePage() {
                   <span style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(153,27,27,0.3)', borderTopColor: '#991B1B', display: 'inline-block', animation: 'card-spin 0.7s linear infinite', flexShrink: 0 }} />
                 )}
                 Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel confirmation modal */}
+      {cancelConfirmId && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1200 }}
+          onClick={() => !cancellingModal && setCancelConfirmId(null)}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', boxSizing: 'border-box' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.1)', margin: '0 auto 20px' }} />
+            <p style={{ fontSize: 16, fontWeight: 800, margin: '0 0 16px', color: '#991B1B' }}>
+              {lang === 'id' ? 'Batalkan booking ini?' : 'Cancel this booking?'}
+            </p>
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 8px' }}>
+              {lang === 'id' ? 'Alasan (opsional)' : 'Reason (optional)'}
+            </p>
+            <input
+              type="text"
+              value={cancelNote}
+              onChange={e => setCancelNote(e.target.value)}
+              placeholder={lang === 'id' ? 'mis. Trip sudah tidak diperlukan' : 'e.g. Trip no longer needed'}
+              style={{ width: '100%', padding: '12px 14px', fontSize: 14, border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 12, outline: 'none', marginBottom: 16, boxSizing: 'border-box', fontFamily: 'inherit' }}
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <button onClick={() => setCancelConfirmId(null)} disabled={cancellingModal}
+                style={{ padding: '13px', background: 'transparent', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                {lang === 'id' ? 'Kembali' : 'Back'}
+              </button>
+              <button onClick={confirmCancel} disabled={cancellingModal}
+                style={{ padding: '13px', background: cancellingModal ? '#9ca3af' : '#991B1B', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: cancellingModal ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                {cancellingModal ? (lang === 'id' ? 'Membatalkan...' : 'Cancelling...') : (lang === 'id' ? 'Batalkan Booking' : 'Cancel Booking')}
               </button>
             </div>
           </div>

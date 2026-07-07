@@ -431,7 +431,7 @@ export default function DispatchPage() {
       {/* ── Reassign sheet ── */}
       {reassigning && selected && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 100 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
           onClick={() => { setReassigning(null); setSelected(null) }}
         >
           <div

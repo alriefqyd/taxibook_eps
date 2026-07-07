@@ -1,14 +1,12 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet'
+import { MapContainer, Marker, Polyline, Popup, useMap } from 'react-leaflet'
+import TileLayerSwitcher from './TileLayerSwitcher'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { createClient } from '@/lib/supabase/client'
 import { geocodeAddress } from '@/lib/geocode'
 import { getRoute } from '@/lib/routing'
-import { DEFAULT_TILE_ATTRIBUTION, DEFAULT_TILE_URL } from './tileConfig'
-
-const TILE_URL = DEFAULT_TILE_URL
 const DEFAULT_CENTER: [number, number] = [-2.5397, 121.3588] // PTVI Sorowako
 
 function driverIcon(color: string) {
@@ -132,7 +130,7 @@ export default function TrackingMap({ taxiId, taxiColor, pickup, destination, st
       )}
 
       <MapContainer center={DEFAULT_CENTER} zoom={5} style={{ height: 260, width: '100%' }} zoomControl>
-        <TileLayer url={TILE_URL} attribution={DEFAULT_TILE_ATTRIBUTION} />
+        <TileLayerSwitcher />
         {bounds.length > 0 && <FitBounds positions={bounds} />}
         {driverPos && (
           <Marker position={driverPos} icon={driverIcon(taxiColor || '#006064')}>

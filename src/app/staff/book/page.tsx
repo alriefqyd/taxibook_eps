@@ -293,6 +293,7 @@ export default function BookPage() {
           notes:           form.notes || null,
           scheduled_at:    scheduledDate.toISOString(),
           status,
+          is_now_trip:     form.mode === 'now',
           pickup_lat:      pickupCoords!.lat,
           pickup_lng:      pickupCoords!.lng,
           destination_lat: destCoords!.lat,

@@ -1,13 +1,11 @@
 'use client'
 import { useEffect, useState, useRef, Fragment } from 'react'
-import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet'
+import { MapContainer, Marker, Polyline, Popup, useMap } from 'react-leaflet'
+import TileLayerSwitcher from './TileLayerSwitcher'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useDriverLocations } from '@/hooks/useDriverLocations'
 import { getRoute } from '@/lib/routing'
-import { DEFAULT_TILE_ATTRIBUTION, DEFAULT_TILE_URL } from './tileConfig'
-
-const TILE_URL = DEFAULT_TILE_URL
 const DEFAULT_CENTER: [number, number] = [-2.5397, 121.3588]
 const GPS_STALE_MS = 10 * 60 * 1000
 
@@ -179,7 +177,7 @@ export default function DriverFleetMap({ style }: Props) {
       ...(!isCssFs ? style : {}),
     }}>
       <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl>
-        <TileLayer url={TILE_URL} attribution={DEFAULT_TILE_ATTRIBUTION} />
+        <TileLayerSwitcher />
         {fitPositions.length > 0 && <FitBounds positions={fitPositions} />}
 
         {positioned.map(d => {
@@ -262,7 +260,7 @@ export default function DriverFleetMap({ style }: Props) {
         onClick={toggleFullscreen}
         title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
         style={{
-          position: 'absolute', top: 10, right: 10, zIndex: 1000,
+          position: 'absolute', top: 10, right: 10, zIndex: 10,
           width: 34, height: 34, borderRadius: 6,
           background: '#fff', border: '1px solid rgba(0,0,0,0.12)',
           boxShadow: '0 1px 5px rgba(0,0,0,0.2)',

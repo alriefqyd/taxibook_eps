@@ -173,8 +173,9 @@ export default function CoordinatorBookPage() {
   const [pickerField,   setPickerField]   = useState<'pickup' | 'destination' | null>(null)
   const [pickupCoords,  setPickupCoords]  = useState<Coords | null>(null)
   const [destCoords,    setDestCoords]    = useState<Coords | null>(null)
-  const [staffUsers,    setStaffUsers]    = useState<StaffUser[]>([])
-  const [form,          setForm]          = useState<FormData>({
+  const [staffUsers,      setStaffUsers]      = useState<StaffUser[]>([])
+  const [passengerSearch, setPassengerSearch] = useState('')
+  const [form,            setForm]            = useState<FormData>({
     mode:         'schedule',
     pickup:       '',
     destination:  '',
@@ -196,7 +197,10 @@ export default function CoordinatorBookPage() {
         const json = await res.json()
         const users = json.users || []
         setStaffUsers(users)
-        if (users.length) setForm(f => ({ ...f, passenger_id: users[0].id }))
+        if (users.length) {
+          setForm(f => ({ ...f, passenger_id: users[0].id }))
+          setPassengerSearch(users[0].name)
+        }
       }
       setPageLoading(false)
     }
@@ -311,6 +315,7 @@ export default function CoordinatorBookPage() {
           notes:           form.notes || null,
           scheduled_at:    scheduledDate.toISOString(),
           status:          bookingStatus,
+          is_now_trip:     form.mode === 'now',
           pickup_lat:      pickupCoords!.lat,
           pickup_lng:      pickupCoords!.lng,
           destination_lat: destCoords!.lat,
@@ -412,17 +417,35 @@ export default function CoordinatorBookPage() {
         {/* STEP 1 */}
         {step === 1 && (
           <div>
-            {/* Passenger selector */}
+            {/* Passenger selector with search */}
             <FG label={t.passenger}>
-              <select
-                value={form.passenger_id}
-                onChange={e => update('passenger_id', e.target.value)}
-                style={{ ...inputSt, appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23006064\' stroke-width=\'2\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px center', paddingRight: 36 }}
-              >
-                {staffUsers.map(u => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </select>
+              <input
+                type="text"
+                value={passengerSearch}
+                onChange={e => { setPassengerSearch(e.target.value); update('passenger_id', '') }}
+                placeholder={lang === 'id' ? 'Cari penumpang...' : 'Search passenger...'}
+                style={{ ...inputSt, borderColor: form.passenger_id ? C.black : C.border2 }}
+              />
+              {passengerSearch && !form.passenger_id && (
+                <div style={{ border: `1px solid ${C.border2}`, borderRadius: 12, marginTop: 4, overflow: 'hidden', background: '#fff', maxHeight: 200, overflowY: 'auto' }}>
+                  {staffUsers
+                    .filter(u => u.name.toLowerCase().includes(passengerSearch.toLowerCase()))
+                    .map(u => (
+                      <div
+                        key={u.id}
+                        onClick={() => { update('passenger_id', u.id); setPassengerSearch(u.name) }}
+                        style={{ padding: '11px 14px', fontSize: 14, cursor: 'pointer', borderBottom: `1px solid ${C.border}`, color: C.textPrimary, fontWeight: 500 }}
+                      >
+                        {u.name}
+                      </div>
+                    ))}
+                  {staffUsers.filter(u => u.name.toLowerCase().includes(passengerSearch.toLowerCase())).length === 0 && (
+                    <div style={{ padding: '11px 14px', fontSize: 13, color: C.textTert }}>
+                      {lang === 'id' ? 'Tidak ditemukan' : 'No results'}
+                    </div>
+                  )}
+                </div>
+              )}
             </FG>
 
             {/* Mode toggle */}

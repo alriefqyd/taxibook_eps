@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
       pickup, destination, trip_type,
       wait_minutes = 0, notes, scheduled_at,
       status,
+      is_now_trip = false,
       pickup_lat = null, pickup_lng = null,
       destination_lat = null, destination_lng = null,
       passenger_id: requestedPassengerId = null,
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
     // ── Auto-assign if submitted ──
     // Use the DB-returned auto_complete_at — the trigger may have adjusted it
     if (status === 'submitted') {
-      const result = await autoAssign(admin, booking.id, booking.scheduled_at, booking.auto_complete_at)
+      const result = await autoAssign(admin, booking.id, booking.scheduled_at, booking.auto_complete_at, pickup_lat, pickup_lng, is_now_trip)
 
       if (result.taxi) {
         // Notify driver
@@ -167,8 +168,28 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ── Auto-assign: fewest trips today + longest idle tiebreaker ────────────────
-async function autoAssign(admin: any, bookingId: string, scheduledAt: string, autoCompleteAt: string) {
+// ── Haversine distance in km ─────────────────────────────────────────────────
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R    = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a    = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.asin(Math.sqrt(a))
+}
+
+// ── Auto-assign ───────────────────────────────────────────────────────────────
+// Now trips (scheduled ≤30 min from now): nearest driver first (if GPS fresh).
+// Scheduled trips: fewest trips today → longest idle tiebreaker.
+async function autoAssign(
+  admin: any,
+  bookingId: string,
+  scheduledAt: string,
+  autoCompleteAt: string,
+  pickupLat: number | null = null,
+  pickupLng: number | null = null,
+  isNowTrip: boolean = false,
+) {
   // Midnight WITA (UTC+8) expressed as UTC — trips are counted per local business day
   const WITA_MS     = 8 * 60 * 60 * 1000
   const nowWita     = new Date(Date.now() + WITA_MS)
@@ -186,9 +207,12 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string, au
   const todayWitaDate     = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
   const isFutureDay       = scheduledWitaDate > todayWitaDate
 
+  // Also treat as now-trip if scheduled within 20 min even when user chose "schedule" mode
+  const effectiveNowTrip = isNowTrip || (new Date(scheduledAt).getTime() - Date.now() <= 15 * 60 * 1000)
+
   let taxiQuery = admin
     .from('taxis')
-    .select('id, name, driver_id, users!driver_id(name, phone)')
+    .select('id, name, driver_id, latitude, longitude, location_updated_at, users!driver_id(name, phone)')
     .eq('is_active', true)
     .not('driver_id', 'is', null)
   if (!isFutureDay) taxiQuery = taxiQuery.eq('is_available', true)
@@ -209,6 +233,8 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string, au
   if (!candidates.length) return { taxi: null }
 
   // Build availability data for each taxi
+  const GPS_FRESH_MS = 30 * 60 * 1000
+
   const availability = await Promise.all(
     candidates.map(async (taxi: any) => {
 
@@ -248,16 +274,32 @@ async function autoAssign(admin: any, bookingId: string, scheduledAt: string, au
 
       const idleSince = lastBooking ? new Date(lastBooking.auto_complete_at).getTime() : 0
 
-      return { taxi, tripsToday: tripsToday || 0, idleSince }
+      // Distance from driver's current GPS to pickup — only meaningful for now-trips
+      let distanceKm: number | null = null
+      if (effectiveNowTrip && pickupLat && pickupLng && taxi.latitude && taxi.longitude) {
+        const gpsAgeMs = taxi.location_updated_at
+          ? Date.now() - new Date(taxi.location_updated_at).getTime()
+          : Infinity
+        if (gpsAgeMs <= GPS_FRESH_MS) {
+          distanceKm = haversineKm(taxi.latitude, taxi.longitude, pickupLat, pickupLng)
+        }
+      }
+
+      return { taxi, tripsToday: tripsToday || 0, idleSince, distanceKm }
     })
   )
 
   // Filter nulls (unavailable taxis)
-  // Primary: fewest trips today (spread load)
-  // Tiebreaker: longest idle (smallest idleSince = has been free the longest)
+  // Now-trips: nearest driver first (GPS must be fresh); fall back to fewest-trips if no GPS.
+  // Scheduled trips: fewest trips today → longest idle tiebreaker.
   const available = availability
     .filter(Boolean)
     .sort((a: any, b: any) => {
+      if (effectiveNowTrip) {
+        if (a.distanceKm !== null && b.distanceKm !== null) return a.distanceKm - b.distanceKm
+        if (a.distanceKm !== null) return -1  // driver with GPS data ranks higher
+        if (b.distanceKm !== null) return 1
+      }
       if (a.tripsToday !== b.tripsToday) return a.tripsToday - b.tripsToday
       return a.idleSince - b.idleSince
     }) as any[]

@@ -151,6 +151,9 @@ html, body { background-color: #F5F5F2 !important; margin: 0; padding: 0; }
 
 body { background-color: #F5F5F2; }
 
+/* Leaflet z-index: keep map tiles below fixed/sticky headers */
+.leaflet-container { z-index: 10; }
+
 /* Leaflet popup overrides for taxibook-popup class */
 .taxibook-popup .leaflet-popup-content-wrapper {
   border-radius: 12px;

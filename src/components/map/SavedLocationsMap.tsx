@@ -1,12 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, Marker, Popup, useMap } from 'react-leaflet'
+import TileLayerSwitcher from './TileLayerSwitcher'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { RegisteredLocation } from '@/types'
-import { DEFAULT_TILE_ATTRIBUTION, DEFAULT_TILE_URL } from './tileConfig'
-
-const TILE_URL = DEFAULT_TILE_URL
 const SOROWAKO: [number, number] = [-2.5397, 121.3588]
 const FONT = "var(--font-inter), 'Inter', sans-serif"
 
@@ -70,7 +68,7 @@ export default function SavedLocationsMap({ locations, onMarkerClick }: Props) {
         zoomControl={false}
         scrollWheelZoom
       >
-        <TileLayer url={TILE_URL} attribution={DEFAULT_TILE_ATTRIBUTION} />
+        <TileLayerSwitcher />
         <FitBounds locations={locations} />
         <MapCapture onMap={setMapInst} />
 

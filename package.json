@@ -25,6 +25,7 @@
     "react-leaflet": "^4.2.1",
     "tailwind-merge": "^2.3.0",
     "web-push": "^3.6.7",
+    "xlsx": "^0.18.5",
     "zustand": "^4.5.2"
   },
   "devDependencies": {

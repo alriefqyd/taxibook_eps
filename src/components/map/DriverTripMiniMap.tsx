@@ -1,9 +1,9 @@
 'use client'
 import { useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet'
+import { MapContainer, Marker, Polyline, useMap } from 'react-leaflet'
+import TileLayerSwitcher from './TileLayerSwitcher'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { DEFAULT_TILE_URL, DEFAULT_TILE_ATTRIBUTION } from './tileConfig'
 
 function markerIcon(emoji: string, color: string, size = 28) {
   return L.divIcon({
@@ -53,7 +53,7 @@ export default function DriverTripMiniMap({ driverLat, driverLng, pickupLat, pic
       zoomControl={false}
       attributionControl={false}
     >
-      <TileLayer url={DEFAULT_TILE_URL} attribution={DEFAULT_TILE_ATTRIBUTION} />
+      <TileLayerSwitcher showToggle={false} />
       <FitAll positions={positions} />
 
       {/* Route line */}

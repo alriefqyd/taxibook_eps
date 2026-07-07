@@ -371,7 +371,7 @@ export default function RegisteredLocationsPage() {
                           <>
                             <div
                               onClick={e => { e.stopPropagation(); setMenuOpenId(null) }}
-                              style={{ position: 'fixed', inset: 0, zIndex: 200 }}
+                              style={{ position: 'fixed', inset: 0, zIndex: 1100 }}
                             />
                             <div style={{
                               position: 'absolute', top: 36, right: 8, zIndex: 201,

@@ -355,7 +355,7 @@ export default function CoordinatorUsersPage() {
       {/* Modal */}
       {showModal && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 100,
+          position: 'fixed', inset: 0, zIndex: 1100,
           background: 'rgba(0,0,0,0.4)', display: 'flex',
           alignItems: 'flex-end', justifyContent: 'center',
         }} onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>

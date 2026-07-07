@@ -357,7 +357,7 @@ export default function DriverTripsPage() {
       {selectedTrip && (
         <div
           onClick={() => setSelectedTrip(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 100 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
         >
           <div
             onClick={e => e.stopPropagation()}

@@ -9,7 +9,10 @@
       "Bash(python -c ' *)",
       "Bash(bash d:/project/taxibook-app/create_user_cpc.sh)",
       "Bash(npx tsc *)",
-      "Bash(git diff *)"
+      "Bash(git diff *)",
+      "Bash(npm init *)",
+      "Bash(npm install *)",
+      "Bash(npx playwright *)"
     ]
   }
 }

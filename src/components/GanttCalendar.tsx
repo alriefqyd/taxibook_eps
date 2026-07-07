@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import {
   format, startOfWeek, addDays, addMonths,
   isSameDay, isSameMonth, startOfMonth,
@@ -10,6 +11,16 @@ import type { BookingDetail } from '@/types'
 import { STATUS_LABELS, STATUS_COLORS } from '@/types'
 
 type ViewMode = 'day' | 'week' | 'month'
+
+export interface DayAssignment {
+  taxi_id:        string
+  assign_date:    string
+  reason?:        string | null
+  taxi_name?:     string | null
+  taxi_plate?:    string | null
+  driver_name?:   string | null
+  passenger_name?: string | null
+}
 
 const HOUR_START = 7
 const HOUR_END   = 19
@@ -22,15 +33,16 @@ interface GanttCalendarProps {
   taxis:           any[]
   showCompleted?:  boolean
   onRefresh?:      () => void
-  dayAssignments?: { taxi_id: string; assign_date: string }[]
+  dayAssignments?: DayAssignment[]
   onMapClick?:     () => void
   mapActive?:      boolean
 }
 
 export default function GanttCalendar({ bookings, taxis, showCompleted = false, dayAssignments = [], onMapClick, mapActive = false }: GanttCalendarProps) {
-  const [view,            setView]            = useState<ViewMode>('day')
-  const [cursor,          setCursor]          = useState(new Date())
-  const [selectedBooking, setSelectedBooking] = useState<BookingDetail | null>(null)
+  const [view,                    setView]                    = useState<ViewMode>('day')
+  const [cursor,                  setCursor]                  = useState(new Date())
+  const [selectedBooking,         setSelectedBooking]         = useState<BookingDetail | null>(null)
+  const [selectedDayAssignment,   setSelectedDayAssignment]   = useState<DayAssignment | null>(null)
   const dayRef  = useRef<HTMLDivElement>(null)
   const weekRef = useRef<HTMLDivElement>(null)
 
@@ -132,23 +144,29 @@ export default function GanttCalendar({ bookings, taxis, showCompleted = false, 
       </div>
 
       {/* ── Views ── */}
-      {!mapActive && view === 'day'   && <DayGantt   bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={dayRef}  onSelectBooking={setSelectedBooking} dayAssignments={dayAssignments} />}
-      {!mapActive && view === 'week'  && <WeekGantt  bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={weekRef} onSelectBooking={setSelectedBooking} dayAssignments={dayAssignments} />}
+      {!mapActive && view === 'day'   && <DayGantt   bookings={ganttBookings} taxis={taxis} cursor={cursor} scrollRef={dayRef}  onSelectBooking={setSelectedBooking} dayAssignments={dayAssignments} onSelectDayAssignment={setSelectedDayAssignment} />}
+      {!mapActive && view === 'week'  && <WeekGrid   bookings={ganttBookings} cursor={cursor} onSelectBooking={setSelectedBooking} dayAssignments={dayAssignments} onSelectDayAssignment={setSelectedDayAssignment} />}
       {!mapActive && view === 'month' && <MonthView  bookings={ganttBookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} dayAssignments={dayAssignments} />}
 
       {/* ── Booking detail sheet ── */}
       {selectedBooking && (
         <BookingSheet booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
       )}
+
+      {/* ── Day assignment detail sheet ── */}
+      {selectedDayAssignment && (
+        <DayAssignmentSheet assignment={selectedDayAssignment} onClose={() => setSelectedDayAssignment(null)} />
+      )}
     </div>
   )
 }
 
 // ── DAY GANTT ───────────────────────────────────────────────
-function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAssignments }: {
+function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAssignments, onSelectDayAssignment }: {
   bookings: BookingDetail[]; taxis: any[]; cursor: Date; scrollRef: React.RefObject<HTMLDivElement>
   onSelectBooking: (b: BookingDetail) => void
-  dayAssignments: { taxi_id: string; assign_date: string }[]
+  dayAssignments: DayAssignment[]
+  onSelectDayAssignment: (a: DayAssignment) => void
 }) {
   const today        = new Date()
   const cursorDateStr = format(cursor, 'yyyy-MM-dd')
@@ -184,6 +202,7 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAssi
           {/* Taxi rows */}
           {taxis.map((taxi, idx) => {
             const isFullDay = dayAssignments.some(a => a.taxi_id === taxi.id && a.assign_date === cursorDateStr)
+            const fullDayAssignment = dayAssignments.find(a => a.taxi_id === taxi.id && a.assign_date === cursorDateStr)
             return (
             <GanttRow
               key={taxi.id}
@@ -198,9 +217,9 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAssi
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#EF4444', position: 'absolute', top: -3, left: -2 }} />
                 </div>
               ) : null}
-              overlay={isFullDay ? (
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(254,243,199,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderTop: '2px solid #FCD34D', borderBottom: '2px solid #FCD34D' }}>
-                  <span style={{ fontSize: 10, fontWeight: 800, color: '#92400E', letterSpacing: '0.05em' }}>★ FULL DAY DUTY</span>
+              overlay={isFullDay && fullDayAssignment ? (
+                <div onClick={() => onSelectDayAssignment(fullDayAssignment)} style={{ position: 'absolute', inset: 0, background: 'rgba(254,243,199,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderTop: '2px solid #FCD34D', borderBottom: '2px solid #FCD34D', cursor: 'pointer' }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: '#92400E', letterSpacing: '0.05em' }}>★ FULL DAY DUTY · tap for detail</span>
                 </div>
               ) : undefined}
               bookings={dayBks.filter(b => b.taxi_id === taxi.id)}
@@ -343,10 +362,117 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAss
   )
 }
 
+// ── WEEK GRID (simple 7-column, matches staff view) ─────────
+function WeekGrid({ bookings, cursor, onSelectBooking, dayAssignments = [], onSelectDayAssignment }: {
+  bookings: BookingDetail[]
+  cursor: Date
+  onSelectBooking: (b: BookingDetail) => void
+  dayAssignments: DayAssignment[]
+  onSelectDayAssignment: (a: DayAssignment) => void
+}) {
+  const today  = new Date()
+  const monday = startOfWeek(cursor, { weekStartsOn: 1 })
+  const days   = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
+
+  return (
+    <div style={{ padding: '14px 16px 20px' }}>
+      <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+
+        {/* Day headers */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+          {days.map(d => {
+            const isToday     = isSameDay(d, today)
+            const dayStr      = format(d, 'yyyy-MM-dd')
+            const assignCount = dayAssignments.filter(a => a.assign_date === dayStr).length
+            return (
+              <div key={d.toISOString()} style={{ textAlign: 'center', padding: '8px 2px', background: isToday ? '#006064' : assignCount > 0 ? 'rgba(254,179,0,0.12)' : 'transparent', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
+                <p style={{ fontSize: '8px', fontWeight: 700, color: isToday ? 'rgba(255,255,255,0.6)' : '#9ca3af', margin: '0 0 2px', textTransform: 'uppercase' }}>
+                  {format(d, 'EEE', { locale: idLocale })}
+                </p>
+                <p style={{ fontSize: '15px', fontWeight: 700, color: isToday ? '#fff' : '#006064', margin: '0 0 2px', lineHeight: 1 }}>
+                  {format(d, 'd')}
+                </p>
+                {assignCount > 0 && !isToday && (
+                  <p style={{ fontSize: '8px', fontWeight: 700, color: '#7e5700', margin: 0 }}>★ {assignCount}</p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Day columns */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', minHeight: 120 }}>
+          {days.map(d => {
+            const dayBks      = bookings.filter(b => isSameDay(new Date(b.scheduled_at), d))
+            const dayStr      = format(d, 'yyyy-MM-dd')
+            const assignCount = dayAssignments.filter(a => a.assign_date === dayStr).length
+            return (
+              <div key={d.toISOString()} style={{ borderRight: '1px solid rgba(0,0,0,0.08)', padding: '4px 2px', minHeight: 120, background: assignCount > 0 ? 'rgba(254,179,0,0.06)' : 'transparent', overflow: 'hidden', minWidth: 0 }}>
+                {assignCount > 0 && (
+                  <div
+                    onClick={() => {
+                      const a = dayAssignments.find(x => x.assign_date === dayStr)
+                      if (a) onSelectDayAssignment(a)
+                    }}
+                    style={{ fontSize: '7px', fontWeight: 700, color: '#7e5700', background: 'rgba(254,179,0,0.18)', borderRadius: 3, padding: '1px 2px', marginBottom: 3, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                    ★ full day{assignCount > 1 ? ` ×${assignCount}` : ''}
+                  </div>
+                )}
+                {dayBks.map(b => {
+                  const color     = b.taxi_color || '#3f4949'
+                  const isPending = b.status.includes('pending')
+                  const isDone    = b.status === 'completed'
+                  return (
+                    <div
+                      key={b.id}
+                      onClick={() => onSelectBooking(b)}
+                      style={{
+                        background: isDone ? '#F1F5F9' : color + '20',
+                        border: `1px ${isPending ? 'dashed' : 'solid'} ${isDone ? '#94a3b8' : color}`,
+                        borderRadius: 3, padding: '2px 3px', marginBottom: 2,
+                        fontSize: '8px', fontWeight: 700, color: isDone ? '#64748b' : color,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        width: '100%', boxSizing: 'border-box', cursor: 'pointer',
+                        opacity: isDone ? 0.75 : 1,
+                      }}
+                    >
+                      {isDone ? '✓ ' : ''}{format(new Date(b.scheduled_at), 'HH:mm')}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: '14px', marginTop: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px dashed #9ca3af', borderRadius: 2 }} />
+          <span style={{ fontSize: '10px', color: '#6B7C8F' }}>Pending</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px solid #2563EB', borderRadius: 2, background: '#2563EB20' }} />
+          <span style={{ fontSize: '10px', color: '#6B7C8F' }}>Confirmed (taxi color)</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px solid #CBD5E1', borderRadius: 2, background: '#F1F5F9' }} />
+          <span style={{ fontSize: '10px', color: '#6B7C8F' }}>✓ Completed</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: '10px', color: '#7e5700', fontWeight: 700 }}>★</span>
+          <span style={{ fontSize: '10px', color: '#6B7C8F' }}>Full Day Duty</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── MONTH VIEW ──────────────────────────────────────────────
 function MonthView({ bookings, cursor, onDayClick, dayAssignments }: {
   bookings: BookingDetail[]; cursor: Date; onDayClick: (d: Date) => void
-  dayAssignments: { taxi_id: string; assign_date: string }[]
+  dayAssignments: DayAssignment[]
 }) {
   const today = new Date()
   const start = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 })
@@ -455,10 +581,12 @@ function BookingSheet({ booking: b, onClose }: { booking: BookingDetail; onClose
   const sc    = STATUS_COLORS[b.status] ?? { bg: '#f3f4f6', text: '#374151' }
   const label = STATUS_LABELS[b.status] ?? b.status
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200 }} />
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 201, background: '#fff', borderRadius: '20px 20px 0 0', padding: '20px 20px 32px', maxHeight: '80vh', overflowY: 'auto' }}>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1100 }} />
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1101, background: '#fff', borderRadius: '20px 20px 0 0', padding: '20px 20px 32px', maxHeight: '80vh', overflowY: 'auto' }}>
         {/* Handle */}
         <div style={{ width: 36, height: 4, borderRadius: 9999, background: 'rgba(0,0,0,0.12)', margin: '0 auto 16px' }} />
 
@@ -565,7 +693,66 @@ function BookingSheet({ booking: b, onClose }: { booking: BookingDetail; onClose
           Tutup
         </button>
       </div>
-    </>
+    </>,
+    document.body
+  )
+}
+
+// ── Day assignment detail bottom sheet ─────────────────────
+function DayAssignmentSheet({ assignment: a, onClose }: { assignment: DayAssignment; onClose: () => void }) {
+  if (typeof document === 'undefined') return null
+
+  const dateLabel = (() => {
+    try { return format(new Date(a.assign_date + 'T00:00:00'), 'EEEE, dd MMMM yyyy', { locale: idLocale }) }
+    catch { return a.assign_date }
+  })()
+
+  return createPortal(
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1100 }} />
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1101, background: '#fff', borderRadius: '20px 20px 0 0', padding: '20px 20px 32px', maxHeight: '80vh', overflowY: 'auto' }}>
+        {/* Handle */}
+        <div style={{ width: 36, height: 4, borderRadius: 9999, background: 'rgba(0,0,0,0.12)', margin: '0 auto 16px' }} />
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0, letterSpacing: '0.04em' }}>★ FULL DAY DUTY</p>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9999, background: '#FEF3C7', color: '#92400E' }}>Full Day</span>
+        </div>
+
+        {/* Date */}
+        <Row label="Tanggal">
+          <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{dateLabel}</p>
+        </Row>
+
+        {/* Taxi / Driver */}
+        <Row label="Taxi / Driver">
+          <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 1px' }}>
+            {a.taxi_name ?? '—'}{a.taxi_plate ? ` · ${a.taxi_plate}` : ''}
+          </p>
+          <p style={{ fontSize: 12, color: '#6f7979', margin: 0 }}>{a.driver_name ?? 'Tidak ada driver'}</p>
+        </Row>
+
+        {/* Passenger */}
+        {a.passenger_name && (
+          <Row label="Penumpang">
+            <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>👤 {a.passenger_name}</p>
+          </Row>
+        )}
+
+        {/* Reason */}
+        {a.reason && (
+          <Row label="Keterangan">
+            <p style={{ fontSize: 13, margin: 0, color: '#6f7979' }}>{a.reason}</p>
+          </Row>
+        )}
+
+        <button onClick={onClose} style={{ width: '100%', padding: '13px', background: '#92400E', color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 8 }}>
+          Tutup
+        </button>
+      </div>
+    </>,
+    document.body
   )
 }
 

@@ -7,6 +7,7 @@ import { id as idLocale } from 'date-fns/locale'
 import { STATUS_LABELS, STATUS_COLORS } from '@/types'
 import { useLang } from '@/lib/language'
 import PageLoader from '@/components/PageLoader'
+import { exportBookingsExcel } from '@/lib/exportExcel'
 
 const PRIMARY = '#006064'
 
@@ -75,6 +76,14 @@ const MSG = {
     reassignCancel:   'Cancel',
     currentTaxi:      'Current',
     noDriver:         'No driver',
+    exportExcel:         'Export Excel',
+    exporting:           'Exporting…',
+    cancelBooking:       'Cancel booking',
+    cancelConfirmTitle:  'Cancel this booking?',
+    cancelReasonLabel:   'Reason (optional)',
+    cancelReasonPh:      'e.g. Trip no longer needed',
+    cancelBack:          'Back',
+    cancellingBtn:       'Cancelling...',
   },
   id: {
     title:            'Laporan Trip',
@@ -140,6 +149,14 @@ const MSG = {
     reassignCancel:   'Batal',
     currentTaxi:      'Saat ini',
     noDriver:         'Tanpa driver',
+    exportExcel:         'Export Excel',
+    exporting:           'Mengekspor…',
+    cancelBooking:       'Batalkan booking',
+    cancelConfirmTitle:  'Batalkan booking ini?',
+    cancelReasonLabel:   'Alasan (opsional)',
+    cancelReasonPh:      'mis. Trip sudah tidak diperlukan',
+    cancelBack:          'Kembali',
+    cancellingBtn:       'Membatalkan...',
   },
 }
 
@@ -173,6 +190,7 @@ interface ReportRow {
   notes: string | null
   rejection_reason: string | null
   created_at: string
+  created_by: string | null
 }
 
 interface TaxiOption {
@@ -187,16 +205,20 @@ export default function CoordinatorReportPage() {
   const lang     = useLang()
   const t        = MSG[lang]
 
-  const [loading,      setLoading]      = useState(true)
-  const [rows,         setRows]         = useState<ReportRow[]>([])
-  const [taxis,        setTaxis]        = useState<TaxiOption[]>([])
-  const [selectedRow,  setSelectedRow]  = useState<ReportRow | null>(null)
-  const [reassignRow,  setReassignRow]  = useState<ReportRow | null>(null)
+  const [loading,        setLoading]        = useState(true)
+  const [rows,           setRows]           = useState<ReportRow[]>([])
+  const [taxis,          setTaxis]          = useState<TaxiOption[]>([])
+  const [selectedRow,    setSelectedRow]    = useState<ReportRow | null>(null)
+  const [reassignRow,    setReassignRow]    = useState<ReportRow | null>(null)
   const [reassignTaxiId, setReassignTaxiId] = useState('')
-  const [reassigning,  setReassigning]  = useState(false)
-  const [page,         setPage]         = useState(0)
-  const [hasMore,      setHasMore]      = useState(false)
-  const [loadingMore,  setLoadingMore]  = useState(false)
+  const [reassigning,    setReassigning]    = useState(false)
+  const [page,           setPage]           = useState(0)
+  const [hasMore,        setHasMore]        = useState(false)
+  const [loadingMore,    setLoadingMore]    = useState(false)
+  const [currentUserId,  setCurrentUserId]  = useState<string | null>(null)
+  const [cancelRow,      setCancelRow]      = useState<ReportRow | null>(null)
+  const [cancelReason,   setCancelReason]   = useState('')
+  const [cancelling,     setCancelling]     = useState(false)
 
   const [dateFrom,      setDateFrom]      = useState(monthStart())
   const [dateTo,        setDateTo]        = useState(todayStr())
@@ -204,6 +226,7 @@ export default function CoordinatorReportPage() {
   const [taxiFilter,    setTaxiFilter]    = useState('all')
   const [typeFilter,    setTypeFilter]    = useState('all')
   const [search,        setSearch]        = useState('')
+  const [exporting,     setExporting]     = useState(false)
 
   const PAGE_SIZE = 20
 
@@ -213,6 +236,7 @@ export default function CoordinatorReportPage() {
       if (!au) { router.push('/login'); return }
       const { data: p } = await supabase.from('users').select('role').eq('id', au.id).single()
       if (p?.role !== 'coordinator') { router.push('/login'); return }
+      setCurrentUserId(au.id)
 
       const { data: txs } = await supabase
         .from('taxis')
@@ -237,7 +261,7 @@ export default function CoordinatorReportPage() {
 
     const { data } = await supabase
       .from('booking_details')
-      .select('id, booking_code, scheduled_at, completed_at, auto_complete_at, passenger_name, passenger_phone, driver_name, driver_phone, taxi_name, taxi_plate, taxi_color, taxi_id, pickup, destination, trip_type, wait_minutes, status, notes, rejection_reason, created_at')
+      .select('id, booking_code, scheduled_at, completed_at, auto_complete_at, passenger_name, passenger_phone, driver_name, driver_phone, taxi_name, taxi_plate, taxi_color, taxi_id, pickup, destination, trip_type, wait_minutes, status, notes, rejection_reason, created_at, created_by')
       .gte('scheduled_at', start.toISOString())
       .lte('scheduled_at', end.toISOString())
       .order('scheduled_at', { ascending: false })
@@ -258,6 +282,23 @@ export default function CoordinatorReportPage() {
     setReassigning(false)
   }
 
+  async function handleCancelBook() {
+    if (!cancelRow) return
+    setCancelling(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setCancelling(false); return }
+    await fetch(`/api/bookings/${cancelRow.id}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ reason: cancelReason }),
+    })
+    setCancelRow(null)
+    setCancelReason('')
+    setSelectedRow(null)
+    await loadData(dateFrom, dateTo, 0, false)
+    setCancelling(false)
+  }
+
   function setRange(from: string, to: string) {
     setPage(0)
     setDateFrom(from); setDateTo(to); loadData(from, to, 0, false)
@@ -266,6 +307,25 @@ export default function CoordinatorReportPage() {
     const d = new Date()
     const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7))
     return { from: mon.toISOString().slice(0, 10), to: todayStr() }
+  }
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const start = new Date(dateFrom); start.setHours(0, 0, 0, 0)
+      const end   = new Date(dateTo);   end.setHours(23, 59, 59, 999)
+      // Fetch all rows in range (up to 10 000) without pagination
+      const { data } = await supabase
+        .from('booking_details')
+        .select('id, booking_code, scheduled_at, completed_at, auto_complete_at, passenger_name, passenger_phone, driver_name, driver_phone, taxi_name, taxi_plate, taxi_color, taxi_id, pickup, destination, trip_type, wait_minutes, status, notes, rejection_reason, created_at, created_by')
+        .gte('scheduled_at', start.toISOString())
+        .lte('scheduled_at', end.toISOString())
+        .order('scheduled_at', { ascending: false })
+        .range(0, 9999)
+      exportBookingsExcel(data ?? [], dateFrom, dateTo)
+    } finally {
+      setExporting(false)
+    }
   }
 
   const filtered = rows.filter(r => {
@@ -295,6 +355,7 @@ export default function CoordinatorReportPage() {
 
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", minHeight: '100vh', background: '#F5F5F2' }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
       {/* Header */}
       <header style={{ background: '#F5F5F2', borderBottom: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 1px 4px rgba(0,96,100,0.06)', position: 'sticky', top: 0, zIndex: 40 }}>
@@ -307,10 +368,22 @@ export default function CoordinatorReportPage() {
               <path d="M19 12H5M12 5l-7 7 7 7" />
             </svg>
           </button>
-          <div>
+          <div style={{ flex: 1 }}>
             <p style={{ fontSize: 15, fontWeight: 700, margin: 0, color: PRIMARY, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{t.title}</p>
             <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{t.recordCount(total)}</p>
           </div>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', background: exporting ? '#e5e7eb' : 'rgba(0,96,100,0.08)', border: '1px solid rgba(0,96,100,0.2)', borderRadius: 10, fontSize: 12, fontWeight: 700, color: exporting ? '#9ca3af' : PRIMARY, cursor: exporting ? 'not-allowed' : 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif", flexShrink: 0 }}
+          >
+            {exporting ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            )}
+            {exporting ? t.exporting : t.exportExcel}
+          </button>
         </div>
       </header>
 
@@ -436,12 +509,48 @@ export default function CoordinatorReportPage() {
 
       {/* Detail modal */}
       {selectedRow && (
-        <DetailModal row={selectedRow} onClose={() => setSelectedRow(null)} />
+        <DetailModal
+          row={selectedRow}
+          onClose={() => setSelectedRow(null)}
+          canCancel={!!currentUserId && selectedRow.created_by === currentUserId && ['submitted','pending_coordinator_approval','booked'].includes(selectedRow.status)}
+          onCancel={() => { setCancelRow(selectedRow); setSelectedRow(null) }}
+        />
+      )}
+
+      {/* Cancel confirmation modal */}
+      {cancelRow && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1200, display: 'flex', alignItems: 'flex-end' }}
+          onClick={() => !cancelling && setCancelRow(null)}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', boxSizing: 'border-box' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.1)', margin: '0 auto 20px' }} />
+            <p style={{ fontSize: 16, fontWeight: 800, margin: '0 0 4px', color: '#991B1B' }}>{t.cancelConfirmTitle}</p>
+            <p style={{ fontSize: 13, color: '#6f7979', margin: '0 0 20px' }}>{cancelRow.booking_code} · {cancelRow.passenger_name} → {cancelRow.destination}</p>
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 8px' }}>{t.cancelReasonLabel}</p>
+            <input
+              type="text"
+              value={cancelReason}
+              onChange={e => setCancelReason(e.target.value)}
+              placeholder={t.cancelReasonPh}
+              style={{ width: '100%', padding: '12px 14px', fontSize: 14, border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 12, outline: 'none', marginBottom: 16, boxSizing: 'border-box', fontFamily: 'inherit' }}
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <button onClick={() => setCancelRow(null)} disabled={cancelling}
+                style={{ padding: '13px', background: 'transparent', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                {t.cancelBack}
+              </button>
+              <button onClick={handleCancelBook} disabled={cancelling}
+                style={{ padding: '13px', background: cancelling ? '#9ca3af' : '#991B1B', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: cancelling ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                {cancelling ? t.cancellingBtn : t.cancelBooking}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Reassign modal */}
       {reassignRow && (
-        <div onClick={() => setReassignRow(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'flex-end' }}>
+        <div onClick={() => setReassignRow(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'flex-end' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
             {/* Handle */}
             <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px', flexShrink: 0 }}>
@@ -573,7 +682,9 @@ function ReportCard({ row: r, onClick, onReassign }: { row: ReportRow; onClick: 
 }
 
 // ── Detail modal (bottom-sheet) ───────────────────────────────────────────────
-function DetailModal({ row: r, onClose }: { row: ReportRow; onClose: () => void }) {
+function DetailModal({ row: r, onClose, canCancel, onCancel }: {
+  row: ReportRow; onClose: () => void; canCancel?: boolean; onCancel?: () => void
+}) {
   const lang  = useLang()
   const t     = MSG[lang]
   const sc    = STATUS_COLORS[r.status as keyof typeof STATUS_COLORS] ?? { bg: '#f3f4f6', text: '#374151' }
@@ -593,7 +704,7 @@ function DetailModal({ row: r, onClose }: { row: ReportRow; onClose: () => void 
   return (
     <div
       onClick={onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'flex-end' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'flex-end' }}
     >
       <div
         onClick={e => e.stopPropagation()}
@@ -680,6 +791,16 @@ function DetailModal({ row: r, onClose }: { row: ReportRow; onClose: () => void 
                 <DetailRow label={t.rowRejectReason} value={r.rejection_reason} valueColor="#DC2626" />
               )}
             </Section>
+          )}
+
+          {/* ── Cancel button ── */}
+          {canCancel && onCancel && (
+            <button
+              onClick={onCancel}
+              style={{ width: '100%', padding: '13px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: 14, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+            >
+              {t.cancelBooking}
+            </button>
           )}
 
         </div>

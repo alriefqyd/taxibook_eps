@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 import { useLang } from '@/lib/language'
 
 const PRIMARY = '#006064'
@@ -43,13 +44,12 @@ const NAV: Record<string, NavItem[]> = {
     { href: '/coordinator/profile', labelEn: 'Profile',  labelId: 'Profil',  iconKey: 'person'    },
   ],
   driver: [
-    { href: '/driver/home',    labelEn: 'Home',    labelId: 'Beranda',    iconKey: 'home'   },
-    { href: '/driver/trips',   labelEn: 'History', labelId: 'Riwayat',   iconKey: 'list'   },
-    { href: '/driver/profile', labelEn: 'Profile', labelId: 'Profil',     iconKey: 'person' },
+    { href: '/driver/home',    labelEn: 'Home',    labelId: 'Beranda',  iconKey: 'home'   },
+    { href: '/driver/trips',   labelEn: 'History', labelId: 'Riwayat',  iconKey: 'list'   },
+    { href: '/driver/profile', labelEn: 'Profile', labelId: 'Profil',   iconKey: 'person' },
   ],
 }
 
-// Roles that get a center FAB (href to navigate to on tap)
 const CENTER_FAB_HREF: Partial<Record<string, string>> = {
   staff:       '/staff/book',
   coordinator: '/coordinator/book',
@@ -61,26 +61,50 @@ export function BottomNav({ role }: { role: 'staff' | 'coordinator' | 'driver' }
   const items    = NAV[role] || []
   const fabHref  = CENTER_FAB_HREF[role]
 
+  const [tapped, setTapped]       = useState<string | null>(null)
+  const [fabTapped, setFabTapped] = useState(false)
+
   const half       = fabHref ? Math.floor(items.length / 2) : items.length
   const leftItems  = fabHref ? items.slice(0, half) : items
   const rightItems = fabHref ? items.slice(half)    : []
 
+  const handleTap = (key: string) => {
+    setTapped(key)
+    setTimeout(() => setTapped(null), 500)
+  }
+
+  const handleFabTap = () => {
+    setFabTapped(true)
+    setTimeout(() => setFabTapped(false), 500)
+  }
+
   const renderItem = (item: NavItem) => {
-    const active = pathname.startsWith(item.href)
-    const icon   = ICONS[item.iconKey]
+    const active  = pathname.startsWith(item.href)
+    const icon    = ICONS[item.iconKey]
+    const popping = tapped === item.href
     return (
-      <Link key={item.href} href={item.href} style={{ textDecoration: 'none', flex: 1 }}>
+      <Link
+        key={item.href}
+        href={item.href}
+        style={{ textDecoration: 'none', flex: 1 }}
+        onClick={() => handleTap(item.href)}
+      >
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           gap: 3, padding: '6px 4px', borderRadius: 12,
           background: active ? 'rgba(0,96,100,0.08)' : 'transparent',
         }}>
-          <SvgIcon
-            d={icon?.outline || ''}
-            color={active ? PRIMARY : '#9ca3af'}
-            fill={active ? 'rgba(0,96,100,0.15)' : 'none'}
-            strokeWidth={active ? 2.5 : 1.8}
-          />
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: popping ? 'navPop 420ms cubic-bezier(0.34,1.56,0.64,1) forwards' : 'none',
+          }}>
+            <SvgIcon
+              d={icon?.outline || ''}
+              color={active ? PRIMARY : '#9ca3af'}
+              fill={active ? 'rgba(0,96,100,0.15)' : 'none'}
+              strokeWidth={active ? 2.5 : 1.8}
+            />
+          </div>
           <span style={{
             fontSize: 11, fontWeight: active ? 700 : 500,
             color: active ? PRIMARY : '#9ca3af',
@@ -95,9 +119,24 @@ export function BottomNav({ role }: { role: 'staff' | 'coordinator' | 'driver' }
 
   return (
     <>
+      <style>{`
+        @keyframes navPop {
+          0%   { transform: scale(1)    }
+          35%  { transform: scale(1.35) }
+          60%  { transform: scale(0.92) }
+          80%  { transform: scale(1.08) }
+          100% { transform: scale(1)    }
+        }
+        @keyframes fabPop {
+          0%   { transform: scale(1)    }
+          35%  { transform: scale(0.88) }
+          65%  { transform: scale(1.12) }
+          100% { transform: scale(1)    }
+        }
+      `}</style>
       <div style={{ height: 68 }} />
       <nav style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000,
         background: '#ffffff',
         borderTop: '1px solid rgba(0,0,0,0.06)',
         boxShadow: '0 -4px 10px rgba(0,96,100,0.06)',
@@ -110,7 +149,6 @@ export function BottomNav({ role }: { role: 'staff' | 'coordinator' | 'driver' }
 
         {fabHref && (
           <div style={{ position: 'relative', flex: '0 0 72px', display: 'flex', justifyContent: 'center' }}>
-            {/* White disc — masks the borderTop line behind the FAB */}
             <div style={{
               position: 'absolute',
               width: 60, height: 60,
@@ -119,8 +157,7 @@ export function BottomNav({ role }: { role: 'staff' | 'coordinator' | 'driver' }
               top: -30,
               zIndex: 1,
             }} />
-            {/* FAB circle */}
-            <Link href={fabHref} style={{ textDecoration: 'none', position: 'relative', zIndex: 2 }}>
+            <Link href={fabHref} style={{ textDecoration: 'none', position: 'relative', zIndex: 2 }} onClick={handleFabTap}>
               <div style={{
                 width: 52, height: 52,
                 borderRadius: '50%',
@@ -128,6 +165,7 @@ export function BottomNav({ role }: { role: 'staff' | 'coordinator' | 'driver' }
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 marginTop: -26,
                 boxShadow: '0 4px 18px rgba(0,96,100,0.45)',
+                animation: fabTapped ? 'fabPop 420ms cubic-bezier(0.34,1.56,0.64,1) forwards' : 'none',
               }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
                   <rect x="10.5" y="4" width="3" height="16" rx="1.5"/>

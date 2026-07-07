@@ -60,12 +60,16 @@ const MSG = {
     assign:          'Assign',
     assignFullDay:   'Assign Full Day Duty',
     date:            'Date',
-    dutyDesc:        'Duty description (optional)',
+    dutyDesc:            'Duty description (optional)',
     dutyDescPlaceholder: 'e.g. VIP escort, site visit, security duty...',
-    dutyWarning:     'Driver will not appear in auto-assign for this date. Coordinator can still manually assign them if needed.',
-    cancel:          'Cancel',
-    assigning:       'Assigning...',
-    confirmFullDay:  'Confirm Full Day Duty',
+    dutyWarning:         'Driver will not appear in auto-assign for this date. Coordinator can still manually assign them if needed.',
+    passenger:           'Passenger (optional)',
+    passengerSearch:     'Search passenger...',
+    passengerOthers:     'Others (not in system)',
+    passengerOtherName:  'Passenger name',
+    cancel:              'Cancel',
+    assigning:           'Assigning...',
+    confirmFullDay:      'Confirm Full Day Duty',
     reassignTitle:   'Reassign trip',
     selectTaxi:      'Select taxi',
     reasonOpt:       'Reason (optional)',
@@ -119,12 +123,16 @@ const MSG = {
     assign:          'Assign',
     assignFullDay:   'Assign Tugas Seharian',
     date:            'Tanggal',
-    dutyDesc:        'Keterangan tugas (opsional)',
+    dutyDesc:            'Keterangan tugas (opsional)',
     dutyDescPlaceholder: 'mis. Pengawalan VIP, kunjungan site, tugas keamanan...',
-    dutyWarning:     'Driver tidak akan muncul di auto-assign untuk tanggal ini. Koordinator tetap bisa assign manual jika dibutuhkan.',
-    cancel:          'Batal',
-    assigning:       'Mengassign...',
-    confirmFullDay:  'Konfirmasi Tugas Seharian',
+    dutyWarning:         'Driver tidak akan muncul di auto-assign untuk tanggal ini. Koordinator tetap bisa assign manual jika dibutuhkan.',
+    passenger:           'Penumpang (opsional)',
+    passengerSearch:     'Cari penumpang...',
+    passengerOthers:     'Lainnya (tidak ada di sistem)',
+    passengerOtherName:  'Nama penumpang',
+    cancel:              'Batal',
+    assigning:           'Mengassign...',
+    confirmFullDay:      'Konfirmasi Tugas Seharian',
     reassignTitle:   'Atur ulang trip',
     selectTaxi:      'Pilih taksi',
     reasonOpt:       'Alasan (opsional)',
@@ -189,6 +197,7 @@ interface TaxiRow {
 }
 interface DayAssignment {
   id: string; taxi_id: string; assign_date: string; reason: string | null
+  passenger_id: string | null; passenger_name_other: string | null
 }
 interface Booking {
   id: string; booking_code: string; passenger_name: string
@@ -218,11 +227,15 @@ export default function DriversPage() {
   const [saving,       setSaving]       = useState(false)
   const [dateFilter,   setDateFilter]   = useState(new Date().toISOString().slice(0, 10))
 
-  const [dayAssignments,  setDayAssignments]  = useState<Record<string, DayAssignment[]>>({})
-  const [assigningTaxi,   setAssigningTaxi]   = useState<TaxiRow | null>(null)
-  const [assignDate,      setAssignDate]      = useState('')
-  const [assignReason,    setAssignReason]    = useState('')
-  const [savingAssign,    setSavingAssign]    = useState(false)
+  const [dayAssignments,      setDayAssignments]      = useState<Record<string, DayAssignment[]>>({})
+  const [assigningTaxi,       setAssigningTaxi]       = useState<TaxiRow | null>(null)
+  const [assignDate,          setAssignDate]          = useState('')
+  const [assignReason,        setAssignReason]        = useState('')
+  const [savingAssign,        setSavingAssign]        = useState(false)
+  const [passengerList,       setPassengerList]       = useState<{ id: string; name: string }[]>([])
+  const [passengerSearch,     setPassengerSearch]     = useState('')
+  const [assignPassengerId,   setAssignPassengerId]   = useState<string>('')
+  const [assignPassengerOther, setAssignPassengerOther] = useState('')
 
   const [addDriverTaxi,   setAddDriverTaxi]   = useState<TaxiRow | null>(null)
   const [driverList,      setDriverList]      = useState<{ id: string; name: string }[]>([])
@@ -338,10 +351,16 @@ export default function DriversPage() {
     setSaving(false)
   }
 
-  function openAssignFullDay(taxi: TaxiRow) {
+  async function openAssignFullDay(taxi: TaxiRow) {
     setAssigningTaxi(taxi)
     setAssignDate(new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10))
     setAssignReason('')
+    setAssignPassengerId('')
+    setAssignPassengerOther('')
+    setPassengerSearch('')
+    const { data } = await supabase
+      .from('users').select('id, name').eq('role', 'staff').eq('is_active', true).order('name')
+    setPassengerList(data || [])
   }
 
   async function confirmAssignFullDay() {
@@ -352,7 +371,13 @@ export default function DriversPage() {
     const res = await fetch('/api/driver-day-assignments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ taxi_id: assigningTaxi.id, assign_date: assignDate, reason: assignReason || null }),
+      body: JSON.stringify({
+        taxi_id:              assigningTaxi.id,
+        assign_date:          assignDate,
+        reason:               assignReason || null,
+        passenger_id:         assignPassengerId && assignPassengerId !== 'others' ? assignPassengerId : null,
+        passenger_name_other: assignPassengerId === 'others' ? assignPassengerOther || null : null,
+      }),
     })
     if (!res.ok) {
       const d = await res.json().catch(() => ({}))
@@ -648,6 +673,11 @@ export default function DriversPage() {
                                   <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: AMBER_T, background: AMBER, padding: '1px 6px', borderRadius: 4 }}>{t.today.toUpperCase()}</span>
                                 )}
                               </p>
+                              {(a.passenger_id || a.passenger_name_other) && (
+                                <p style={{ fontSize: 11, color: AMBER_T, margin: '2px 0 0', fontWeight: 600 }}>
+                                  👤 {a.passenger_name_other || passengerList.find(p => p.id === a.passenger_id)?.name || '—'}
+                                </p>
+                              )}
                               {a.reason && <p style={{ fontSize: 11, color: AMBER_T, margin: '2px 0 0', opacity: 0.8 }}>{a.reason}</p>}
                             </div>
                             <button onClick={e => { e.stopPropagation(); releaseFullDay(a.id) }}
@@ -798,7 +828,7 @@ export default function DriversPage() {
 
       {/* ── Assign Full Day sheet ── */}
       {assigningTaxi && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 100 }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
           onClick={() => setAssigningTaxi(null)}>
           <div style={{ background: SURF, width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', maxHeight: '80vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
@@ -824,6 +854,36 @@ export default function DriversPage() {
               placeholder={t.dutyDescPlaceholder}
               style={{ width: '100%', padding: '12px 14px', fontSize: 14, border: `1.5px solid ${BORDER}`, borderRadius: 12, outline: 'none', marginBottom: 16, boxSizing: 'border-box', fontFamily: FONT, background: SURF }} />
 
+            {/* ── Passenger selector ── */}
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_MUT, margin: '0 0 8px' }}>{t.passenger}</p>
+            <input
+              type="text"
+              value={passengerSearch}
+              onChange={e => setPassengerSearch(e.target.value)}
+              placeholder={t.passengerSearch}
+              style={{ width: '100%', padding: '10px 14px', fontSize: 13, border: `1.5px solid ${assignPassengerId ? PRIMARY : BORDER}`, borderRadius: 12, outline: 'none', marginBottom: 6, boxSizing: 'border-box', fontFamily: FONT, background: SURF }}
+            />
+            <div style={{ maxHeight: 160, overflowY: 'auto', border: `1px solid ${BORDER}`, borderRadius: 10, marginBottom: 16, background: SURF }}>
+              {passengerList
+                .filter(p => !passengerSearch || p.name.toLowerCase().includes(passengerSearch.toLowerCase()))
+                .map(p => (
+                  <div key={p.id} onClick={() => { setAssignPassengerId(p.id); setPassengerSearch(p.name); setAssignPassengerOther('') }}
+                    style={{ padding: '10px 14px', fontSize: 13, fontWeight: assignPassengerId === p.id ? 700 : 500, cursor: 'pointer', background: assignPassengerId === p.id ? `${PRIMARY}12` : 'transparent', color: assignPassengerId === p.id ? PRIMARY : TEXT, borderBottom: `1px solid ${BORDER}` }}>
+                    {p.name}
+                  </div>
+                ))}
+              <div onClick={() => { setAssignPassengerId('others'); setPassengerSearch('') }}
+                style={{ padding: '10px 14px', fontSize: 13, fontWeight: assignPassengerId === 'others' ? 700 : 500, cursor: 'pointer', background: assignPassengerId === 'others' ? `${AMBER}20` : 'transparent', color: assignPassengerId === 'others' ? AMBER_T : TEXT_MUT, fontStyle: 'italic' }}>
+                {t.passengerOthers}
+              </div>
+            </div>
+            {assignPassengerId === 'others' && (
+              <input type="text" value={assignPassengerOther}
+                onChange={e => setAssignPassengerOther(e.target.value)}
+                placeholder={t.passengerOtherName}
+                style={{ width: '100%', padding: '12px 14px', fontSize: 14, border: `1.5px solid ${AMBER}`, borderRadius: 12, outline: 'none', marginBottom: 16, boxSizing: 'border-box', fontFamily: FONT, background: AMBER_BG }} />
+            )}
+
             <div style={{ background: AMBER_BG, border: `1px solid ${AMBER}`, borderRadius: 12, padding: '10px 14px', marginBottom: 20 }}>
               <p style={{ fontSize: 12, color: AMBER_T, margin: 0, fontWeight: 500 }}>{t.dutyWarning}</p>
             </div>
@@ -844,7 +904,7 @@ export default function DriversPage() {
 
       {/* ── Add Driver sheet ── */}
       {addDriverTaxi && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 100 }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
           onClick={() => setAddDriverTaxi(null)}>
           <div style={{ background: SURF, width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', maxHeight: '80vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
@@ -929,7 +989,7 @@ export default function DriversPage() {
         }
 
         return (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 100 }}
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
             onClick={() => setReassigning(null)}>
             <div style={{ background: SURF, width: '100%', borderRadius: '20px 20px 0 0', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
               onClick={e => e.stopPropagation()}>
