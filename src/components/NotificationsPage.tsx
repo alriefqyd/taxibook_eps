@@ -105,7 +105,8 @@ export default function NotificationsPage({ role }: Props) {
     let uid = ''
 
     async function init() {
-      const { data: { user: au } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const au = session?.user
       if (!au) { router.push('/login'); return }
       uid = au.id
       setUserId(uid)

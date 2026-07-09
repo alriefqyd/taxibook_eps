@@ -6,6 +6,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useDriverLocations } from '@/hooks/useDriverLocations'
 import { getRoute } from '@/lib/routing'
+import { trimRouteToDriver } from '@/lib/routeTrim'
 const DEFAULT_CENTER: [number, number] = [-2.5397, 121.3588]
 const GPS_STALE_MS = 10 * 60 * 1000
 
@@ -120,7 +121,9 @@ interface Props { style?: React.CSSProperties }
 
 export default function DriverFleetMap({ style }: Props) {
   const drivers = useDriverLocations()
-  const [routes, setRoutes] = useState<Record<string, [number, number][]>>({})
+  const [routes,        setRoutes]        = useState<Record<string, [number, number][]>>({})
+  const [displayRoutes, setDisplayRoutes] = useState<Record<string, [number, number][]>>({})
+  const trimStateRef = useRef<Record<string, { index: number; route: [number, number][] }>>({})
   const [isFs,    setIsFs]    = useState(false)
   const [isCssFs, setIsCssFs] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -181,6 +184,21 @@ export default function DriverFleetMap({ style }: Props) {
     })
   }, [tripKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Erase the already-traveled portion of each driver's line as they move, like navigation.
+  useEffect(() => {
+    const next: Record<string, [number, number][]> = {}
+    drivers.forEach(d => {
+      const route = routes[d.id]
+      if (!route || route.length < 2 || d.latitude == null || d.longitude == null) return
+      const prevState = trimStateRef.current[d.id]
+      const lastIndex = prevState && prevState.route === route ? prevState.index : 0
+      const { trimmed, index } = trimRouteToDriver(route, d.latitude, d.longitude, lastIndex)
+      trimStateRef.current[d.id] = { index, route }
+      next[d.id] = trimmed
+    })
+    setDisplayRoutes(next)
+  }, [drivers, routes])
+
   const positioned = drivers.filter(d => d.latitude != null && d.longitude != null)
   const fitPositions: [number, number][] = positioned.map(d => [d.latitude!, d.longitude!])
 
@@ -204,7 +222,7 @@ export default function DriverFleetMap({ style }: Props) {
           const hasActiveBooking = bk != null
           const hasPickup = bk?.pickup_lat != null && bk?.pickup_lng != null
           const hasDest   = bk?.destination_lat != null && bk?.destination_lng != null
-          const route     = routes[d.id]
+          const route     = displayRoutes[d.id] ?? routes[d.id]
 
           return (
             <Fragment key={d.id}>

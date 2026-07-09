@@ -290,8 +290,9 @@ export default function BookPage() {
   async function submit() {
     setLoading(true); setError(''); setConflict(null)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/login'); return }
+      const user = session.user
 
       const scheduledDate = form.mode === 'now'
         ? new Date(Date.now() + 2 * 60000)
@@ -324,9 +325,6 @@ export default function BookPage() {
 
       const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 60
       const status        = needsApproval ? 'pending_coordinator_approval' : 'submitted'
-
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
 
       const res = await fetch('/api/bookings', {
         method: 'POST',

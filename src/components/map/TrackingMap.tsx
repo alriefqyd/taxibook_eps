@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MapContainer, Marker, Polyline, Popup, useMap } from 'react-leaflet'
 import TileLayerSwitcher from './TileLayerSwitcher'
 import L from 'leaflet'
@@ -7,6 +7,7 @@ import 'leaflet/dist/leaflet.css'
 import { createClient } from '@/lib/supabase/client'
 import { geocodeAddress } from '@/lib/geocode'
 import { getRoute } from '@/lib/routing'
+import { trimRouteToDriver } from '@/lib/routeTrim'
 const DEFAULT_CENTER: [number, number] = [-2.5397, 121.3588] // PTVI Sorowako
 
 function driverIcon(color: string) {
@@ -58,11 +59,13 @@ interface Props {
 }
 
 export default function TrackingMap({ taxiId, taxiColor, pickup, destination, status, pickupLat, pickupLng, destLat, destLng }: Props) {
-  const [driverPos,  setDriverPos]  = useState<[number, number] | null>(null)
-  const [pickupPos,  setPickupPos]  = useState<[number, number] | null>(null)
-  const [destPos,    setDestPos]    = useState<[number, number] | null>(null)
-  const [route,      setRoute]      = useState<[number, number][] | null>(null)
-  const [eta,        setEta]        = useState<number | null>(null)
+  const [driverPos,    setDriverPos]    = useState<[number, number] | null>(null)
+  const [pickupPos,    setPickupPos]    = useState<[number, number] | null>(null)
+  const [destPos,      setDestPos]      = useState<[number, number] | null>(null)
+  const [route,        setRoute]        = useState<[number, number][] | null>(null)
+  const [displayRoute, setDisplayRoute] = useState<[number, number][] | null>(null)
+  const [eta,          setEta]          = useState<number | null>(null)
+  const trimIndexRef = useRef(0)
 
   // Subscribe to driver's real-time taxi location
   useEffect(() => {
@@ -117,11 +120,22 @@ export default function TrackingMap({ taxiId, taxiColor, pickup, destination, st
       getRoute({ lat: pickupPos[0], lng: pickupPos[1] }, { lat: destPos[0],   lng: destPos[1]   }),
     ]).then(([leg1, leg2]) => {
       const coords = [...(leg1?.coordinates ?? []), ...(leg2?.coordinates ?? [])]
-      if (coords.length > 1) setRoute(coords)
+      if (coords.length > 1) {
+        trimIndexRef.current = 0
+        setRoute(coords)
+      }
       const seconds = (leg1?.durationSeconds ?? 0) + (leg2?.durationSeconds ?? 0)
       if (seconds > 0) setEta(Math.round(seconds / 60))
     })
   }, [driverPos?.[0], driverPos?.[1], pickupPos?.[0], pickupPos?.[1], destPos?.[0], destPos?.[1]]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Erase the already-traveled portion of the line as the driver moves, like navigation.
+  useEffect(() => {
+    if (!driverPos || !route) { setDisplayRoute(route); return }
+    const { trimmed, index } = trimRouteToDriver(route, driverPos[0], driverPos[1], trimIndexRef.current)
+    trimIndexRef.current = index
+    setDisplayRoute(trimmed)
+  }, [driverPos?.[0], driverPos?.[1], route]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const bounds: [number, number][] = [
     ...(driverPos ? [driverPos] : []),
@@ -161,8 +175,8 @@ export default function TrackingMap({ taxiId, taxiColor, pickup, destination, st
             <Popup>Destination: {destination}</Popup>
           </Marker>
         )}
-        {route && route.length > 1 && (
-          <Polyline positions={route} color={taxiColor || '#006064'} weight={4} opacity={0.8} />
+        {displayRoute && displayRoute.length > 1 && (
+          <Polyline positions={displayRoute} color={taxiColor || '#006064'} weight={4} opacity={0.8} />
         )}
       </MapContainer>
 

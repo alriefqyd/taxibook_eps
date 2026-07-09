@@ -9,8 +9,8 @@ export default function DriverLayout({ children }: { children: React.ReactNode }
   const [userId, setUserId] = useState('')
   usePushNotifications()
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) setUserId(session.user.id)
     })
   }, [])
   return (

@@ -126,7 +126,8 @@ export default function CoordinatorMapPage() {
 
   useEffect(() => {
     async function guard() {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (!user) { router.push('/login'); return }
       const { data: p } = await supabase.from('users').select('role').eq('id', user.id).single()
       if (p?.role !== 'coordinator') { router.push('/login'); return }

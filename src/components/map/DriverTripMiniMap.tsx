@@ -1,9 +1,10 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MapContainer, Marker, Polyline, useMap } from 'react-leaflet'
 import TileLayerSwitcher from './TileLayerSwitcher'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { trimRouteToDriver } from '@/lib/routeTrim'
 
 function markerIcon(emoji: string, color: string, size = 28) {
   return L.divIcon({
@@ -46,7 +47,24 @@ export default function DriverTripMiniMap({ driverLat, driverLng, pickupLat, pic
     ...(pickupLat != null && pickupLng != null ? [[pickupLat, pickupLng] as [number, number]] : []),
     ...(destLat != null && destLng != null ? [[destLat, destLng] as [number, number]] : []),
   ]
-  const lineCoords: [number, number][] = route && route.length > 1 ? route : fallback
+
+  // Erase the already-traveled portion of the line as the driver moves, like navigation.
+  const trimIndexRef  = useRef(0)
+  const lastRouteRef   = useRef<[number, number][] | undefined>(undefined)
+  const [displayRoute, setDisplayRoute] = useState<[number, number][] | null>(null)
+
+  useEffect(() => {
+    if (!route || route.length < 2) { setDisplayRoute(null); return }
+    if (lastRouteRef.current !== route) {
+      lastRouteRef.current = route
+      trimIndexRef.current = 0
+    }
+    const { trimmed, index } = trimRouteToDriver(route, driverLat, driverLng, trimIndexRef.current)
+    trimIndexRef.current = index
+    setDisplayRoute(trimmed)
+  }, [route, driverLat, driverLng])
+
+  const lineCoords: [number, number][] = displayRoute ?? fallback
 
   return (
     <MapContainer

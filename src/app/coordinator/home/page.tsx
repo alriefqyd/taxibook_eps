@@ -293,7 +293,8 @@ export default function CoordinatorHomePage() {
 
   useEffect(() => {
     async function init() {
-      const { data: { user: au } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const au = session?.user
       if (!au) { router.push('/login'); return }
       const { data: p } = await supabase.from('users').select('*').eq('id', au.id).single()
       if (p?.role !== 'coordinator') { router.push('/login'); return }
