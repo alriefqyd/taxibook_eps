@@ -285,21 +285,9 @@ export default function CoordinatorBookPage() {
         ? new Date(Date.now() + 2 * 60000)
         : new Date(form.scheduled_at)
 
-      // Client-side conflict pre-check
-      const estimatedEnd = new Date(scheduledDate.getTime() + 3 * 60 * 60 * 1000)
-      const { data: conflicts } = await supabase.from('bookings')
-        .select('booking_code, scheduled_at, destination')
-        .eq('passenger_id', form.passenger_id)
-        .not('status', 'in', '(rejected,cancelled,completed)')
-        .lt('scheduled_at', estimatedEnd.toISOString())
-        .gt('auto_complete_at', scheduledDate.toISOString())
-
-      if (conflicts?.length) {
-        const c = conflicts[0]
-        const t = new Date(c.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-        setError(`Conflict: ${selectedPassenger?.name || 'Passenger'} already has a booking at ${t} to ${c.destination}.`)
-        setLoading(false); return
-      }
+      // Coordinators are exempt from overlap/destination conflict checks entirely — they may need
+      // to serve multiple (possibly different) vendors with overlapping windows at once.
+      // Server also skips this check for coordinators; see /api/bookings.
 
       const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 60
       const bookingStatus = needsApproval ? 'pending_coordinator_approval' : 'submitted'
@@ -479,29 +467,42 @@ export default function CoordinatorBookPage() {
 
             {form.mode === 'schedule' && (
               <FG label={t.dateTime}>
-                <input type="datetime-local" value={form.scheduled_at} onChange={e => update('scheduled_at', e.target.value)} min={new Date().toISOString().slice(0,16)} style={inputSt} />
+                <input type="datetime-local" value={form.scheduled_at} onChange={e => update('scheduled_at', e.target.value)} min={defaultDateTime()} style={inputSt} />
               </FG>
             )}
 
             <FG label={t.pickupLoc}>
-              <button
-                type="button"
-                onClick={() => setPickerField('pickup')}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: C.white, border: `1.5px solid ${pickupCoords ? C.black : C.border}`, borderRadius: 16, padding: '12px 14px', cursor: 'pointer', fontFamily: FONT, textAlign: 'left' }}
-              >
+              <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: C.white, border: `1.5px solid ${pickupCoords ? C.black : C.border}`, borderRadius: 16, padding: '12px 14px', fontFamily: FONT }}>
                 <span style={{ fontSize: 18, flexShrink: 0 }}>📍</span>
-                <div style={{ flex: 1 }}>
-                  {pickupCoords ? (
-                    <>
-                      <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.pickup}</p>
-                      <p style={{ fontSize: 13, color: C.textPrimary, margin: 0, fontWeight: 600 }}>{form.pickup}</p>
-                    </>
-                  ) : (
+                {pickupCoords ? (
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.pickup}</p>
+                    <input
+                      type="text"
+                      value={form.pickup}
+                      onChange={e => update('pickup', e.target.value)}
+                      style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', padding: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary, fontFamily: FONT }}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setPickerField('pickup')}
+                    style={{ flex: 1, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: FONT }}
+                  >
                     <p style={{ fontSize: 14, color: C.textTert, margin: 0 }}>{t.tapMap}</p>
-                  )}
-                </div>
-                {pickupCoords && <span style={{ fontSize: 11, color: C.textTert, flexShrink: 0 }}>{t.change}</span>}
-              </button>
+                  </button>
+                )}
+                {pickupCoords && (
+                  <button
+                    type="button"
+                    onClick={() => setPickerField('pickup')}
+                    style={{ fontSize: 11, color: C.textTert, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: FONT }}
+                  >
+                    {t.change}
+                  </button>
+                )}
+              </div>
             </FG>
 
             <FG label={t.destination}>
@@ -670,7 +671,10 @@ function FG({ label, children }: { label: string; children: React.ReactNode }) {
 
 function defaultDateTime() {
   const d = new Date(); d.setSeconds(0, 0)
-  return d.toISOString().slice(0, 16)
+  // toISOString() is UTC — shift by the local offset first so the sliced
+  // string reflects the browser's local wall-clock time (what <input type="datetime-local"> expects).
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
 }
 
 function formatDateTime(s: string) {

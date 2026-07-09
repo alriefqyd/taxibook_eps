@@ -7,8 +7,14 @@ import 'leaflet/dist/leaflet.css'
 import { reverseGeocode, geocodeAddress } from '@/lib/geocode'
 import type { Coords } from '@/lib/geocode'
 import { createClient } from '@/lib/supabase/client'
+import { useLang } from '@/lib/language'
 import type { RegisteredLocation } from '@/types'
 const SOROWAKO: [number, number] = [-2.5397, 121.3588]
+
+const HINT_TEXT = {
+  en: 'You can specify the location by changing the address name',
+  id: 'Anda bisa menyesuaikan lokasi dengan mengubah nama alamat',
+}
 
 function pinIcon() {
   return L.divIcon({
@@ -52,6 +58,7 @@ interface Props {
 
 export default function LocationPickerMap({ title, onConfirm, onClose, autoGps }: Props) {
   const supabase = createClient()
+  const lang = useLang()
 
   const [picked,      setPicked]      = useState<(Coords & { address: string }) | null>(null)
   const [loading,     setLoading]     = useState(false)
@@ -294,8 +301,21 @@ export default function LocationPickerMap({ title, onConfirm, onClose, autoGps }
             <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 4px' }}>
               Selected location
             </p>
-            <p style={{ fontSize: 14, fontWeight: 600, color: '#006064', margin: '0 0 14px', lineHeight: 1.45 }}>
-              {picked.address}
+            <input
+              type="text"
+              value={picked.address}
+              onChange={e => setPicked({ ...picked, address: e.target.value })}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                fontSize: 14, fontWeight: 600, color: '#006064',
+                margin: '0 0 4px', lineHeight: 1.45,
+                border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 10,
+                padding: '9px 12px', outline: 'none',
+                fontFamily: "var(--font-inter), 'Inter', sans-serif",
+              }}
+            />
+            <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 14px' }}>
+              {HINT_TEXT[lang]}
             </p>
             <button
               onClick={() => !loading && onConfirm(picked.address, { lat: picked.lat, lng: picked.lng })}

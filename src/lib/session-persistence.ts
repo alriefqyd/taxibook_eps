@@ -18,10 +18,15 @@ export async function saveSessionToStorage(session: Session | null) {
 
   try {
     if (session) {
+      // NOTE: session.expires_at is the short-lived ACCESS token expiry (~1hr),
+      // not the refresh token's validity. Using it here would wipe this offline
+      // fallback cache every hour even though the real Supabase session (refresh
+      // token) is still valid. Use a long, fixed window instead — the actual
+      // session lifetime is enforced server-side by Supabase, not this cache.
       const sessionData = {
         session,
         timestamp: Date.now(),
-        expiresAt: session.expires_at ? session.expires_at * 1000 : Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days default
+        expiresAt: Date.now() + 90 * 24 * 60 * 60 * 1000, // 90 days
       }
 
       // Save to localStorage

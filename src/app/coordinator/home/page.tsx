@@ -546,6 +546,8 @@ export default function CoordinatorHomePage() {
             bookings={calendarBookings} taxis={taxis} showCompleted dayAssignments={dayAssignments}
             onMapClick={() => setView(view === 'map' ? 'calendar' : 'map')}
             mapActive={view === 'map'}
+            currentUserId={user?.id}
+            onRefresh={loadData}
           />
           {view === 'map' && (
             <div style={{ height: 'calc(100dvh - 260px - 72px)', minHeight: 300 }}>

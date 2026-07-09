@@ -75,6 +75,20 @@ function destinationIcon(color: string, taxiName: string) {
   })
 }
 
+function pickupIcon(color: string, taxiName: string) {
+  const label = taxiName.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  return L.divIcon({
+    html: `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+        <div style="background:${color};color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.2)">${label}</div>
+        <div style="width:24px;height:24px;background:#16A34A;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;font-size:11px">📍</div>
+      </div>`,
+    className: '',
+    iconSize: [60, 42],
+    iconAnchor: [30, 42],
+  })
+}
+
 function FitBounds({ positions }: { positions: [number, number][] }) {
   const map = useMap()
   useEffect(() => {
@@ -138,26 +152,30 @@ export default function DriverFleetMap({ style }: Props) {
   const isFullscreen = isFs || isCssFs
 
   const tripKey = drivers
-    .filter(d => d.active_booking && ['on_trip', 'waiting_trip'].includes(d.active_booking.status) && d.latitude != null && d.longitude != null)
-    .map(d => `${d.id}:${d.latitude!.toFixed(3)},${d.longitude!.toFixed(3)},${d.active_booking?.destination_lat?.toFixed(3)}`)
+    .filter(d => d.active_booking && d.latitude != null && d.longitude != null)
+    .map(d => `${d.id}:${d.latitude!.toFixed(3)},${d.longitude!.toFixed(3)},${d.active_booking?.pickup_lat?.toFixed(3)},${d.active_booking?.destination_lat?.toFixed(3)}`)
     .join('|')
 
+  // Full trip route per driver: driver position → pickup → destination
   useEffect(() => {
     if (!tripKey) return
     drivers.forEach(d => {
-      if (!d.active_booking || !['on_trip', 'waiting_trip'].includes(d.active_booking.status)) return
       const bk = d.active_booking
+      if (!bk) return
       if (d.latitude == null || d.longitude == null) return
+      if (bk.pickup_lat == null || bk.pickup_lng == null) return
       if (bk.destination_lat == null || bk.destination_lng == null) return
 
-      getRoute(
-        { lat: d.latitude,         lng: d.longitude         },
-        { lat: bk.destination_lat, lng: bk.destination_lng  },
-      ).then(r => {
-        if (r) setRoutes(prev => ({ ...prev, [d.id]: r.coordinates }))
-        else   setRoutes(prev => ({
+      Promise.all([
+        getRoute({ lat: d.latitude, lng: d.longitude }, { lat: bk.pickup_lat, lng: bk.pickup_lng }),
+        getRoute({ lat: bk.pickup_lat, lng: bk.pickup_lng }, { lat: bk.destination_lat, lng: bk.destination_lng }),
+      ]).then(([leg1, leg2]) => {
+        const coords = [...(leg1?.coordinates ?? []), ...(leg2?.coordinates ?? [])]
+        setRoutes(prev => ({
           ...prev,
-          [d.id]: [[d.latitude!, d.longitude!], [bk.destination_lat!, bk.destination_lng!]],
+          [d.id]: coords.length > 1
+            ? coords
+            : [[d.latitude!, d.longitude!], [bk.pickup_lat!, bk.pickup_lng!], [bk.destination_lat!, bk.destination_lng!]],
         }))
       })
     })
@@ -183,18 +201,35 @@ export default function DriverFleetMap({ style }: Props) {
         {positioned.map(d => {
           const stale    = !isGpsActive(d.location_updated_at)
           const bk       = d.active_booking
-          const tripActive = bk != null && ['on_trip', 'waiting_trip'].includes(bk.status)
-          const hasDest  = bk?.destination_lat != null && bk?.destination_lng != null
-          const route    = routes[d.id]
+          const hasActiveBooking = bk != null
+          const hasPickup = bk?.pickup_lat != null && bk?.pickup_lng != null
+          const hasDest   = bk?.destination_lat != null && bk?.destination_lng != null
+          const route     = routes[d.id]
 
           return (
             <Fragment key={d.id}>
-              {tripActive && route && route.length > 1 && (
+              {hasActiveBooking && route && route.length > 1 && (
                 <Polyline positions={route} pathOptions={{ color: d.color, weight: 4, opacity: 0.85 }} />
               )}
 
-              {tripActive && hasDest && (
-                <Marker position={[bk.destination_lat!, bk.destination_lng!]} icon={destinationIcon(d.color, d.driver_name || d.name)}>
+              {hasActiveBooking && hasPickup && (
+                <Marker position={[bk!.pickup_lat!, bk!.pickup_lng!]} icon={pickupIcon(d.color, d.driver_name || d.name)}>
+                  <Popup>
+                    <div style={{ fontFamily: 'Inter, sans-serif' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+                        <span style={{ width: 8, height: 8, background: d.color, borderRadius: '50%', display: 'inline-block' }} />
+                        <strong style={{ fontSize: 12 }}>{d.name}</strong>
+                        {d.driver_name && <span style={{ fontSize: 10, color: '#6f7979' }}>· {d.driver_name}</span>}
+                      </div>
+                      <p style={{ margin: '0 0 1px', fontSize: 10, fontWeight: 700, color: '#16A34A' }}>Pickup</p>
+                      <p style={{ margin: 0, fontSize: 11, color: '#374151' }}>{bk!.pickup}</p>
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
+
+              {hasActiveBooking && hasDest && (
+                <Marker position={[bk!.destination_lat!, bk!.destination_lng!]} icon={destinationIcon(d.color, d.driver_name || d.name)}>
                   <Popup>
                     <div style={{ fontFamily: 'Inter, sans-serif' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
@@ -203,7 +238,7 @@ export default function DriverFleetMap({ style }: Props) {
                         {d.driver_name && <span style={{ fontSize: 10, color: '#6f7979' }}>· {d.driver_name}</span>}
                       </div>
                       <p style={{ margin: '0 0 1px', fontSize: 10, fontWeight: 700, color: d.color }}>Destination</p>
-                      <p style={{ margin: 0, fontSize: 11, color: '#374151' }}>{bk.destination}</p>
+                      <p style={{ margin: 0, fontSize: 11, color: '#374151' }}>{bk!.destination}</p>
                     </div>
                   </Popup>
                 </Marker>
@@ -229,7 +264,7 @@ export default function DriverFleetMap({ style }: Props) {
                     {bk && (
                       <div style={{ background: `${d.color}12`, border: `1px solid ${d.color}30`, borderRadius: 6, padding: '5px 8px' }}>
                         <p style={{ margin: '0 0 3px', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: d.color }}>
-                          {bk.status === 'waiting_trip' ? '⏱ Waiting' : '→ On Trip'}
+                          {bk.status === 'waiting_trip' ? '⏱ Waiting' : bk.status === 'booked' ? '🚕 Heading to pickup' : '→ On Trip'}
                         </p>
                         <p style={{ margin: '0 0 2px', fontSize: 10, color: '#374151' }}>
                           <span style={{ color: '#6f7979' }}>From </span>{bk.pickup}

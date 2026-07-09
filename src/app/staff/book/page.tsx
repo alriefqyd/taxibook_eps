@@ -56,6 +56,13 @@ const MSG = {
     errFuture:      'Booking time must be in the future.',
     noTaxiAll:      'No taxis available. All drivers are off duty.',
     checkFailed:    'Failed to check availability.',
+    backToSchedule: 'Back to schedule',
+    conflictPassenger: (time: string, dest: string) => `Conflict: you already have a booking at ${time} to ${dest}.`,
+    conflictRoute:  (pickup: string, dest: string, time: string, name: string) =>
+      `There is already a booking for this route (${pickup} → ${dest}) from ${time} by ${name}. Please join that booking instead.`,
+    conflictUnknownPassenger: 'another passenger',
+    passengerLabel: 'Passenger',
+    driverLabel:    'Driver',
   },
   id: {
     title:          'Booking Baru',
@@ -105,6 +112,13 @@ const MSG = {
     errFuture:      'Waktu booking harus di masa mendatang.',
     noTaxiAll:      'Tidak ada taksi tersedia. Semua driver sedang tidak bertugas.',
     checkFailed:    'Gagal memeriksa ketersediaan.',
+    backToSchedule: 'Kembali ke jadwal',
+    conflictPassenger: (time: string, dest: string) => `Konflik: Anda sudah punya booking jam ${time} ke ${dest}.`,
+    conflictRoute:  (pickup: string, dest: string, time: string, name: string) =>
+      `Sudah ada booking untuk rute ini (${pickup} → ${dest}) jam ${time} oleh ${name}. Silakan gabung ke booking tersebut.`,
+    conflictUnknownPassenger: 'penumpang lain',
+    passengerLabel: 'Penumpang',
+    driverLabel:    'Driver',
   },
 }
 
@@ -122,6 +136,32 @@ interface FormData {
   scheduled_at: string
   trip_type:    TripType
   wait_minutes: number
+}
+
+interface ConflictInfo {
+  booking_code:     string
+  pickup:           string
+  destination:      string
+  scheduled_at:     string
+  auto_complete_at: string
+  passenger_name:   string | null
+  passenger_phone:  string | null
+  driver_name:      string | null
+  driver_phone:     string | null
+}
+
+function WaIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/>
+    </svg>
+  )
+}
+
+function toWaNumber(phone: string): string {
+  let n = phone.replace(/\D/g, '')
+  if (n.startsWith('0')) n = '62' + n.slice(1)
+  return n
 }
 
 const FONT = "var(--font-inter), 'Inter', sans-serif"
@@ -158,6 +198,7 @@ export default function BookPage() {
   const [loading,     setLoading]     = useState(false)
   const [checkingNow, setCheckingNow] = useState(false)
   const [error,       setError]       = useState('')
+  const [conflict,    setConflict]    = useState<ConflictInfo | null>(null)
   const [noTaxiMsg,   setNoTaxiMsg]   = useState('')
   const [pickerField, setPickerField] = useState<'pickup' | 'destination' | null>(null)
   const [pickupCoords,  setPickupCoords]  = useState<Coords | null>(null)
@@ -174,7 +215,8 @@ export default function BookPage() {
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm(prev => ({ ...prev, [key]: value }))
-    if (key === 'mode') { setNoTaxiMsg(''); setError('') }
+    setError(''); setConflict(null)
+    if (key === 'mode') setNoTaxiMsg('')
   }
 
   async function checkNowAvailability(): Promise<boolean> {
@@ -246,7 +288,7 @@ export default function BookPage() {
   }
 
   async function submit() {
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setConflict(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
@@ -259,22 +301,26 @@ export default function BookPage() {
         setError(t.errFuture); setLoading(false); return
       }
 
-      // Use 3hr as a conservative estimate for the new booking's end time.
+      // Same passenger overlap pre-check — a passenger can't be in two places at once.
       // Server is the authoritative check; this gives quick pre-flight feedback.
       const estimatedEnd = new Date(scheduledDate.getTime() + 3 * 60 * 60 * 1000)
-      const { data: conflicts } = await supabase.from('bookings')
+      const { data: passengerConflicts } = await supabase.from('bookings')
         .select('booking_code, scheduled_at, destination')
         .eq('passenger_id', user.id)
         .not('status', 'in', '(rejected,cancelled,completed)')
         .lt('scheduled_at', estimatedEnd.toISOString())
         .gt('auto_complete_at', scheduledDate.toISOString())
 
-      if (conflicts?.length) {
-        const c = conflicts[0]
-        const t = new Date(c.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-        setError(`Conflict: you already have a booking at ${t} to ${c.destination}.`)
+      if (passengerConflicts?.length) {
+        const c = passengerConflicts[0]
+        const conflictTime = new Date(c.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+        setError(t.conflictPassenger(conflictTime, c.destination))
         setLoading(false); return
       }
+
+      // Note: the "same route, join booking" check is server-authoritative only (not pre-checked
+      // client-side) — RLS only lets a staff user see their own bookings, so a client-side query
+      // can't see other passengers' bookings to detect this conflict. See /api/bookings.
 
       const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 60
       const status        = needsApproval ? 'pending_coordinator_approval' : 'submitted'
@@ -303,7 +349,13 @@ export default function BookPage() {
 
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || 'Failed to submit')
+        if (data.conflict) {
+          setConflict(data.conflict)
+          const conflictTime = new Date(data.conflict.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+          setError(t.conflictRoute(data.conflict.pickup, data.conflict.destination, conflictTime, data.conflict.passenger_name || t.conflictUnknownPassenger))
+        } else {
+          setError(data.error || 'Failed to submit')
+        }
         setLoading(false); return
       }
 
@@ -481,32 +533,45 @@ export default function BookPage() {
                   type="datetime-local"
                   value={form.scheduled_at}
                   onChange={e => update('scheduled_at', e.target.value)}
-                  min={new Date().toISOString().slice(0,16)}
+                  min={defaultDateTime()}
                   style={inputSt}
                 />
               </FG>
             )}
 
-            {/* Route fields — map picker only */}
+            {/* Route fields — map picker, editable once pinned */}
             <FG label={t.pickupLoc}>
-              <button
-                type="button"
-                onClick={() => setPickerField('pickup')}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: C.white, border: `1.5px solid ${pickupCoords ? C.black : C.border}`, borderRadius: 16, padding: '12px 14px', cursor: 'pointer', fontFamily: FONT, textAlign: 'left' }}
-              >
+              <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: C.white, border: `1.5px solid ${pickupCoords ? C.black : C.border}`, borderRadius: 16, padding: '12px 14px', fontFamily: FONT }}>
                 <span style={{ fontSize: 18, flexShrink: 0 }}>📍</span>
-                <div style={{ flex: 1 }}>
-                  {pickupCoords ? (
-                    <>
-                      <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.pickup}</p>
-                      <p style={{ fontSize: 13, color: C.textPrimary, margin: 0, fontWeight: 600 }}>{form.pickup}</p>
-                    </>
-                  ) : (
+                {pickupCoords ? (
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.pickup}</p>
+                    <input
+                      type="text"
+                      value={form.pickup}
+                      onChange={e => update('pickup', e.target.value)}
+                      style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', padding: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary, fontFamily: FONT }}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setPickerField('pickup')}
+                    style={{ flex: 1, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: FONT }}
+                  >
                     <p style={{ fontSize: 14, color: C.textTert, margin: 0 }}>{t.tapMap}</p>
-                  )}
-                </div>
-                {pickupCoords && <span style={{ fontSize: 11, color: C.textTert, flexShrink: 0 }}>{t.change}</span>}
-              </button>
+                  </button>
+                )}
+                {pickupCoords && (
+                  <button
+                    type="button"
+                    onClick={() => setPickerField('pickup')}
+                    style={{ fontSize: 11, color: C.textTert, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: FONT }}
+                  >
+                    {t.change}
+                  </button>
+                )}
+              </div>
             </FG>
 
             <FG label={t.destination}>
@@ -645,16 +710,19 @@ export default function BookPage() {
               ))}
             </div>
 
-            {/* Status notice */}
-            <div style={{ padding: '12px 14px', borderRadius: 12, border: `1px solid ${needsApproval ? '#FDE68A' : '#B7E4C7'}`, background: needsApproval ? C.amberBg : C.greenBg, marginBottom: 4 }}>
-              <p style={{ fontSize: 12, color: needsApproval ? C.amber : C.green, margin: 0 }}>
-                {needsApproval
-                  ? t.sentCoord
-                  : form.mode === 'now'
-                    ? t.assignedNow
-                    : t.assignedAuto}
-              </p>
-            </div>
+            {/* Status notice — hidden while a submit error/conflict is showing below, since it
+                would contradict the fact that the booking wasn't actually created */}
+            {!error && (
+              <div style={{ padding: '12px 14px', borderRadius: 12, border: `1px solid ${needsApproval ? '#FDE68A' : '#B7E4C7'}`, background: needsApproval ? C.amberBg : C.greenBg, marginBottom: 4 }}>
+                <p style={{ fontSize: 12, color: needsApproval ? C.amber : C.green, margin: 0 }}>
+                  {needsApproval
+                    ? t.sentCoord
+                    : form.mode === 'now'
+                      ? t.assignedNow
+                      : t.assignedAuto}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -662,6 +730,31 @@ export default function BookPage() {
         {error && (
           <div style={{ padding: '10px 14px', background: C.redBg, border: `1px solid #FECACA`, borderRadius: 12, marginTop: 12 }}>
             <p style={{ fontSize: 12, color: C.red, margin: 0, fontWeight: 500 }}>{error}</p>
+
+            {conflict && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'row', gap: 8 }}>
+                {conflict.passenger_phone && (
+                  <a
+                    href={`https://wa.me/${toWaNumber(conflict.passenger_phone)}?text=${encodeURIComponent(`Halo ${conflict.passenger_name || ''}, saya juga mau ke ${conflict.destination} dari ${conflict.pickup}. Bisa gabung booking ${conflict.booking_code}?`)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 8px', background: '#25D366', color: '#fff', borderRadius: 12, fontSize: 12, fontWeight: 700, textDecoration: 'none', minWidth: 0 }}
+                  >
+                    <WaIcon />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conflict.passenger_name || t.passengerLabel}</span>
+                  </a>
+                )}
+                {conflict.driver_phone && (
+                  <a
+                    href={`https://wa.me/${toWaNumber(conflict.driver_phone)}?text=${encodeURIComponent(`Halo ${conflict.driver_name || ''}, ada penumpang tambahan untuk booking ${conflict.booking_code} (${conflict.pickup} → ${conflict.destination}).`)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 8px', background: '#25D366', color: '#fff', borderRadius: 12, fontSize: 12, fontWeight: 700, textDecoration: 'none', minWidth: 0 }}
+                  >
+                    <WaIcon />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conflict.driver_name || t.driverLabel}</span>
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -674,6 +767,13 @@ export default function BookPage() {
               style={{ width: '100%', padding: '14px 20px', background: checkingNow ? C.border2 : C.black, color: C.white, border: 'none', borderRadius: 16, fontSize: 15, fontWeight: 600, cursor: checkingNow ? 'not-allowed' : 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif", letterSpacing: '-0.1px', transition: 'opacity 0.15s' }}
             >
               {checkingNow ? t.checkingAvail : step === 1 ? t.nextTripType : t.nextReview}
+            </button>
+          ) : conflict ? (
+            <button
+              onClick={() => router.push('/staff/home')}
+              style={{ width: '100%', padding: '14px 20px', background: C.black, color: C.white, border: 'none', borderRadius: 16, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: "var(--font-inter), 'Inter', sans-serif", letterSpacing: '-0.1px' }}
+            >
+              {t.backToSchedule}
             </button>
           ) : (
             <button
@@ -706,7 +806,10 @@ function FG({ label, children }: { label: string; children: React.ReactNode }) {
 function defaultDateTime() {
   const d = new Date()
   d.setSeconds(0, 0)
-  return d.toISOString().slice(0, 16)
+  // toISOString() is UTC — shift by the local offset first so the sliced
+  // string reflects the browser's local wall-clock time (what <input type="datetime-local"> expects).
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
 }
 
 function formatDateTime(s: string) {

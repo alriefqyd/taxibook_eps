@@ -18,6 +18,7 @@ const ICONS: Record<string, { outline: string; filled: string }> = {
   users:     { outline: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M19 8v6 M22 11h-6', filled: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
   map:       { outline: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z M8 2v16 M16 6v16', filled: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z' },
   list:      { outline: 'M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01', filled: 'M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01' },
+  route:     { outline: 'M9 19a3 3 0 1 1-6 0 3 3 0 0 1 6 0z M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15 M21 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0z', filled: 'M9 19a3 3 0 1 1-6 0 3 3 0 0 1 6 0z M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15 M21 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0z' },
 }
 
 const SvgIcon = ({ d, size = 22, color = 'currentColor', fill = 'none', strokeWidth = 2 }: {
@@ -34,8 +35,8 @@ type NavItem = { href: string; labelEn: string; labelId: string; iconKey: string
 
 const NAV: Record<string, NavItem[]> = {
   staff: [
-    { href: '/staff/home',    labelEn: 'Home',    labelId: 'Beranda', iconKey: 'home'   },
-    { href: '/staff/profile', labelEn: 'Profile', labelId: 'Profil',  iconKey: 'person' },
+    { href: '/staff/home',  labelEn: 'Home',    labelId: 'Beranda', iconKey: 'home' },
+    { href: '/staff/trips', labelEn: 'Trips',   labelId: 'Riwayat', iconKey: 'route' },
   ],
   coordinator: [
     { href: '/coordinator/home',    labelEn: 'Home',     labelId: 'Beranda', iconKey: 'dashboard' },

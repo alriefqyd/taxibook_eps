@@ -462,6 +462,7 @@ export default function DriverHomePage() {
           taxis={[myTaxi]}
           showCompleted
           dayAssignments={dayAssignments}
+          currentUserId={user?.id}
         />
       )}
 

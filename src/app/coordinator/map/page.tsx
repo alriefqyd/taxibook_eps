@@ -150,13 +150,16 @@ export default function CoordinatorMapPage() {
       if (data) setBookingExtra(data as BookingExtra)
     }
 
-    // Fetch route for mini-map
-    if (d.latitude && d.longitude && d.active_booking?.destination_lat && d.active_booking?.destination_lng) {
-      const r = await getRoute(
-        { lat: d.latitude, lng: d.longitude },
-        { lat: d.active_booking.destination_lat, lng: d.active_booking.destination_lng },
-      )
-      if (r) setMiniRoute(r.coordinates)
+    // Fetch full trip route for mini-map: driver position → pickup → destination
+    const bk = d.active_booking
+    if (d.latitude && d.longitude && bk && bk.pickup_lat != null && bk.pickup_lng != null
+        && bk.destination_lat != null && bk.destination_lng != null) {
+      const [leg1, leg2] = await Promise.all([
+        getRoute({ lat: d.latitude, lng: d.longitude }, { lat: bk.pickup_lat, lng: bk.pickup_lng }),
+        getRoute({ lat: bk.pickup_lat, lng: bk.pickup_lng }, { lat: bk.destination_lat, lng: bk.destination_lng }),
+      ])
+      const coords = [...(leg1?.coordinates ?? []), ...(leg2?.coordinates ?? [])]
+      if (coords.length > 1) setMiniRoute(coords)
     }
   }
 

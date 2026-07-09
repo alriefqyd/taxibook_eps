@@ -54,23 +54,86 @@ export async function POST(request: NextRequest) {
       new Date(scheduled_at).getTime() + (routeSec + MARGIN_S + waitSec) * 1000
     ).toISOString()
 
-    // ── Passenger overlap check (server-side guard) ──
-    const { data: passengerConflict } = await admin
-      .from('bookings')
-      .select('booking_code, scheduled_at, destination')
-      .eq('passenger_id', passengerId)
-      .not('status', 'in', '(rejected,cancelled,completed)')
-      .lt('scheduled_at', auto_complete_at)
-      .gt('auto_complete_at', scheduled_at)
-      .limit(1)
-      .maybeSingle()
+    // Coordinators are fully exempt from the overlap checks below — they may need to serve
+    // multiple (possibly different) vendors with overlapping windows at once.
+    const isCoordinator = caller?.role === 'coordinator'
 
-    if (passengerConflict) {
-      const t = new Date(passengerConflict.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar' })
-      return NextResponse.json(
-        { error: `Passenger already has a booking at ${t} to ${passengerConflict.destination} that overlaps this trip.` },
-        { status: 409 }
-      )
+    // ── Same passenger overlap check (server-side guard) ──
+    // A passenger can't be in two places at once — their bookings' time windows must not overlap.
+    if (!isCoordinator) {
+      const { data: passengerConflict } = await admin
+        .from('bookings')
+        .select('booking_code, scheduled_at, destination')
+        .eq('passenger_id', passengerId)
+        .not('status', 'in', '(rejected,cancelled,completed)')
+        .lt('scheduled_at', auto_complete_at)
+        .gt('auto_complete_at', scheduled_at)
+        .limit(1)
+        .maybeSingle()
+
+      if (passengerConflict) {
+        const t = new Date(passengerConflict.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar' })
+        return NextResponse.json(
+          { error: `Passenger already has a booking at ${t} to ${passengerConflict.destination} that overlaps this trip.` },
+          { status: 409 }
+        )
+      }
+    }
+
+    // ── Same route, near-simultaneous booking check (server-side guard) ──
+    // If someone already has a booking for the exact same pickup → destination and trip type
+    // (DROP vs WAITING — a WAITING trip has different logistics so it isn't a candidate to join)
+    // within 15 minutes at or before this one, and that trip hasn't departed yet, tell this
+    // booker to join the existing one instead of creating a redundant trip. Once the earlier trip
+    // has actually started (on_trip / waiting_trip) it's too late to join — let this booking
+    // proceed normally. This only depends on scheduled_at, not on now-vs-schedule mode.
+    if (!isCoordinator) {
+      const JOIN_WINDOW_MS = 15 * 60 * 1000
+      const windowStart = new Date(new Date(scheduled_at).getTime() - JOIN_WINDOW_MS).toISOString()
+
+      const { data: sameRouteBooking } = await admin
+        .from('bookings')
+        .select('booking_code, pickup, destination, scheduled_at, auto_complete_at, status, passenger_id, taxi_id')
+        .eq('pickup', pickup)
+        .eq('destination', destination)
+        .eq('trip_type', trip_type)
+        .not('status', 'in', '(rejected,cancelled,completed)')
+        .gte('scheduled_at', windowStart)
+        .lte('scheduled_at', scheduled_at)
+        .order('scheduled_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (sameRouteBooking && !['on_trip', 'waiting_trip'].includes(sameRouteBooking.status)) {
+        const tz = 'Asia/Makassar'
+        const start = new Date(sameRouteBooking.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: tz })
+
+        const [{ data: conflictPassenger }, taxiResult] = await Promise.all([
+          admin.from('users').select('name, phone').eq('id', sameRouteBooking.passenger_id).single(),
+          sameRouteBooking.taxi_id
+            ? admin.from('taxis').select('name, users!driver_id(name, phone)').eq('id', sameRouteBooking.taxi_id).maybeSingle()
+            : Promise.resolve({ data: null }),
+        ])
+        const conflictDriver = (taxiResult.data?.users as any) || null
+
+        return NextResponse.json(
+          {
+            error: `There is already a booking for this route (${sameRouteBooking.pickup} → ${sameRouteBooking.destination}) from ${start} by ${conflictPassenger?.name || 'another passenger'}. Please join that booking instead.`,
+            conflict: {
+              booking_code:    sameRouteBooking.booking_code,
+              pickup:          sameRouteBooking.pickup,
+              destination:     sameRouteBooking.destination,
+              scheduled_at:    sameRouteBooking.scheduled_at,
+              auto_complete_at: sameRouteBooking.auto_complete_at,
+              passenger_name:  conflictPassenger?.name || null,
+              passenger_phone: conflictPassenger?.phone || null,
+              driver_name:     conflictDriver?.name || null,
+              driver_phone:    conflictDriver?.phone || null,
+            },
+          },
+          { status: 409 }
+        )
+      }
     }
 
     // ── Insert booking ──
