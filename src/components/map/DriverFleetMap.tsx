@@ -7,6 +7,7 @@ import 'leaflet/dist/leaflet.css'
 import { useDriverLocations } from '@/hooks/useDriverLocations'
 import { getRoute } from '@/lib/routing'
 import { trimRouteToDriver } from '@/lib/routeTrim'
+import { carSvg, sphereGradient, SPHERE_SHADOW } from './carIcon'
 const DEFAULT_CENTER: [number, number] = [-2.5397, 121.3588]
 const GPS_STALE_MS = 10 * 60 * 1000
 
@@ -54,7 +55,7 @@ function driverIcon(color: string, name: string, locationUpdatedAt: string | nul
         <span>${label}</span>
         <span style="font-size:8px;font-weight:600;opacity:0.9">${timeStr}</span>
       </div>
-      <div style="width:26px;height:26px;background:${color};border:3px solid ${border};border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:12px">🚗</div>
+      <div style="width:26px;height:26px;background:${sphereGradient(color)};border:3px solid ${border};border-radius:50%;box-shadow:${SPHERE_SHADOW};display:flex;align-items:center;justify-content:center">${carSvg(14)}</div>
     </div>`,
     className: '',
     iconSize: [90, 54],

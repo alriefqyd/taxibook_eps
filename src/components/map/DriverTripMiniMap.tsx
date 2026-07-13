@@ -5,10 +5,20 @@ import TileLayerSwitcher from './TileLayerSwitcher'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { trimRouteToDriver } from '@/lib/routeTrim'
+import { carSvg, sphereGradient, SPHERE_SHADOW } from './carIcon'
 
 function markerIcon(emoji: string, color: string, size = 28) {
   return L.divIcon({
     html: `<div style="width:${size}px;height:${size}px;background:${color};border:3px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;font-size:${size * 0.45}px">${emoji}</div>`,
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  })
+}
+
+function carMarkerIcon(color: string, size = 28) {
+  return L.divIcon({
+    html: `<div style="width:${size}px;height:${size}px;background:${sphereGradient(color)};border:3px solid #fff;border-radius:50%;box-shadow:${SPHERE_SHADOW};display:flex;align-items:center;justify-content:center">${carSvg(size * 0.45)}</div>`,
     className: '',
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
@@ -93,7 +103,7 @@ export default function DriverTripMiniMap({ driverLat, driverLng, pickupLat, pic
       )}
 
       {/* Driver marker */}
-      <Marker position={[driverLat, driverLng]} icon={markerIcon('🚗', color, 32)} />
+      <Marker position={[driverLat, driverLng]} icon={carMarkerIcon(color, 32)} />
     </MapContainer>
   )
 }

@@ -449,3 +449,53 @@ alter table public.bookings
     tstzrange(scheduled_at, auto_complete_at) with &&
   )
   where (taxi_id is not null and status in ('booked', 'on_trip', 'waiting_trip'));
+
+-- ============================================================
+-- FEEDBACK TABLE
+-- General app feedback (voice of customer), not tied to a trip
+-- ============================================================
+create table if not exists public.feedback (
+  id          uuid primary key default uuid_generate_v4(),
+  user_id     uuid references public.users(id) on delete set null,
+  category    text not null default 'general' check (category in ('bug', 'suggestion', 'complaint', 'general')),
+  message     text not null,
+  created_at  timestamptz default now()
+);
+
+alter table public.feedback enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where tablename = 'feedback'
+    and policyname = 'Users can submit feedback'
+  ) then
+    execute $p$
+      create policy "Users can submit feedback" on public.feedback
+        for insert with check (auth.uid() = user_id)
+    $p$;
+  end if;
+
+  if not exists (
+    select 1 from pg_policies where tablename = 'feedback'
+    and policyname = 'Users view own feedback'
+  ) then
+    execute $p$
+      create policy "Users view own feedback" on public.feedback
+        for select using (auth.uid() = user_id)
+    $p$;
+  end if;
+
+  if not exists (
+    select 1 from pg_policies where tablename = 'feedback'
+    and policyname = 'Coordinator can view all feedback'
+  ) then
+    execute $p$
+      create policy "Coordinator can view all feedback" on public.feedback
+        for select using (
+          exists (select 1 from public.users where id = auth.uid() and role = 'coordinator')
+        )
+    $p$;
+  end if;
+end;
+$$;

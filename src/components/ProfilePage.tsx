@@ -50,6 +50,7 @@ const MSG = {
     testPush:         'Send test push',
     testingPush:      'Sending…',
     howToUse:         'How to use',
+    giveFeedback:     'Give feedback',
     signOut:          'Sign out',
     signOutConfirm:   'Sign out of TaxiBook?',
     signOutBody:      "You'll need to log in again to use the app.",
@@ -103,6 +104,7 @@ const MSG = {
     testPush:         'Kirim push test',
     testingPush:      'Mengirim…',
     howToUse:         'Cara penggunaan',
+    giveFeedback:     'Beri masukan',
     signOut:          'Keluar',
     signOutConfirm:   'Keluar dari TaxiBook?',
     signOutBody:      'Anda perlu masuk kembali untuk menggunakan aplikasi.',
@@ -758,6 +760,17 @@ export default function ProfilePage({ role }: Props) {
             </div>
           </>
         )}
+
+        {/* Feedback */}
+        <button
+          onClick={() => router.push('/feedback')}
+          style={{ width: '100%', padding: '13px', background: '#E0F2F1', color: '#006064', border: '1px solid rgba(0,96,100,0.15)', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: FONT, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          {t.giveFeedback}
+        </button>
 
         {/* How to use */}
         <button

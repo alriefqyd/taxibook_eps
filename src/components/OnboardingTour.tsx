@@ -11,15 +11,6 @@ type TourStep = {
 
 const TOUR_STORAGE_KEY = 'taxibook-onboarding-tour-v1'
 
-function isAppInstalled() {
-  if (typeof window === 'undefined') return false
-  if (typeof navigator !== 'undefined' && 'standalone' in navigator) {
-    return (navigator as any).standalone === true
-  }
-  return window.matchMedia('(display-mode: standalone)').matches
-}
-
-
 function getRoleSteps(role: Role): TourStep[] {
   if (role === 'coordinator') {
     return [
@@ -71,7 +62,6 @@ export default function OnboardingTour({ role }: { role: Role }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (isAppInstalled()) return
     const seen = window.localStorage.getItem(TOUR_STORAGE_KEY)
     if (!seen) {
       setOpen(true)

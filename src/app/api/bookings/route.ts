@@ -34,9 +34,9 @@ export async function POST(request: NextRequest) {
       ? requestedPassengerId
       : user.id
 
-    // ── Compute auto_complete_at: pickup→destination + destination→pickup + wait + 30 min ──
+    // ── Compute auto_complete_at: pickup→destination + destination→pickup + wait + 15 min ──
     // Window covers the full round trip so the driver isn't double-booked until back at base.
-    const MARGIN_S   = 30 * 60   // 30 min buffer
+    const MARGIN_S   = 15 * 60   // 15 min buffer
     const FALLBACK_S = 2 * 3600  // 2h fallback when route unavailable
     const waitSec    = trip_type === 'WAITING' ? (wait_minutes || 0) * 60 : 0
 

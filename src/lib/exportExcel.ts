@@ -253,3 +253,31 @@ function topEntry(map: Record<string, number>): string {
   entries.sort((a, b) => b[1] - a[1])
   return `${entries[0][0]} (${entries[0][1]})`
 }
+
+export interface FeedbackExportRow {
+  category:   string
+  message:    string
+  created_at: string
+  user_name:  string
+  user_role:  string
+}
+
+export function exportFeedbackExcel(rows: FeedbackExportRow[]) {
+  const wb = XLSX.utils.book_new()
+
+  const headers = ['No.', 'Date', 'Category', 'Submitted By', 'Role', 'Message']
+  const data = rows.map((r, i) => [
+    i + 1,
+    fmt(r.created_at),
+    r.category,
+    r.user_name,
+    r.user_role,
+    r.message,
+  ])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...data])
+  ws['!cols'] = [5, 18, 14, 22, 14, 60].map(w => ({ wch: w }))
+  XLSX.utils.book_append_sheet(wb, ws, 'Feedback')
+
+  const filename = `taxibook-feedback_${format(new Date(), 'yyyy-MM-dd')}.xlsx`
+  XLSX.writeFile(wb, filename)
+}

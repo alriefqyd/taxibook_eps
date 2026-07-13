@@ -10,6 +10,7 @@ import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import BottomNav from '@/components/BottomNav'
 import { useLang } from '@/lib/language'
+import { sphereGradient, SPHERE_SHADOW } from '@/components/map/carIcon'
 
 const MSG = {
   en: {
@@ -101,6 +102,16 @@ function GpsIcon({ active }: { active: boolean }) {
   return (
     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke={active ? '#059669' : '#9ca3af'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+    </svg>
+  )
+}
+
+function CarIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="#ffffff" style={{ display: 'block', filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.4))' }}>
+      <path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11h1a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-1a2 2 0 0 1-4 0H8a2 2 0 0 1-4 0H3a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h1zm2.1 0h9.8l-1-3H8.1l-1 3z"/>
+      <circle cx="7" cy="17" r="1.6"/>
+      <circle cx="17" cy="17" r="1.6"/>
     </svg>
   )
 }
@@ -327,7 +338,7 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
         <div style={{ padding: '12px 16px 24px' }}>
           {/* Driver header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', background: d.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🚗</div>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: sphereGradient(d.color), boxShadow: SPHERE_SHADOW, border: '2.5px solid rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><CarIcon size={20} /></div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <p style={{ fontSize: 15, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.driver_name ?? m.noDriver}</p>

@@ -26,6 +26,7 @@ const MSG = {
     dispatchBoard:    'Dispatch Board',
     savedLocations:   'Saved Locations',
     tripReport:       'Trip Report',
+    feedback:         'Feedback',
     newBooking:       '+ New booking',
     viewCalendar:     'Calendar',
     viewMap:          'Map',
@@ -89,6 +90,7 @@ const MSG = {
     dispatchBoard:    'Papan Dispatch',
     savedLocations:   'Lokasi Tersimpan',
     tripReport:       'Laporan Perjalanan',
+    feedback:         'Masukan',
     newBooking:       '+ Booking Baru',
     viewCalendar:     'Kalender',
     viewMap:          'Peta',
@@ -471,6 +473,10 @@ export default function CoordinatorHomePage() {
                     <button onClick={() => { setMenuOpen(false); router.push('/coordinator/report') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>
                       <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>{t.tripReport}</p>
+                    </button>
+                    <button onClick={() => { setMenuOpen(false); router.push('/coordinator/feedback') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>{t.feedback}</p>
                     </button>
                     <button onClick={() => { setMenuOpen(false); router.push('/coordinator/profile') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>

@@ -50,7 +50,7 @@ export async function POST(
 
     const newStatus = booking.trip_type === 'WAITING' ? 'waiting_trip' : 'on_trip'
 
-    // auto_complete_at is fixed at booking creation (pickup→dest + dest→pickup + 30 min).
+    // auto_complete_at is fixed at booking creation (pickup→dest + dest→pickup + 15 min).
     // We do not recalculate here — changing it would shift the driver's window and
     // could invalidate any booking already scheduled after this one.
     await admin.from('bookings')

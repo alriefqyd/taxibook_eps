@@ -7,11 +7,12 @@ import 'leaflet/dist/leaflet.css'
 import { geocodeAddress } from '@/lib/geocode'
 import { getRoute } from '@/lib/routing'
 import { trimRouteToDriver } from '@/lib/routeTrim'
+import { carSvg, sphereGradient, SPHERE_SHADOW } from './carIcon'
 const DEFAULT_CENTER: [number, number] = [-2.5397, 121.3588] // PTVI Sorowako
 
 function driverIcon(color: string) {
   return L.divIcon({
-    html: `<div style="width:20px;height:20px;background:${color};border:3px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;font-size:10px">🚗</div>`,
+    html: `<div style="width:20px;height:20px;background:${sphereGradient(color)};border:3px solid #fff;border-radius:50%;box-shadow:${SPHERE_SHADOW};display:flex;align-items:center;justify-content:center">${carSvg(12)}</div>`,
     className: '',
     iconSize: [20, 20],
     iconAnchor: [10, 10],
