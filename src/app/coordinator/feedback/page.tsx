@@ -116,9 +116,19 @@ export default function CoordinatorFeedbackPage() {
   return (
     <div style={{ fontFamily: FONT, minHeight: '100vh', background: '#F5F5F2', WebkitFontSmoothing: 'antialiased' }}>
       <div style={{ background: '#ffffff', padding: '20px 20px 16px', borderBottom: '1px solid rgba(0,0,0,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', letterSpacing: '-0.2px' }}>{t.title}</h1>
-          <p style={{ fontSize: 12, color: '#6f7979', margin: 0 }}>{t.subtitle}</p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <button
+            onClick={() => router.back()}
+            style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: -8, marginTop: -2 }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 5l-7 7 7 7" />
+            </svg>
+          </button>
+          <div>
+            <h1 style={{ fontSize: 17, fontWeight: 600, margin: '0 0 2px', letterSpacing: '-0.2px' }}>{t.title}</h1>
+            <p style={{ fontSize: 12, color: '#6f7979', margin: 0 }}>{t.subtitle}</p>
+          </div>
         </div>
         <button
           onClick={handleExport}

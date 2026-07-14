@@ -21,7 +21,7 @@ const DriverFleetMap = dynamic(() => import('@/components/map/DriverFleetMap'), 
 
 type ViewMode = 'day' | 'week' | 'month' | 'map'
 
-const HOUR_START = 7
+const HOUR_START = 5
 const HOUR_END   = 19
 const HOUR_W     = 80   // px per hour (day view)
 const DAY_W      = 100  // px per day  (week view)
@@ -43,7 +43,7 @@ export default function StaffHomePage() {
   const [unreadCount,  setUnreadCount]  = useState(0)
   const [view,           setView]           = useState<ViewMode>('day')
   const [cursor,         setCursor]         = useState(new Date())
-  const [dayAssignments, setDayAssignments] = useState<{ taxi_id: string; assign_date: string }[]>([])
+  const [dayAssignments, setDayAssignments] = useState<{ taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null }[]>([])
   const [selectedBk,   setSelectedBk]   = useState<BookingDetail | null>(null)
   const [refreshing,   setRefreshing]   = useState(false)
   const [pullY,        setPullY]        = useState(0)
@@ -77,7 +77,7 @@ export default function StaffHomePage() {
         .order('name'),
     ])
     const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
-    supabase.from('driver_day_assignments').select('taxi_id, assign_date')
+    supabase.from('driver_day_assignments').select('taxi_id, assign_date, start_time, end_time')
       .gte('assign_date', witaToday).then(({ data }) => setDayAssignments(data || []))
 
     const bkList = bks || []
@@ -220,10 +220,10 @@ export default function StaffHomePage() {
       }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0 20px', height: 64 }}>
           <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
-            <img src="/vale-logo.svg" alt="Vale" style={{ height: 30, display: 'block' }} />
-            <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-              <span style={{ width:6, height:6, borderRadius:'50%', background:'#344500', display:'inline-block' }} />
-              <span style={{ fontSize:10, color:'#6f7979', fontWeight:500 }}>Staff</span>
+            <img src="/icon-192.png" alt="" style={{ width: 26, height: 26, borderRadius: 7, display: 'block' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, lineHeight: 1 }}>
+              <span style={{ fontSize: 16, fontWeight: 800, color: '#006064', letterSpacing: '-0.3px' }}>Ridr</span>
+              <span style={{ fontSize: 9, color: '#9ca3af', fontWeight: 500, marginTop: 2 }}>PT Vale Indonesia</span>
             </div>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:4 }}>
@@ -478,7 +478,7 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, current
   scrollRef: React.RefObject<HTMLDivElement>
   onSelectBooking: (b: BookingDetail) => void
   currentUserId?: string
-  dayAssignments?: { taxi_id: string; assign_date: string }[]
+  dayAssignments?: { taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null }[]
 }) {
   const today    = new Date()
   const cursorDateStr = format(cursor, 'yyyy-MM-dd')
@@ -508,24 +508,37 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, current
 
           {/* All taxi rows */}
           {taxis.map((taxi, idx) => {
-            const isFullDay = dayAssignments.some(a => a.taxi_id === taxi.id && a.assign_date === cursorDateStr)
+            const fullDayAssignment = dayAssignments.find(a => a.taxi_id === taxi.id && a.assign_date === cursorDateStr)
             return (
             <GanttRow
               key={taxi.id}
               taxi={taxi}
               idx={idx}
               bookings={dayBks.filter(b => b.taxi_id === taxi.id)}
-              overlay={isFullDay ? (
-                <div style={{
-                  position: 'absolute', inset: 0,
-                  background: 'rgba(254,179,0,0.13)',
-                  borderTop: '2px solid #feb300',
-                  zIndex: 2, display: 'flex', alignItems: 'center', paddingLeft: 10,
-                  pointerEvents: 'none',
-                }}>
-                  <span style={{ fontSize: 9, fontWeight: 800, color: '#7e5700', letterSpacing: '0.05em' }}>★ FULL DAY DUTY</span>
-                </div>
-              ) : undefined}
+              overlay={fullDayAssignment ? (() => {
+                const hasRange = !!(fullDayAssignment.start_time && fullDayAssignment.end_time)
+                const parseHour = (t: string) => {
+                  const [h, m] = t.split(':').map(Number)
+                  return h + m / 60
+                }
+                const startH = hasRange ? Math.max(parseHour(fullDayAssignment.start_time!), HOUR_START) : HOUR_START
+                const endH   = hasRange ? Math.min(parseHour(fullDayAssignment.end_time!), HOUR_END)     : HOUR_END
+                const left   = (startH - HOUR_START) * HOUR_W
+                const width  = Math.max((endH - startH) * HOUR_W, 4)
+                return (
+                  <div style={{
+                    position: 'absolute', left, width, top: 0, bottom: 0,
+                    background: 'rgba(254,179,0,0.13)',
+                    borderTop: '2px solid #feb300',
+                    zIndex: 2, display: 'flex', alignItems: 'center', paddingLeft: 10, overflow: 'hidden',
+                    pointerEvents: 'none',
+                  }}>
+                    <span style={{ fontSize: 9, fontWeight: 800, color: '#7e5700', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+                      {hasRange ? `★ ${fullDayAssignment.start_time!.slice(0, 5)}–${fullDayAssignment.end_time!.slice(0, 5)}` : '★ FULL DAY DUTY'}
+                    </span>
+                  </div>
+                )
+              })() : undefined}
               renderBlock={(b) => {
                 const dt        = new Date(b.scheduled_at)
                 const startH    = dt.getHours() + dt.getMinutes() / 60
@@ -756,7 +769,7 @@ function MonthView({ bookings, cursor, onDayClick, dayAssignments = [] }: {
   bookings: BookingDetail[]
   cursor: Date
   onDayClick: (d: Date) => void
-  dayAssignments?: { taxi_id: string; assign_date: string }[]
+  dayAssignments?: { taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null }[]
 }) {
   const today  = new Date()
   const start  = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 })
@@ -881,7 +894,7 @@ const navBtn: React.CSSProperties = {
 }
 
 // ── WEEK VIEW (original grid) ───────────────────────────────
-function WeekView({ bookings, cursor, onSelectBooking, dayAssignments = [] }: { bookings: BookingDetail[]; cursor: Date; onSelectBooking: (b: BookingDetail) => void; currentUserId?: string; dayAssignments?: { taxi_id: string; assign_date: string }[] }) {
+function WeekView({ bookings, cursor, onSelectBooking, dayAssignments = [] }: { bookings: BookingDetail[]; cursor: Date; onSelectBooking: (b: BookingDetail) => void; currentUserId?: string; dayAssignments?: { taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null }[] }) {
   const today  = new Date()
   const monday = startOfWeek(cursor, { weekStartsOn: 1 })
   const days   = Array.from({ length: 7 }, (_, i) => addDays(monday, i))

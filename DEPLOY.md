@@ -1,4 +1,4 @@
-# TaxiBook — Deploy Checklist
+# Ridr — Deploy Checklist
 
 ## 1. Supabase SQL (run in order)
 Run these in Supabase SQL Editor before deploying:

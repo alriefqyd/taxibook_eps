@@ -13,7 +13,7 @@ export default function Error({
   const router = useRouter()
 
   useEffect(() => {
-    console.error('[TaxiBook error]', error)
+    console.error('[Ridr error]', error)
   }, [error])
 
   return (

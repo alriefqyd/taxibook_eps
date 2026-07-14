@@ -52,7 +52,7 @@ const MSG = {
     howToUse:         'How to use',
     giveFeedback:     'Give feedback',
     signOut:          'Sign out',
-    signOutConfirm:   'Sign out of TaxiBook?',
+    signOutConfirm:   'Sign out of Ridr?',
     signOutBody:      "You'll need to log in again to use the app.",
     yesSignOut:       'Yes, sign out',
     signingOut:       'Signing out…',
@@ -106,7 +106,7 @@ const MSG = {
     howToUse:         'Cara penggunaan',
     giveFeedback:     'Beri masukan',
     signOut:          'Keluar',
-    signOutConfirm:   'Keluar dari TaxiBook?',
+    signOutConfirm:   'Keluar dari Ridr?',
     signOutBody:      'Anda perlu masuk kembali untuk menggunakan aplikasi.',
     yesSignOut:       'Ya, keluar',
     signingOut:       'Keluar…',
@@ -651,7 +651,7 @@ export default function ProfilePage({ role }: Props) {
         <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>{t.app}</p>
         <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', marginBottom: 28 }}>
           {[
-            { label: t.appName, value: 'TaxiBook' },
+            { label: t.appName, value: 'Ridr' },
             { label: t.version, value: '1.1.0' },
             { label: t.company, value: 'PT Vale Indonesia' },
           ].map((row, i, arr) => (

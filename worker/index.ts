@@ -3,7 +3,7 @@
 self.addEventListener('push', (event: any) => {
   if (!event.data) return
   const data  = event.data.json()
-  const title = data.title || 'TaxiBook'
+  const title = data.title || 'Ridr'
 
   event.waitUntil(
     (self as any).registration.showNotification(title, {
@@ -11,7 +11,7 @@ self.addEventListener('push', (event: any) => {
       icon:    '/icon-192.png',
       badge:   '/icon-192.png',
       vibrate: [200, 100, 200],
-      tag:     data.type || 'taxibook',   // prevents duplicate notifications
+      tag:     data.type || 'ridr',   // prevents duplicate notifications
       renotify: true,                     // always show even if same tag
       data:    { url: data.url || '/', type: data.type },
     }).then(() => {

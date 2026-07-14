@@ -48,7 +48,7 @@ export default function DriverHomePage() {
   const [past,       setPast]       = useState<DriverBooking[]>([])
   const [activeTrip,  setActiveTrip]  = useState<DriverBooking | null>(null)
   const [myTaxi,        setMyTaxi]        = useState<any | null>(null)
-  const [dayAssignments, setDayAssignments] = useState<{ taxi_id: string; assign_date: string }[]>([])
+  const [dayAssignments, setDayAssignments] = useState<{ taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null }[]>([])
   const [loading,    setLoading]    = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
   const [selected,   setSelected]   = useState<DriverBooking | null>(null)
@@ -64,9 +64,16 @@ export default function DriverHomePage() {
   const [menuOpen,   setMenuOpen]   = useState(false)
   const uidRef = React.useRef('')
   const [toggling,   setToggling]   = useState(false)
+  const [, setTick] = useState(0) // forces periodic re-render so the GPS-stale banner's elapsed time stays live
 
   // Broadcast GPS to Supabase whenever driver has a taxi assigned
   useGpsReporting(myTaxi?.id ?? null)
+
+  // Re-render every 30s so the GPS staleness banner's elapsed time keeps ticking
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   async function toggleAvailability() {
     if (!myTaxi || toggling) return
@@ -135,7 +142,7 @@ export default function DriverHomePage() {
       if (taxi) {
         setMyTaxi({ ...taxi, driver_name: taxi.users?.name || p.name })
         const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
-        supabase.from('driver_day_assignments').select('taxi_id, assign_date')
+        supabase.from('driver_day_assignments').select('taxi_id, assign_date, start_time, end_time')
           .eq('taxi_id', taxi.id).gte('assign_date', witaToday)
           .then(({ data }) => setDayAssignments(data || []))
       }
@@ -217,6 +224,21 @@ export default function DriverHomePage() {
 
   const tabColor = myTaxi?.color || '#2563EB'
 
+  // GPS staleness — only nag while on duty; matches the 1h server-side threshold
+  const gpsStaleMinutes = myTaxi && myTaxi.is_available !== false
+    ? (myTaxi.location_updated_at
+        ? Math.floor((Date.now() - new Date(myTaxi.location_updated_at).getTime()) / 60000)
+        : Infinity)
+    : null
+  const showGpsStaleBanner = gpsStaleMinutes !== null && gpsStaleMinutes >= 60
+  const gpsStaleText = gpsStaleMinutes === Infinity
+    ? 'never'
+    : gpsStaleMinutes !== null
+      ? gpsStaleMinutes >= 60
+        ? `${Math.floor(gpsStaleMinutes / 60)}h ${gpsStaleMinutes % 60}m`
+        : `${gpsStaleMinutes}m`
+      : ''
+
   return (
     <div style={{ fontFamily: 'Inter, sans-serif', minHeight: '100vh', background: '#F5F5F2', WebkitFontSmoothing: 'antialiased' }}>
 
@@ -224,8 +246,12 @@ export default function DriverHomePage() {
       <header style={{ background: '#F5F5F2', borderBottom: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 1px 4px rgba(0,96,100,0.06)', position: 'sticky', top: 0, zIndex: 40 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', height: 64 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <img src="/vale-logo.svg" alt="Vale" style={{ height: 30, display: 'block' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <img src="/icon-192.png" alt="" style={{ width: 26, height: 26, borderRadius: 7, display: 'block' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, lineHeight: 1 }}>
+              <span style={{ fontSize: 16, fontWeight: 800, color: '#006064', letterSpacing: '-0.3px' }}>Ridr</span>
+              <span style={{ fontSize: 9, color: '#9ca3af', fontWeight: 500, marginTop: 2 }}>PT Vale Indonesia</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 2 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: myTaxi?.is_available === false ? '#ba1a1a' : '#344500', display: 'inline-block' }} />
               <span style={{ fontSize: 10, color: '#6f7979', fontWeight: 500 }}>{myTaxi?.is_available === false ? 'Offline' : 'On duty'}</span>
             </div>
@@ -275,6 +301,16 @@ export default function DriverHomePage() {
         </div>
       </header>
       <OnboardingTour role="driver" />
+
+      {/* ── GPS stale warning ── */}
+      {showGpsStaleBanner && (
+        <div style={{ background: '#DC2626', color: '#fff', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+          <p style={{ fontSize: 12.5, fontWeight: 600, margin: 0, lineHeight: 1.4 }}>
+            Your location hasn't updated for {gpsStaleText}. Please check location permissions and keep the app open.
+          </p>
+        </div>
+      )}
 
       {/* ── Driver hero card ── */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '20px 20px 0' }}>
@@ -470,7 +506,7 @@ export default function DriverHomePage() {
       {/* ── Trip detail sheet ── */}
       {selected && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
           onClick={() => setSelected(null)}
         >
           <div
@@ -581,7 +617,8 @@ function TripDetailCard({ trip: t, processing, onStart, onComplete }: {
       </div>
 
       {t.status === 'booked' && onStart && (() => {
-        const tooEarly = new Date() < new Date(t.scheduled_at)
+        const earliestStart = new Date(t.scheduled_at).getTime() - 10 * 60 * 1000
+        const tooEarly = Date.now() < earliestStart
         const isDisabled = processing === t.id || tooEarly
         return (
           <button

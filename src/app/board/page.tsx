@@ -91,7 +91,7 @@ export default function BoardPage() {
 
   const [bookings,       setBookings]       = useState<any[]>([])
   const [taxis,          setTaxis]          = useState<any[]>([])
-  const [dayAssignments, setDayAssignments] = useState<{ taxi_id: string; assign_date: string }[]>([])
+  const [dayAssignments, setDayAssignments] = useState<{ taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null }[]>([])
   const [loading,   setLoading]   = useState(true)
   const [view,      setView]      = useState<View>('day')
   const [cursor,    setCursor]    = useState(new Date())
@@ -109,7 +109,7 @@ export default function BoardPage() {
     ])
     const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
     const { data: dayAssign } = await supabase
-      .from('driver_day_assignments').select('taxi_id, assign_date').gte('assign_date', witaToday)
+      .from('driver_day_assignments').select('taxi_id, assign_date, start_time, end_time').gte('assign_date', witaToday)
     setBookings(bks || [])
     setTaxis((txs || []).map((taxi: any) => ({ ...taxi, driver_name: taxi.users?.name || null })))
     setDayAssignments(dayAssign || [])
@@ -200,7 +200,11 @@ export default function BoardPage() {
             title="Back"
             style={{ width: 32, height: 32, borderRadius: '50%', background: '#F5F5F2', border: '1px solid #D4E8EA', cursor: 'pointer', fontSize: 15, color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
           >←</button>
-          <img src="/vale-logo.svg" alt="PT Vale" style={{ height: 32, display: 'block' }} />
+          <img src="/icon-192.png" alt="" style={{ width: 28, height: 28, borderRadius: 8, display: 'block' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0, lineHeight: 1 }}>
+            <span style={{ fontSize: 17, fontWeight: 800, color: '#006064', letterSpacing: '-0.3px' }}>Ridr</span>
+            <span style={{ fontSize: 9, color: '#9ca3af', fontWeight: 500, marginTop: 2 }}>PT Vale Indonesia</span>
+          </div>
           <p style={{ fontSize: 11, color: '#9CA3AF', margin: 0 }}>{t.boardSubtitle}</p>
         </div>
 
@@ -343,7 +347,8 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip, dayAssig
       {/* Taxi rows */}
       {taxis.map((taxi: any, idx: number) => {
         const txBks     = dayBks.filter((b: any) => b.taxi_id === taxi.id)
-        const isFullDay = dayAssignments.some((a: any) => a.taxi_id === taxi.id && a.assign_date === cursorDateStr)
+        const fullDayAssignment = dayAssignments.find((a: any) => a.taxi_id === taxi.id && a.assign_date === cursorDateStr)
+        const isFullDay = !!fullDayAssignment
         return (
           <div key={taxi.id} style={{ display: 'flex', borderBottom: '1px solid #D4E8EA', background: idx % 2 === 0 ? '#fff' : '#f9f9f6' }}>
             {/* Taxi label */}
@@ -368,12 +373,25 @@ function DayView({ bookings, taxis, cursor, today, tooltip, setTooltip, dayAssig
               {!taxi.is_available && (
                 <div style={{ position: 'absolute', inset: 0, background: 'repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(0,0,0,0.03) 5px,rgba(0,0,0,0.03) 10px)' }} />
               )}
-              {/* Full day duty overlay */}
-              {isFullDay && (
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(254,243,199,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderTop: '2px solid #FCD34D', borderBottom: '2px solid #FCD34D' }}>
-                  <span style={{ fontSize: 11, fontWeight: 800, color: '#92400E', letterSpacing: '0.05em' }}>{m.fullDayOverlay}</span>
-                </div>
-              )}
+              {/* Full day / time-range duty overlay */}
+              {fullDayAssignment && (() => {
+                const hasRange = !!(fullDayAssignment.start_time && fullDayAssignment.end_time)
+                const parseHour = (t: string) => {
+                  const [h, mi] = t.split(':').map(Number)
+                  return h + mi / 60
+                }
+                const startH = hasRange ? Math.max(parseHour(fullDayAssignment.start_time!), HOUR_S) : HOUR_S
+                const endH   = hasRange ? Math.min(parseHour(fullDayAssignment.end_time!), HOUR_S + HOURS.length) : HOUR_S + HOURS.length
+                const left   = (startH - HOUR_S) * HOUR_W
+                const width  = Math.max((endH - startH) * HOUR_W, 4)
+                return (
+                  <div style={{ position: 'absolute', left, width, top: 0, bottom: 0, background: 'rgba(254,243,199,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderTop: '2px solid #FCD34D', borderBottom: '2px solid #FCD34D', overflow: 'hidden' }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#92400E', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+                      {hasRange ? `★ ${fullDayAssignment.start_time!.slice(0, 5)}–${fullDayAssignment.end_time!.slice(0, 5)}` : m.fullDayOverlay}
+                    </span>
+                  </div>
+                )
+              })()}
               {/* Now line */}
               {nowLeft !== null && (
                 <div style={{ position: 'absolute', left: nowLeft, top: 0, bottom: 0, width: 2, background: '#EF4444', zIndex: 8 }}>

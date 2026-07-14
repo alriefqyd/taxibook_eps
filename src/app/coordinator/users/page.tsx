@@ -217,11 +217,21 @@ export default function CoordinatorUsersPage() {
         padding: '16px 20px', position: 'sticky', top: 0, zIndex: 10,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#1a1a1a' }}>{t.title}</h1>
-            <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>
-              {t.totalActive(users.length, users.filter(u => u.is_active).length)}
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              onClick={() => router.back()}
+              style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: -8 }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 12H5M12 5l-7 7 7 7" />
+              </svg>
+            </button>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#1a1a1a' }}>{t.title}</h1>
+              <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>
+                {t.totalActive(users.length, users.filter(u => u.is_active).length)}
+              </p>
+            </div>
           </div>
           <button
             onClick={openAddModal}
@@ -355,7 +365,7 @@ export default function CoordinatorUsersPage() {
       {/* Modal */}
       {showModal && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 1100,
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, zIndex: 1100,
           background: 'rgba(0,0,0,0.4)', display: 'flex',
           alignItems: 'flex-end', justifyContent: 'center',
         }} onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>

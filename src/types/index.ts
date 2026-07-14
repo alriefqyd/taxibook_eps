@@ -1,5 +1,5 @@
 // ============================================================
-// TaxiBook — TypeScript Types
+// Ridr — TypeScript Types
 // ============================================================
 
 export type Role = 'staff' | 'coordinator' | 'driver'

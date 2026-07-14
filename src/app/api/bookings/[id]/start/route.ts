@@ -40,8 +40,10 @@ export async function POST(
       )
     }
 
-    // Cannot start before scheduled time
-    if (new Date() < new Date(booking.scheduled_at)) {
+    // Driver may start up to 10 min early; otherwise must wait for scheduled time
+    const EARLY_START_MS = 10 * 60 * 1000
+    const earliestStart  = new Date(booking.scheduled_at).getTime() - EARLY_START_MS
+    if (Date.now() < earliestStart) {
       return NextResponse.json(
         { error: `Trip is not yet scheduled to start. Scheduled at ${booking.scheduled_at}` },
         { status: 400 }

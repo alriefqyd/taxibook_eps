@@ -4,14 +4,38 @@ import { useEffect, useState } from 'react'
 import { useNavRouter as useRouter } from '@/hooks/useNavRouter'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
+import { differenceInCalendarDays } from 'date-fns'
 import type { Coords } from '@/lib/geocode'
 import { useLang } from '@/lib/language'
 import PageLoader from '@/components/PageLoader'
+import SwitchRow from '@/components/SwitchRow'
 
 const MSG = {
   en: {
     title:         'Book a trip',
     step:          (n: number) => `Step ${n} of 3`,
+    kindLabel:     'Booking type',
+    kindTrip:      'Trip',
+    kindDuty:      'Driver duty',
+    selectTaxi:    'Select taxi',
+    noTaxiForDuty: 'No taxis with a driver assigned',
+    dutyDate:      'Date',
+    repeatSwitch:     'Repeat every day',
+    repeatSwitchDesc: 'Assign the same duty daily until an end date',
+    untilDate:     'Until',
+    recurringInfo: (n: number) => `This will assign the driver for ${n} day${n === 1 ? '' : 's'} in a row.`,
+    rangeSwitch:      'Limit to specific hours',
+    rangeSwitchDesc:  'Only block auto-assign during these hours, not the whole day',
+    startTime:     'Start time',
+    endTime:       'End time',
+    dutyReason:      'Duty description (optional)',
+    dutyReasonPh:    'e.g. VIP escort, site visit, security duty...',
+    dutyWarning:      'Driver will not appear in auto-assign for this date. Coordinator can still manually assign them if needed.',
+    dutyWarningRange: (s: string, e: string) => `Driver will not appear in auto-assign between ${s}–${e} on this date. Coordinator can still manually assign them if needed.`,
+    confirmDuty:   'Confirm duty',
+    errTaxi:       'Please select a taxi',
+    errDutyDate:   'Please select a date',
+    nextReviewDuty: 'Next — Review →',
     passenger:     'Passenger',
     when:          'When',
     now:           '⚡  Now',
@@ -65,6 +89,28 @@ const MSG = {
   id: {
     title:         'Buat Booking',
     step:          (n: number) => `Langkah ${n} dari 3`,
+    kindLabel:     'Jenis booking',
+    kindTrip:      'Perjalanan',
+    kindDuty:      'Tugas Driver',
+    selectTaxi:    'Pilih taksi',
+    noTaxiForDuty: 'Tidak ada taksi dengan driver',
+    dutyDate:      'Tanggal',
+    repeatSwitch:     'Ulangi setiap hari',
+    repeatSwitchDesc: 'Tugaskan hal yang sama tiap hari sampai tanggal akhir',
+    untilDate:     'Sampai',
+    recurringInfo: (n: number) => `Ini akan menugaskan driver selama ${n} hari berturut-turut.`,
+    rangeSwitch:      'Batasi ke jam tertentu',
+    rangeSwitchDesc:  'Hanya blokir auto-assign selama jam ini, bukan sepanjang hari',
+    startTime:     'Jam mulai',
+    endTime:       'Jam selesai',
+    dutyReason:      'Keterangan tugas (opsional)',
+    dutyReasonPh:    'mis. Pengawalan VIP, kunjungan site, tugas keamanan...',
+    dutyWarning:      'Driver tidak akan muncul di auto-assign untuk tanggal ini. Koordinator tetap bisa assign manual jika dibutuhkan.',
+    dutyWarningRange: (s: string, e: string) => `Driver tidak akan muncul di auto-assign antara ${s}–${e} pada tanggal ini. Koordinator tetap bisa assign manual jika dibutuhkan.`,
+    confirmDuty:   'Konfirmasi tugas',
+    errTaxi:       'Pilih taksi terlebih dahulu',
+    errDutyDate:   'Pilih tanggal terlebih dahulu',
+    nextReviewDuty: 'Lanjut — Tinjau →',
     passenger:     'Penumpang',
     when:          'Kapan',
     now:           '⚡  Sekarang',
@@ -122,8 +168,10 @@ const LocationPickerMap = dynamic(() => import('@/components/map/LocationPickerM
 type Step = 1 | 2 | 3
 type TripType = 'DROP' | 'WAITING'
 type BookingMode = 'now' | 'schedule'
+type BookingKind = 'trip' | 'duty'
 
 interface StaffUser { id: string; name: string; email: string; role: string }
+interface DutyTaxi { id: string; name: string; plate: string | null; driver_name: string | null }
 
 interface FormData {
   mode:         BookingMode
@@ -175,6 +223,7 @@ export default function CoordinatorBookPage() {
   const [destCoords,    setDestCoords]    = useState<Coords | null>(null)
   const [staffUsers,      setStaffUsers]      = useState<StaffUser[]>([])
   const [passengerSearch, setPassengerSearch] = useState('')
+  const [passengerFocused, setPassengerFocused] = useState(false)
   const [form,            setForm]            = useState<FormData>({
     mode:         'schedule',
     pickup:       '',
@@ -185,6 +234,20 @@ export default function CoordinatorBookPage() {
     wait_minutes: 30,
     passenger_id: '',
   })
+
+  // ── Driver duty (full-day / periodic) mode ──────────────────
+  const [bookingKind,     setBookingKind]     = useState<BookingKind>('trip')
+  const [dutyTaxis,       setDutyTaxis]       = useState<DutyTaxi[]>([])
+  const [dutyTaxiId,      setDutyTaxiId]      = useState('')
+  const [dutyTaxiSearch,  setDutyTaxiSearch]  = useState('')
+  const [dutyTaxiFocused, setDutyTaxiFocused] = useState(false)
+  const [dutyDate,        setDutyDate]        = useState(defaultDateOnly())
+  const [dutyRepeat,      setDutyRepeat]      = useState(false)
+  const [dutyEndDate,     setDutyEndDate]     = useState(defaultDateOnly())
+  const [dutyRange,       setDutyRange]       = useState(false)
+  const [dutyStartTime,   setDutyStartTime]   = useState('08:00')
+  const [dutyEndTime,     setDutyEndTime]     = useState('17:00')
+  const [dutyReason,      setDutyReason]      = useState('')
 
   useEffect(() => {
     async function loadUsers() {
@@ -197,15 +260,24 @@ export default function CoordinatorBookPage() {
         const json = await res.json()
         const users = json.users || []
         setStaffUsers(users)
-        if (users.length) {
-          setForm(f => ({ ...f, passenger_id: users[0].id }))
-          setPassengerSearch(users[0].name)
-        }
       }
       setPageLoading(false)
     }
     loadUsers()
-  }, [])
+
+    supabase
+      .from('taxis')
+      .select('id, name, plate, driver_id, users!driver_id(name)')
+      .eq('is_active', true)
+      .not('driver_id', 'is', null)
+      .order('name')
+      .then(({ data }) => {
+        const rows = (data || []).map((tx: any) => ({
+          id: tx.id, name: tx.name, plate: tx.plate, driver_name: tx.users?.name || null,
+        }))
+        setDutyTaxis(rows)
+      })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -261,6 +333,16 @@ export default function CoordinatorBookPage() {
 
   async function handleNext() {
     setError('')
+
+    if (bookingKind === 'duty') {
+      if (!dutyTaxiId)  { setError(t.errTaxi); return }
+      if (!dutyDate)    { setError(t.errDutyDate); return }
+      if (dutyRepeat && !dutyEndDate) { setError(t.errDutyDate); return }
+      if (dutyRange && (!dutyStartTime || !dutyEndTime || dutyEndTime <= dutyStartTime)) { setError(t.errDutyDate); return }
+      setStep(3) // duty mode has no trip-type step — skip straight to review
+      return
+    }
+
     if (step === 1) {
       if (!form.passenger_id) { setError(t.errPassenger); return }
       if (!pickupCoords) { setError(t.errPickup); return }
@@ -275,7 +357,50 @@ export default function CoordinatorBookPage() {
     setStep(prev => (prev + 1) as Step)
   }
 
+  async function submitDuty() {
+    setLoading(true); setError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/login'); return }
+
+      const res = await fetch('/api/driver-day-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          taxi_id:      dutyTaxiId,
+          assign_date:  dutyDate,
+          repeat_until: dutyRepeat ? dutyEndDate : null,
+          start_time:   dutyRange ? dutyStartTime : null,
+          end_time:     dutyRange ? dutyEndTime : null,
+          reason:       dutyReason || null,
+          passenger_id: form.passenger_id || null,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Failed to submit'); setLoading(false); return
+      }
+
+      const taxiInfo = dutyTaxis.find(tx => tx.id === dutyTaxiId)
+      const params = new URLSearchParams({
+        kind:  'duty',
+        taxi:  taxiInfo?.name || '',
+        driver: taxiInfo?.driver_name || '',
+        date:  dutyDate,
+        ...(dutyRepeat ? { endDate: dutyEndDate } : {}),
+        ...(dutyRange ? { startTime: dutyStartTime, endTime: dutyEndTime } : {}),
+        ...(dutyReason ? { reason: dutyReason } : {}),
+      })
+      router.push(`/coordinator/success?${params.toString()}`)
+    } catch (e: any) {
+      setError('Error: ' + e.message); setLoading(false)
+    }
+  }
+
   async function submit() {
+    if (bookingKind === 'duty') { await submitDuty(); return }
+
     setLoading(true); setError('')
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -317,15 +442,13 @@ export default function CoordinatorBookPage() {
         setError(data.error || 'Failed to submit'); setLoading(false); return
       }
 
-      // Build success redirect URL with booking result info
+      // Build success redirect URL with booking result info — same shape as the staff success page
       const code = data.booking.booking_code
-      if (data.assigned) {
-        router.push(
-          `/coordinator/home?booked=${code}&taxi=${encodeURIComponent(data.taxi_name)}&driver=${encodeURIComponent(data.driver_name)}${data.driver_phone ? `&phone=${encodeURIComponent(data.driver_phone)}` : ''}`
-        )
-      } else {
-        router.push(`/coordinator/home?booked=${code}&pending=${needsApproval ? '1' : '0'}`)
-      }
+      const assigned = data.assigned
+        ? `&taxi=${encodeURIComponent(data.taxi_name)}&driver=${encodeURIComponent(data.driver_name)}${data.driver_phone ? `&phone=${encodeURIComponent(data.driver_phone)}` : ''}` : ''
+      const extra = `&pickup=${encodeURIComponent(form.pickup)}&dest=${encodeURIComponent(form.destination)}&time=${encodeURIComponent(scheduledDate.toISOString())}&type=${form.trip_type}${form.trip_type === 'WAITING' ? `&wait=${form.wait_minutes}` : ''}${form.notes ? `&notes=${encodeURIComponent(form.notes)}` : ''}`
+
+      router.push(`/coordinator/success?code=${code}${assigned}${extra}`)
     } catch (e: any) {
       setError('Error: ' + e.message); setLoading(false)
     }
@@ -335,6 +458,11 @@ export default function CoordinatorBookPage() {
   if (pageLoading) return <PageLoader />
 
   const selectedPassenger = staffUsers.find(u => u.id === form.passenger_id)
+  const selectedDutyTaxi = dutyTaxis.find(tx => tx.id === dutyTaxiId)
+
+  const totalSteps  = bookingKind === 'duty' ? 2 : 3
+  const displayStep = bookingKind === 'duty' ? (step === 3 ? 2 : 1) : step
+  const stepLabel = lang === 'id' ? `Langkah ${displayStep} dari ${totalSteps}` : `Step ${displayStep} of ${totalSteps}`
 
   return (
     <div style={{ fontFamily: FONT, minHeight: '100vh', background: C.surface, WebkitFontSmoothing: 'antialiased' }}>
@@ -385,17 +513,21 @@ export default function CoordinatorBookPage() {
       <div style={{ background: C.white, borderBottom: `1px solid ${C.border}`, padding: '12px 20px 0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 14 }}>
           <button
-            onClick={() => step === 1 ? router.push('/coordinator/home') : setStep(p => (p - 1) as Step)}
+            onClick={() => {
+              if (step === 1) { router.push('/coordinator/home') }
+              else if (bookingKind === 'duty' && step === 3) { setStep(1) }
+              else { setStep(p => (p - 1) as Step) }
+            }}
             style={{ width: 34, height: 34, borderRadius: '50%', background: C.surface, border: `1px solid ${C.border}`, cursor: 'pointer', fontSize: 16, color: C.textSecond, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
           >←</button>
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: 17, fontWeight: 600, margin: 0, letterSpacing: '-0.2px', color: C.textPrimary }}>{t.title}</p>
-            <p style={{ fontSize: 12, color: C.textTert, margin: 0 }}>{t.step(step)}</p>
+            <p style={{ fontSize: 12, color: C.textTert, margin: 0 }}>{stepLabel}</p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 4, paddingBottom: 0 }}>
-          {[1,2,3].map(i => (
-            <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= step ? C.black : C.border, transition: 'background 0.2s' }} />
+          {Array.from({ length: totalSteps }, (_, i) => i + 1).map(i => (
+            <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= displayStep ? C.black : C.border, transition: 'background 0.2s' }} />
           ))}
         </div>
       </div>
@@ -405,29 +537,45 @@ export default function CoordinatorBookPage() {
         {/* STEP 1 */}
         {step === 1 && (
           <div>
-            {/* Passenger selector with search */}
+            {/* Booking type toggle */}
+            <FG label={t.kindLabel}>
+              <div style={{ background: C.surface2, borderRadius: 16, padding: 4, display: 'flex', gap: 4 }}>
+                {(['trip','duty'] as BookingKind[]).map(k => (
+                  <button key={k} onClick={() => { setBookingKind(k); setError('') }} style={{ flex: 1, padding: '10px 8px', border: 'none', borderRadius: 11, cursor: 'pointer', fontFamily: FONT, fontWeight: 600, fontSize: 13, background: bookingKind === k ? C.white : 'transparent', color: bookingKind === k ? C.textPrimary : C.textTert, boxShadow: bookingKind === k ? '0 1px 4px rgba(0,0,0,0.08)' : 'none' }}>
+                    {k === 'trip' ? t.kindTrip : t.kindDuty}
+                  </button>
+                ))}
+              </div>
+            </FG>
+
+            {/* Passenger selector — select-style dropdown, empty by default, filters by name */}
             <FG label={t.passenger}>
               <input
                 type="text"
                 value={passengerSearch}
+                onFocus={() => setPassengerFocused(true)}
+                onBlur={() => setPassengerFocused(false)}
                 onChange={e => { setPassengerSearch(e.target.value); update('passenger_id', '') }}
-                placeholder={lang === 'id' ? 'Cari penumpang...' : 'Search passenger...'}
+                placeholder={lang === 'id' ? 'Pilih penumpang...' : 'Select passenger...'}
                 style={{ ...inputSt, borderColor: form.passenger_id ? C.black : C.border2 }}
               />
-              {passengerSearch && !form.passenger_id && (
-                <div style={{ border: `1px solid ${C.border2}`, borderRadius: 12, marginTop: 4, overflow: 'hidden', background: '#fff', maxHeight: 200, overflowY: 'auto' }}>
+              {passengerFocused && (
+                <div
+                  onMouseDown={e => e.preventDefault()}
+                  style={{ border: `1px solid ${C.border2}`, borderRadius: 12, marginTop: 4, overflow: 'hidden', background: '#fff', maxHeight: 200, overflowY: 'auto' }}
+                >
                   {staffUsers
-                    .filter(u => u.name.toLowerCase().includes(passengerSearch.toLowerCase()))
+                    .filter(u => !passengerSearch || u.name.toLowerCase().includes(passengerSearch.toLowerCase()))
                     .map(u => (
                       <div
                         key={u.id}
-                        onClick={() => { update('passenger_id', u.id); setPassengerSearch(u.name) }}
+                        onClick={() => { update('passenger_id', u.id); setPassengerSearch(u.name); setPassengerFocused(false) }}
                         style={{ padding: '11px 14px', fontSize: 14, cursor: 'pointer', borderBottom: `1px solid ${C.border}`, color: C.textPrimary, fontWeight: 500 }}
                       >
                         {u.name}
                       </div>
                     ))}
-                  {staffUsers.filter(u => u.name.toLowerCase().includes(passengerSearch.toLowerCase())).length === 0 && (
+                  {staffUsers.filter(u => !passengerSearch || u.name.toLowerCase().includes(passengerSearch.toLowerCase())).length === 0 && (
                     <div style={{ padding: '11px 14px', fontSize: 13, color: C.textTert }}>
                       {lang === 'id' ? 'Tidak ditemukan' : 'No results'}
                     </div>
@@ -436,99 +584,202 @@ export default function CoordinatorBookPage() {
               )}
             </FG>
 
-            {/* Mode toggle */}
-            <FG label={t.when}>
-              <div style={{ background: C.surface2, borderRadius: 16, padding: 4, display: 'flex', gap: 4 }}>
-                {(['now','schedule'] as BookingMode[]).map(m => (
-                  <button key={m} onClick={() => update('mode', m)} style={{ flex: 1, padding: '10px 8px', border: 'none', borderRadius: 11, cursor: 'pointer', fontFamily: FONT, fontWeight: 600, fontSize: 13, background: form.mode === m ? C.white : 'transparent', color: form.mode === m ? C.textPrimary : C.textTert, boxShadow: form.mode === m ? '0 1px 4px rgba(0,0,0,0.08)' : 'none' }}>
-                    {m === 'now' ? t.now : t.schedule}
-                  </button>
-                ))}
-              </div>
-            </FG>
-
-            {/* Now status */}
-            {form.mode === 'now' && !noTaxiMsg && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: C.greenBg, border: `1px solid #B7E4C7`, borderRadius: 12, marginBottom: 16 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.greenMid, flexShrink: 0, display: 'inline-block' }} />
-                <p style={{ fontSize: 12, color: C.green, margin: 0, fontWeight: 500 }}>
-                  {t.taxiAssigned}
-                </p>
-              </div>
-            )}
-
-            {/* No taxi error */}
-            {noTaxiMsg && (
-              <div style={{ padding: '10px 14px', background: C.redBg, border: `1px solid #FECACA`, borderRadius: 12, marginBottom: 16 }}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: C.red, margin: '0 0 2px' }}>{t.noTaxiNow}</p>
-                <p style={{ fontSize: 12, color: C.red, margin: 0 }}>{noTaxiMsg}</p>
-              </div>
-            )}
-
-            {form.mode === 'schedule' && (
-              <FG label={t.dateTime}>
-                <input type="datetime-local" value={form.scheduled_at} onChange={e => update('scheduled_at', e.target.value)} min={defaultDateTime()} style={inputSt} />
-              </FG>
-            )}
-
-            <FG label={t.pickupLoc}>
-              <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: C.white, border: `1.5px solid ${pickupCoords ? C.black : C.border}`, borderRadius: 16, padding: '12px 14px', fontFamily: FONT }}>
-                <span style={{ fontSize: 18, flexShrink: 0 }}>📍</span>
-                {pickupCoords ? (
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.pickup}</p>
-                    <input
-                      type="text"
-                      value={form.pickup}
-                      onChange={e => update('pickup', e.target.value)}
-                      style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', padding: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary, fontFamily: FONT }}
-                    />
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setPickerField('pickup')}
-                    style={{ flex: 1, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: FONT }}
-                  >
-                    <p style={{ fontSize: 14, color: C.textTert, margin: 0 }}>{t.tapMap}</p>
-                  </button>
-                )}
-                {pickupCoords && (
-                  <button
-                    type="button"
-                    onClick={() => setPickerField('pickup')}
-                    style={{ fontSize: 11, color: C.textTert, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: FONT }}
-                  >
-                    {t.change}
-                  </button>
-                )}
-              </div>
-            </FG>
-
-            <FG label={t.destination}>
-              <button
-                type="button"
-                onClick={() => setPickerField('destination')}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: C.white, border: `1.5px solid ${destCoords ? C.black : C.border}`, borderRadius: 16, padding: '12px 14px', cursor: 'pointer', fontFamily: FONT, textAlign: 'left' }}
-              >
-                <span style={{ fontSize: 18, flexShrink: 0 }}>🏁</span>
-                <div style={{ flex: 1 }}>
-                  {destCoords ? (
-                    <>
-                      <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.dest}</p>
-                      <p style={{ fontSize: 13, color: C.textPrimary, margin: 0, fontWeight: 600 }}>{form.destination}</p>
-                    </>
+            {bookingKind === 'duty' ? (
+              <>
+                {/* Taxi selector — select-style dropdown, empty by default, filters by taxi or driver name */}
+                <FG label={t.selectTaxi}>
+                  {dutyTaxis.length === 0 ? (
+                    <p style={{ fontSize: 13, color: C.textTert, margin: 0 }}>{t.noTaxiForDuty}</p>
                   ) : (
-                    <p style={{ fontSize: 14, color: C.textTert, margin: 0 }}>{t.tapMap}</p>
+                    <>
+                      <input
+                        type="text"
+                        value={dutyTaxiSearch}
+                        onFocus={() => setDutyTaxiFocused(true)}
+                        onBlur={() => setDutyTaxiFocused(false)}
+                        onChange={e => { setDutyTaxiSearch(e.target.value); setDutyTaxiId('') }}
+                        placeholder={lang === 'id' ? 'Pilih taksi...' : 'Select taxi...'}
+                        style={{ ...inputSt, borderColor: dutyTaxiId ? C.black : C.border2 }}
+                      />
+                      {dutyTaxiFocused && (
+                        <div
+                          onMouseDown={e => e.preventDefault()}
+                          style={{ border: `1px solid ${C.border2}`, borderRadius: 12, marginTop: 4, overflow: 'hidden', background: '#fff', maxHeight: 220, overflowY: 'auto' }}
+                        >
+                          {dutyTaxis
+                            .filter(tx => !dutyTaxiSearch
+                              || tx.name.toLowerCase().includes(dutyTaxiSearch.toLowerCase())
+                              || (tx.driver_name || '').toLowerCase().includes(dutyTaxiSearch.toLowerCase()))
+                            .map(tx => (
+                              <div
+                                key={tx.id}
+                                onClick={() => { setDutyTaxiId(tx.id); setDutyTaxiSearch(`${tx.name}${tx.driver_name ? ` — ${tx.driver_name}` : ''}`); setDutyTaxiFocused(false) }}
+                                style={{ padding: '11px 14px', cursor: 'pointer', borderBottom: `1px solid ${C.border}` }}
+                              >
+                                <p style={{ fontSize: 14, fontWeight: 700, margin: 0, color: C.textPrimary }}>{tx.name}{tx.plate ? ` · ${tx.plate}` : ''}</p>
+                                <p style={{ fontSize: 12, color: C.textSecond, margin: '2px 0 0' }}>{tx.driver_name}</p>
+                              </div>
+                            ))}
+                          {dutyTaxis.filter(tx => !dutyTaxiSearch
+                            || tx.name.toLowerCase().includes(dutyTaxiSearch.toLowerCase())
+                            || (tx.driver_name || '').toLowerCase().includes(dutyTaxiSearch.toLowerCase())).length === 0 && (
+                            <div style={{ padding: '11px 14px', fontSize: 13, color: C.textTert }}>
+                              {lang === 'id' ? 'Tidak ditemukan' : 'No results'}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
-                </div>
-                {destCoords && <span style={{ fontSize: 11, color: C.textTert, flexShrink: 0 }}>{t.change}</span>}
-              </button>
-            </FG>
+                </FG>
 
-            <FG label={t.notes}>
-              <input type="text" value={form.notes} onChange={e => update('notes', e.target.value)} placeholder={t.specialReq} style={inputSt} />
-            </FG>
+                <FG label={t.dutyDate}>
+                  <input type="date" value={dutyDate}
+                    onChange={e => { setDutyDate(e.target.value); if (dutyEndDate < e.target.value) setDutyEndDate(e.target.value) }}
+                    min={defaultDateOnly()} style={inputSt} />
+                </FG>
+
+                <SwitchRow
+                  label={t.repeatSwitch} description={t.repeatSwitchDesc}
+                  checked={dutyRepeat} onChange={setDutyRepeat}
+                  color={C.black} border={C.border2} text={C.textPrimary} textMuted={C.textTert} surface={C.white}
+                />
+                {dutyRepeat && (
+                  <div style={{ marginTop: -6, marginBottom: 14, paddingLeft: 4 }}>
+                    <FG label={t.untilDate}>
+                      <input type="date" value={dutyEndDate} onChange={e => setDutyEndDate(e.target.value)} min={dutyDate} style={inputSt} />
+                    </FG>
+                    {dutyDate && dutyEndDate && (
+                      <p style={{ fontSize: 12, color: C.textTert, margin: '-10px 0 0' }}>
+                        {t.recurringInfo(differenceInCalendarDays(new Date(dutyEndDate), new Date(dutyDate)) + 1)}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <SwitchRow
+                  label={t.rangeSwitch} description={t.rangeSwitchDesc}
+                  checked={dutyRange} onChange={setDutyRange}
+                  color={C.black} border={C.border2} text={C.textPrimary} textMuted={C.textTert} surface={C.white}
+                />
+                {dutyRange && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: -6, marginBottom: 14, paddingLeft: 4 }}>
+                    <FG label={t.startTime}>
+                      <input type="time" value={dutyStartTime} onChange={e => setDutyStartTime(e.target.value)} style={inputSt} />
+                    </FG>
+                    <FG label={t.endTime}>
+                      <input type="time" value={dutyEndTime} onChange={e => setDutyEndTime(e.target.value)} style={inputSt} />
+                    </FG>
+                  </div>
+                )}
+
+                <FG label={t.dutyReason}>
+                  <input type="text" value={dutyReason} onChange={e => setDutyReason(e.target.value)} placeholder={t.dutyReasonPh} style={inputSt} />
+                </FG>
+
+                <div style={{ padding: '12px 14px', borderRadius: 12, border: `1px solid #FDE68A`, background: C.amberBg }}>
+                  <p style={{ fontSize: 12, color: C.amber, margin: 0 }}>
+                    {dutyRange ? t.dutyWarningRange(dutyStartTime, dutyEndTime) : t.dutyWarning}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Mode toggle */}
+                <FG label={t.when}>
+                  <div style={{ background: C.surface2, borderRadius: 16, padding: 4, display: 'flex', gap: 4 }}>
+                    {(['now','schedule'] as BookingMode[]).map(m => (
+                      <button key={m} onClick={() => update('mode', m)} style={{ flex: 1, padding: '10px 8px', border: 'none', borderRadius: 11, cursor: 'pointer', fontFamily: FONT, fontWeight: 600, fontSize: 13, background: form.mode === m ? C.white : 'transparent', color: form.mode === m ? C.textPrimary : C.textTert, boxShadow: form.mode === m ? '0 1px 4px rgba(0,0,0,0.08)' : 'none' }}>
+                        {m === 'now' ? t.now : t.schedule}
+                      </button>
+                    ))}
+                  </div>
+                </FG>
+
+                {/* Now status */}
+                {form.mode === 'now' && !noTaxiMsg && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: C.greenBg, border: `1px solid #B7E4C7`, borderRadius: 12, marginBottom: 16 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: C.greenMid, flexShrink: 0, display: 'inline-block' }} />
+                    <p style={{ fontSize: 12, color: C.green, margin: 0, fontWeight: 500 }}>
+                      {t.taxiAssigned}
+                    </p>
+                  </div>
+                )}
+
+                {/* No taxi error */}
+                {noTaxiMsg && (
+                  <div style={{ padding: '10px 14px', background: C.redBg, border: `1px solid #FECACA`, borderRadius: 12, marginBottom: 16 }}>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: C.red, margin: '0 0 2px' }}>{t.noTaxiNow}</p>
+                    <p style={{ fontSize: 12, color: C.red, margin: 0 }}>{noTaxiMsg}</p>
+                  </div>
+                )}
+
+                {form.mode === 'schedule' && (
+                  <FG label={t.dateTime}>
+                    <input type="datetime-local" value={form.scheduled_at} onChange={e => update('scheduled_at', e.target.value)} min={defaultDateTime()} style={inputSt} />
+                  </FG>
+                )}
+
+                <FG label={t.pickupLoc}>
+                  <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: C.white, border: `1.5px solid ${pickupCoords ? C.black : C.border}`, borderRadius: 16, padding: '12px 14px', fontFamily: FONT }}>
+                    <span style={{ fontSize: 18, flexShrink: 0 }}>📍</span>
+                    {pickupCoords ? (
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.pickup}</p>
+                        <input
+                          type="text"
+                          value={form.pickup}
+                          onChange={e => update('pickup', e.target.value)}
+                          style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', padding: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary, fontFamily: FONT }}
+                        />
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPickerField('pickup')}
+                        style={{ flex: 1, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: FONT }}
+                      >
+                        <p style={{ fontSize: 14, color: C.textTert, margin: 0 }}>{t.tapMap}</p>
+                      </button>
+                    )}
+                    {pickupCoords && (
+                      <button
+                        type="button"
+                        onClick={() => setPickerField('pickup')}
+                        style={{ fontSize: 11, color: C.textTert, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: FONT }}
+                      >
+                        {t.change}
+                      </button>
+                    )}
+                  </div>
+                </FG>
+
+                <FG label={t.destination}>
+                  <button
+                    type="button"
+                    onClick={() => setPickerField('destination')}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, background: C.white, border: `1.5px solid ${destCoords ? C.black : C.border}`, borderRadius: 16, padding: '12px 14px', cursor: 'pointer', fontFamily: FONT, textAlign: 'left' }}
+                  >
+                    <span style={{ fontSize: 18, flexShrink: 0 }}>🏁</span>
+                    <div style={{ flex: 1 }}>
+                      {destCoords ? (
+                        <>
+                          <p style={{ fontSize: 10, color: C.textTert, margin: '0 0 2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.dest}</p>
+                          <p style={{ fontSize: 13, color: C.textPrimary, margin: 0, fontWeight: 600 }}>{form.destination}</p>
+                        </>
+                      ) : (
+                        <p style={{ fontSize: 14, color: C.textTert, margin: 0 }}>{t.tapMap}</p>
+                      )}
+                    </div>
+                    {destCoords && <span style={{ fontSize: 11, color: C.textTert, flexShrink: 0 }}>{t.change}</span>}
+                  </button>
+                </FG>
+
+                <FG label={t.notes}>
+                  <input type="text" value={form.notes} onChange={e => update('notes', e.target.value)} placeholder={t.specialReq} style={inputSt} />
+                </FG>
+              </>
+            )}
           </div>
         )}
 
@@ -574,7 +825,44 @@ export default function CoordinatorBookPage() {
         )}
 
         {/* STEP 3 */}
-        {step === 3 && (
+        {step === 3 && bookingKind === 'duty' && (
+          <div>
+            <p style={{ fontSize: 12, color: C.textTert, margin: '0 0 16px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.reviewConfirm}</p>
+            <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', marginBottom: 16 }}>
+              <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}`, background: C.surface }}>
+                <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.textTert, margin: '0 0 4px' }}>{t.selectTaxi}</p>
+                <p style={{ fontSize: 15, fontWeight: 700, color: C.textPrimary, margin: 0 }}>{selectedDutyTaxi?.name || '—'}</p>
+                <p style={{ fontSize: 12, color: C.textSecond, margin: '2px 0 0' }}>{selectedDutyTaxi?.driver_name}</p>
+              </div>
+              <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}` }}>
+                <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.textTert, margin: '0 0 4px' }}>{t.dutyDate}</p>
+                <p style={{ fontSize: 15, fontWeight: 700, color: C.textPrimary, margin: 0, letterSpacing: '-0.2px' }}>
+                  {dutyRepeat ? `${formatDateOnly(dutyDate)} – ${formatDateOnly(dutyEndDate)}` : formatDateOnly(dutyDate)}
+                </p>
+                {dutyRange && (
+                  <p style={{ fontSize: 12, color: C.textTert, margin: '3px 0 0' }}>{dutyStartTime}–{dutyEndTime}</p>
+                )}
+              </div>
+              {[
+                { label: t.passengerLabel, value: selectedPassenger?.name || '—' },
+                ...(dutyReason ? [{ label: t.dutyReason.replace(' (optional)', '').replace(' (opsional)', ''), value: dutyReason }] : []),
+              ].map((row, i, arr) => (
+                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 16px', borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                  <span style={{ fontSize: 12, color: C.textSecond }}>{row.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary, textAlign: 'right', maxWidth: '60%' }}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid #FDE68A', background: C.amberBg }}>
+              <p style={{ fontSize: 12, color: C.amber, margin: 0 }}>
+                {dutyRange ? t.dutyWarningRange(dutyStartTime, dutyEndTime) : t.dutyWarning}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && bookingKind === 'trip' && (
           <div>
             <p style={{ fontSize: 12, color: C.textTert, margin: '0 0 16px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.reviewConfirm}</p>
             <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', marginBottom: 16 }}>
@@ -645,11 +933,11 @@ export default function CoordinatorBookPage() {
               onClick={handleNext}
               disabled={checkingNow}
               style={{ width: '100%', padding: '14px 20px', background: checkingNow ? C.border2 : C.black, color: C.white, border: 'none', borderRadius: 16, fontSize: 15, fontWeight: 600, cursor: checkingNow ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
-              {checkingNow ? t.checkingAvail : step === 1 ? t.nextTripType : t.nextReview}
+              {checkingNow ? t.checkingAvail : bookingKind === 'duty' ? t.nextReviewDuty : step === 1 ? t.nextTripType : t.nextReview}
             </button>
           ) : (
             <button onClick={submit} disabled={loading} style={{ width: '100%', padding: '14px 20px', background: loading ? C.border2 : C.black, color: C.white, border: 'none', borderRadius: 16, fontSize: 15, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
-              {loading ? t.checkingAvail : t.confirmBook}
+              {loading ? t.checkingAvail : bookingKind === 'duty' ? t.confirmDuty : t.confirmBook}
             </button>
           )}
         </div>
@@ -680,6 +968,16 @@ function defaultDateTime() {
 function formatDateTime(s: string) {
   if (!s) return '—'
   return new Date(s).toLocaleString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+// WITA-aware 'yyyy-MM-dd' for date-only pickers (driver duty)
+function defaultDateOnly() {
+  return new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+}
+
+function formatDateOnly(s: string) {
+  if (!s) return '—'
+  return new Date(s + 'T12:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 const inputSt: React.CSSProperties = {

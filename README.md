@@ -1,4 +1,4 @@
-# TaxiBook — Setup Guide
+# Ridr — Setup Guide
 
 Company fleet booking system built with Next.js 14 PWA + Supabase.
 
@@ -166,12 +166,12 @@ src/
 ## PWA install instructions (share with users)
 
 **Android (Chrome):**
-1. Open taxibook.yourcompany.com in Chrome
+1. Open ridr.yourcompany.com in Chrome
 2. Tap the 3-dot menu → "Add to Home screen"
 3. Tap Add → Done
 
 **iPhone (Safari):**
-1. Open taxibook.yourcompany.com in Safari
+1. Open ridr.yourcompany.com in Safari
 2. Tap the Share button (box with arrow)
 3. Tap "Add to Home Screen"
 4. Tap Add → Done

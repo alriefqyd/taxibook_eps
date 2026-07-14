@@ -28,3 +28,11 @@ CREATE POLICY "Coordinators manage driver day assignments"
 CREATE POLICY "Authenticated users can view driver day assignments"
   ON driver_day_assignments FOR SELECT
   USING (auth.uid() IS NOT NULL);
+
+-- ============================================================
+-- MIGRATION: partial-day duty window
+-- A duty can now be a specific time range instead of the full day.
+-- NULL start_time/end_time means full day (original behavior).
+-- ============================================================
+ALTER TABLE driver_day_assignments ADD COLUMN IF NOT EXISTS start_time time;
+ALTER TABLE driver_day_assignments ADD COLUMN IF NOT EXISTS end_time   time;

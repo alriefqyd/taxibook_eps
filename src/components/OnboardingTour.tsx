@@ -54,8 +54,8 @@ export default function OnboardingTour({ role }: { role: Role }) {
 
   const steps = useMemo<TourStep[]>(() => [
     {
-      title: 'Install TaxiBook on your phone',
-      description: 'Open your browser menu and choose Add to Home screen to install TaxiBook as a phone app for the best experience.',
+      title: 'Install Ridr on your phone',
+      description: 'Open your browser menu and choose Add to Home screen to install Ridr as a phone app for the best experience.',
     },
     ...getRoleSteps(role),
   ], [role])
@@ -87,7 +87,7 @@ export default function OnboardingTour({ role }: { role: Role }) {
         <div style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.48)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ width: 'min(660px,100%)', background: '#fff', borderRadius: 24, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.25)' }}>
             <div style={{ padding: '24px 28px 16px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#006064' }}>Welcome to TaxiBook</p>
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#006064' }}>Welcome to Ridr</p>
               <h2 style={{ margin: '10px 0 0', fontSize: 22, fontWeight: 800, color: '#102a43' }}>{steps[stepIndex].title}</h2>
               <p style={{ margin: '10px 0 0', fontSize: 14, lineHeight: 1.7, color: '#334155' }}>{steps[stepIndex].description}</p>
             </div>

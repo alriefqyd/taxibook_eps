@@ -1,13 +1,12 @@
 'use client'
 import { useEffect, useState, useRef, Fragment } from 'react'
-import { MapContainer, Marker, Polyline, Popup, useMap } from 'react-leaflet'
+import { MapContainer, Marker, Popup, useMap } from 'react-leaflet'
 import TileLayerSwitcher from './TileLayerSwitcher'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useDriverLocations } from '@/hooks/useDriverLocations'
-import { getRoute } from '@/lib/routing'
-import { trimRouteToDriver } from '@/lib/routeTrim'
 import { carSvg, sphereGradient, SPHERE_SHADOW } from './carIcon'
+import { spreadOverlappingPins } from '@/lib/spreadPins'
 const DEFAULT_CENTER: [number, number] = [-2.5397, 121.3588]
 const GPS_STALE_MS = 10 * 60 * 1000
 
@@ -122,9 +121,6 @@ interface Props { style?: React.CSSProperties }
 
 export default function DriverFleetMap({ style }: Props) {
   const drivers = useDriverLocations()
-  const [routes,        setRoutes]        = useState<Record<string, [number, number][]>>({})
-  const [displayRoutes, setDisplayRoutes] = useState<Record<string, [number, number][]>>({})
-  const trimStateRef = useRef<Record<string, { index: number; route: [number, number][] }>>({})
   const [isFs,    setIsFs]    = useState(false)
   const [isCssFs, setIsCssFs] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -155,53 +151,24 @@ export default function DriverFleetMap({ style }: Props) {
 
   const isFullscreen = isFs || isCssFs
 
-  const tripKey = drivers
-    .filter(d => d.active_booking && d.latitude != null && d.longitude != null)
-    .map(d => `${d.id}:${d.latitude!.toFixed(3)},${d.longitude!.toFixed(3)},${d.active_booking?.pickup_lat?.toFixed(3)},${d.active_booking?.destination_lat?.toFixed(3)}`)
-    .join('|')
-
-  // Full trip route per driver: driver position → pickup → destination
-  useEffect(() => {
-    if (!tripKey) return
-    drivers.forEach(d => {
-      const bk = d.active_booking
-      if (!bk) return
-      if (d.latitude == null || d.longitude == null) return
-      if (bk.pickup_lat == null || bk.pickup_lng == null) return
-      if (bk.destination_lat == null || bk.destination_lng == null) return
-
-      Promise.all([
-        getRoute({ lat: d.latitude, lng: d.longitude }, { lat: bk.pickup_lat, lng: bk.pickup_lng }),
-        getRoute({ lat: bk.pickup_lat, lng: bk.pickup_lng }, { lat: bk.destination_lat, lng: bk.destination_lng }),
-      ]).then(([leg1, leg2]) => {
-        const coords = [...(leg1?.coordinates ?? []), ...(leg2?.coordinates ?? [])]
-        setRoutes(prev => ({
-          ...prev,
-          [d.id]: coords.length > 1
-            ? coords
-            : [[d.latitude!, d.longitude!], [bk.pickup_lat!, bk.pickup_lng!], [bk.destination_lat!, bk.destination_lng!]],
-        }))
-      })
-    })
-  }, [tripKey]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Erase the already-traveled portion of each driver's line as they move, like navigation.
-  useEffect(() => {
-    const next: Record<string, [number, number][]> = {}
-    drivers.forEach(d => {
-      const route = routes[d.id]
-      if (!route || route.length < 2 || d.latitude == null || d.longitude == null) return
-      const prevState = trimStateRef.current[d.id]
-      const lastIndex = prevState && prevState.route === route ? prevState.index : 0
-      const { trimmed, index } = trimRouteToDriver(route, d.latitude, d.longitude, lastIndex)
-      trimStateRef.current[d.id] = { index, route }
-      next[d.id] = trimmed
-    })
-    setDisplayRoutes(next)
-  }, [drivers, routes])
-
   const positioned = drivers.filter(d => d.latitude != null && d.longitude != null)
   const fitPositions: [number, number][] = positioned.map(d => [d.latitude!, d.longitude!])
+
+  // Spread pickup/destination pins that share (near-)identical coordinates so they
+  // don't stack and hide each other — e.g. several taxis heading to the same office.
+  const pinItems = positioned.flatMap(d => {
+    const bk = d.active_booking
+    if (!bk) return []
+    const items: { id: string; lat: number; lng: number }[] = []
+    if (bk.pickup_lat != null && bk.pickup_lng != null) {
+      items.push({ id: `${d.id}-pickup`, lat: bk.pickup_lat, lng: bk.pickup_lng })
+    }
+    if (bk.destination_lat != null && bk.destination_lng != null) {
+      items.push({ id: `${d.id}-dest`, lat: bk.destination_lat, lng: bk.destination_lng })
+    }
+    return items
+  })
+  const pinPositions = spreadOverlappingPins(pinItems)
 
   return (
     <div ref={containerRef} style={{
@@ -223,16 +190,11 @@ export default function DriverFleetMap({ style }: Props) {
           const hasActiveBooking = bk != null
           const hasPickup = bk?.pickup_lat != null && bk?.pickup_lng != null
           const hasDest   = bk?.destination_lat != null && bk?.destination_lng != null
-          const route     = displayRoutes[d.id] ?? routes[d.id]
 
           return (
             <Fragment key={d.id}>
-              {hasActiveBooking && route && route.length > 1 && (
-                <Polyline positions={route} pathOptions={{ color: d.color, weight: 4, opacity: 0.85 }} />
-              )}
-
               {hasActiveBooking && hasPickup && (
-                <Marker position={[bk!.pickup_lat!, bk!.pickup_lng!]} icon={pickupIcon(d.color, d.driver_name || d.name)}>
+                <Marker position={pinPositions[`${d.id}-pickup`] ?? [bk!.pickup_lat!, bk!.pickup_lng!]} icon={pickupIcon(d.color, d.driver_name || d.name)}>
                   <Popup>
                     <div style={{ fontFamily: 'Inter, sans-serif' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
@@ -248,7 +210,7 @@ export default function DriverFleetMap({ style }: Props) {
               )}
 
               {hasActiveBooking && hasDest && (
-                <Marker position={[bk!.destination_lat!, bk!.destination_lng!]} icon={destinationIcon(d.color, d.driver_name || d.name)}>
+                <Marker position={pinPositions[`${d.id}-dest`] ?? [bk!.destination_lat!, bk!.destination_lng!]} icon={destinationIcon(d.color, d.driver_name || d.name)}>
                   <Popup>
                     <div style={{ fontFamily: 'Inter, sans-serif' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>

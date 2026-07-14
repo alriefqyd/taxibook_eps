@@ -7,7 +7,7 @@ export async function geocodeAddress(address: string): Promise<Coords | null> {
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`
     const res = await fetch(url, {
-      headers: { 'Accept-Language': 'en', 'User-Agent': 'TaxiBook/1.0' },
+      headers: { 'Accept-Language': 'en', 'User-Agent': 'Ridr/1.0' },
     })
     const data = await res.json()
     if (!data.length) return null
@@ -21,7 +21,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string |
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
     const res = await fetch(url, {
-      headers: { 'Accept-Language': 'en', 'User-Agent': 'TaxiBook/1.0' },
+      headers: { 'Accept-Language': 'en', 'User-Agent': 'Ridr/1.0' },
     })
     const data = await res.json()
     // Prefer a short readable name over the full display_name

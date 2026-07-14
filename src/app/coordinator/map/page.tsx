@@ -197,7 +197,7 @@ export default function CoordinatorMapPage() {
   })
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif", height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', touchAction: 'manipulation' }}>
+    <div style={{ fontFamily: "'Inter', sans-serif", position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', touchAction: 'manipulation' }}>
 
       {/* Header */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid rgba(0,0,0,0.08)', padding: '12px 20px', flexShrink: 0 }}>
@@ -321,7 +321,7 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
   return (
     <>
       {/* Backdrop */}
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1100 }} />
+      <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.4)', zIndex: 1100 }} />
 
       {/* Sheet */}
       <div style={{

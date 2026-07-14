@@ -1,12 +1,16 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { useNavRouter as useRouter } from '@/hooks/useNavRouter'
 import { createClient } from '@/lib/supabase/client'
-import { format } from 'date-fns'
+import { format, differenceInCalendarDays } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { useLang } from '@/lib/language'
 import PageLoader from '@/components/PageLoader'
+import SwitchRow from '@/components/SwitchRow'
+
+const DriverLastLocationMap = dynamic(() => import('@/components/map/DriverLastLocationMap'), { ssr: false })
 
 // ── Design tokens (DESIGN.md "Fleet Modernist") ─────────────
 const FONT     = "'Plus Jakarta Sans', sans-serif"
@@ -37,6 +41,8 @@ const MSG = {
     tabSchedule:     'Schedule',
     trips:           'trips',
     scheduled:       'Scheduled',
+    lastLocation:    'Last location',
+    noGpsYet:        'No GPS data yet',
     todayTrips:      "Today's trips",
     fullDayDuty:     'Full Day Duty',
     assignDay:       'Assign Day',
@@ -60,9 +66,18 @@ const MSG = {
     assign:          'Assign',
     assignFullDay:   'Assign Full Day Duty',
     date:            'Date',
+    repeatSwitch:     'Repeat every day',
+    repeatSwitchDesc: 'Assign the same duty daily until an end date',
+    untilDate:       'Until',
+    recurringInfo:   (n: number) => `This will assign the driver for ${n} day${n === 1 ? '' : 's'} in a row.`,
+    rangeSwitch:      'Limit to specific hours',
+    rangeSwitchDesc:  'Only block auto-assign during these hours, not the whole day',
+    startTime:       'Start time',
+    endTime:         'End time',
     dutyDesc:            'Duty description (optional)',
     dutyDescPlaceholder: 'e.g. VIP escort, site visit, security duty...',
     dutyWarning:         'Driver will not appear in auto-assign for this date. Coordinator can still manually assign them if needed.',
+    dutyWarningRange:    (s: string, e: string) => `Driver will not appear in auto-assign between ${s}–${e} on this date. Coordinator can still manually assign them if needed.`,
     passenger:           'Passenger (optional)',
     passengerSearch:     'Search passenger...',
     passengerOthers:     'Others (not in system)',
@@ -89,6 +104,14 @@ const MSG = {
     confirmRemove:   'Remove driver from this taxi?',
     adding:          'Adding...',
     removing:        'Removing...',
+    confirmSetFree:    'Set this taxi to free/online?',
+    confirmSetOffline: 'Set this taxi to offline?',
+    setFreeDesc:       'It will start receiving new trip assignments again.',
+    setOfflineDesc:    'It will stop receiving new trip assignments.',
+    confirmReleaseDuty: 'Release this duty assignment?',
+    releasing:          'Releasing...',
+    setFree:            'Set Free',
+    setOffline:         'Set Offline',
   },
   id: {
     fleetMgmt:       'Manajemen Armada',
@@ -100,6 +123,8 @@ const MSG = {
     tabSchedule:     'Jadwal',
     trips:           'trip',
     scheduled:       'Dijadwalkan',
+    lastLocation:    'Lokasi terakhir',
+    noGpsYet:        'Belum ada data GPS',
     todayTrips:      'Trip hari ini',
     fullDayDuty:     'Tugas Seharian',
     assignDay:       'Assign Hari',
@@ -123,9 +148,18 @@ const MSG = {
     assign:          'Assign',
     assignFullDay:   'Assign Tugas Seharian',
     date:            'Tanggal',
+    repeatSwitch:     'Ulangi setiap hari',
+    repeatSwitchDesc: 'Tugaskan hal yang sama tiap hari sampai tanggal akhir',
+    untilDate:       'Sampai',
+    recurringInfo:   (n: number) => `Ini akan menugaskan driver selama ${n} hari berturut-turut.`,
+    rangeSwitch:      'Batasi ke jam tertentu',
+    rangeSwitchDesc:  'Hanya blokir auto-assign selama jam ini, bukan sepanjang hari',
+    startTime:       'Jam mulai',
+    endTime:         'Jam selesai',
     dutyDesc:            'Keterangan tugas (opsional)',
     dutyDescPlaceholder: 'mis. Pengawalan VIP, kunjungan site, tugas keamanan...',
     dutyWarning:         'Driver tidak akan muncul di auto-assign untuk tanggal ini. Koordinator tetap bisa assign manual jika dibutuhkan.',
+    dutyWarningRange:    (s: string, e: string) => `Driver tidak akan muncul di auto-assign antara ${s}–${e} pada tanggal ini. Koordinator tetap bisa assign manual jika dibutuhkan.`,
     passenger:           'Penumpang (opsional)',
     passengerSearch:     'Cari penumpang...',
     passengerOthers:     'Lainnya (tidak ada di sistem)',
@@ -152,6 +186,14 @@ const MSG = {
     confirmRemove:   'Hapus driver dari taksi ini?',
     adding:          'Menambahkan...',
     removing:        'Menghapus...',
+    confirmSetFree:    'Jadikan taksi ini bebas/online?',
+    confirmSetOffline: 'Jadikan taksi ini offline?',
+    setFreeDesc:       'Taksi akan kembali menerima penugasan trip baru.',
+    setOfflineDesc:    'Taksi akan berhenti menerima penugasan trip baru.',
+    confirmReleaseDuty: 'Lepaskan tugas ini?',
+    releasing:          'Melepaskan...',
+    setFree:            'Jadikan Bebas',
+    setOffline:         'Jadikan Offline',
   },
 }
 
@@ -194,10 +236,12 @@ interface TaxiRow {
   is_available: boolean; driver_id: string | null; driver_name: string | null
   trips_today: number
   active_booking: any | null; next_booking: any | null
+  latitude: number | null; longitude: number | null; location_updated_at: string | null
 }
 interface DayAssignment {
   id: string; taxi_id: string; assign_date: string; reason: string | null
   passenger_id: string | null; passenger_name_other: string | null
+  start_time: string | null; end_time: string | null
 }
 interface Booking {
   id: string; booking_code: string; passenger_name: string
@@ -207,6 +251,31 @@ interface Booking {
   taxi_color: string | null; driver_name: string | null; passenger_id: string
 }
 type Section = 'fleet' | 'schedule'
+
+// Minutes since last GPS update
+function minsAgo(ts: string | null): number | null {
+  if (!ts) return null
+  return Math.floor((Date.now() - new Date(ts).getTime()) / 60000)
+}
+
+function relativeTime(ts: string | null): string {
+  const m = minsAgo(ts)
+  if (m === null) return 'never'
+  if (m < 1)  return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  return `${h}h ${m % 60}m ago`
+}
+
+// Staleness color: green → amber → red → gray
+function stalenessColor(ts: string | null): string {
+  const m = minsAgo(ts)
+  if (m === null)  return '#9ca3af' // never
+  if (m < 5)       return '#059669' // green
+  if (m < 15)      return '#D97706' // amber
+  if (m < 60)      return '#DC2626' // red
+  return '#6b7280'                  // gray (very stale)
+}
 
 export default function DriversPage() {
   const router   = useRouter()
@@ -229,7 +298,12 @@ export default function DriversPage() {
 
   const [dayAssignments,      setDayAssignments]      = useState<Record<string, DayAssignment[]>>({})
   const [assigningTaxi,       setAssigningTaxi]       = useState<TaxiRow | null>(null)
+  const [assignMode,          setAssignMode]          = useState<'once' | 'recurring'>('once')
   const [assignDate,          setAssignDate]          = useState('')
+  const [assignEndDate,       setAssignEndDate]       = useState('')
+  const [assignDuration,      setAssignDuration]      = useState<'full' | 'range'>('full')
+  const [assignStartTime,     setAssignStartTime]     = useState('08:00')
+  const [assignEndTime,       setAssignEndTime]       = useState('17:00')
   const [assignReason,        setAssignReason]        = useState('')
   const [savingAssign,        setSavingAssign]        = useState(false)
   const [passengerList,       setPassengerList]       = useState<{ id: string; name: string }[]>([])
@@ -243,6 +317,9 @@ export default function DriversPage() {
   const [savingDriver,    setSavingDriver]    = useState(false)
   const [removingDriver,  setRemovingDriver]  = useState<string | null>(null)
   const [pendingRemove,   setPendingRemove]   = useState<TaxiRow | null>(null)
+  const [pendingToggle,   setPendingToggle]   = useState<TaxiRow | null>(null)
+  const [pendingRelease,  setPendingRelease]  = useState<DayAssignment | null>(null)
+  const [releasingId,     setReleasingId]     = useState<string | null>(null)
 
   const loadData = useCallback(async (date?: string) => {
     const d = date || dateFilter
@@ -286,6 +363,8 @@ export default function DriversPage() {
         is_available: taxi.is_available,
         driver_id: taxi.driver_id, driver_name: taxi.users?.name || null,
         trips_today: trips || 0, active_booking: activeBk || null, next_booking: nextBk || null,
+        latitude: taxi.latitude ?? null, longitude: taxi.longitude ?? null,
+        location_updated_at: taxi.location_updated_at ?? null,
       }
     }))
     setTaxis(enriched)
@@ -309,11 +388,14 @@ export default function DriversPage() {
     return () => { supabase.removeChannel(ch) }
   }, [])
 
-  async function toggleAvail(taxi: TaxiRow) {
+  async function doToggleAvail() {
+    if (!pendingToggle) return
+    const taxi = pendingToggle
     setToggling(taxi.id)
     await supabase.from('taxis').update({ is_available: !taxi.is_available }).eq('id', taxi.id)
     await loadData()
     setToggling(null)
+    setPendingToggle(null)
   }
 
   async function openReassign(booking: Booking) {
@@ -354,7 +436,13 @@ export default function DriversPage() {
 
   async function openAssignFullDay(taxi: TaxiRow) {
     setAssigningTaxi(taxi)
-    setAssignDate(new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10))
+    setAssignMode('once')
+    setAssignDuration('full')
+    setAssignStartTime('08:00')
+    setAssignEndTime('17:00')
+    const startDate = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+    setAssignDate(startDate)
+    setAssignEndDate(startDate)
     setAssignReason('')
     setAssignPassengerId('')
     setAssignPassengerOther('')
@@ -366,6 +454,8 @@ export default function DriversPage() {
 
   async function confirmAssignFullDay() {
     if (!assigningTaxi || !assignDate) return
+    if (assignMode === 'recurring' && !assignEndDate) return
+    if (assignDuration === 'range' && (!assignStartTime || !assignEndTime || assignEndTime <= assignStartTime)) return
     setSavingAssign(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setSavingAssign(false); return }
@@ -375,6 +465,9 @@ export default function DriversPage() {
       body: JSON.stringify({
         taxi_id:              assigningTaxi.id,
         assign_date:          assignDate,
+        repeat_until:         assignMode === 'recurring' ? assignEndDate : null,
+        start_time:           assignDuration === 'range' ? assignStartTime : null,
+        end_time:             assignDuration === 'range' ? assignEndTime : null,
         reason:               assignReason || null,
         passenger_id:         assignPassengerId && assignPassengerId !== 'others' ? assignPassengerId : null,
         passenger_name_other: assignPassengerId === 'others' ? assignPassengerOther || null : null,
@@ -390,14 +483,18 @@ export default function DriversPage() {
     setSavingAssign(false)
   }
 
-  async function releaseFullDay(assignmentId: string) {
+  async function doReleaseFullDay() {
+    if (!pendingRelease) return
+    setReleasingId(pendingRelease.id)
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-    await fetch(`/api/driver-day-assignments/${assignmentId}`, {
+    if (!session) { setReleasingId(null); return }
+    await fetch(`/api/driver-day-assignments/${pendingRelease.id}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${session.access_token}` },
     })
     await loadData()
+    setReleasingId(null)
+    setPendingRelease(null)
   }
 
   async function openAddDriver(taxi: TaxiRow) {
@@ -580,7 +677,7 @@ export default function DriversPage() {
                     </div>
 
                     {taxi.driver_id ? (
-                      <div onClick={e => { e.stopPropagation(); if (!isToggling) toggleAvail(taxi) }}
+                      <div onClick={e => { e.stopPropagation(); if (!isToggling) setPendingToggle(taxi) }}
                         style={{
                           width: 44, height: 24, borderRadius: 12, flexShrink: 0,
                           background: isToggling ? BORDER : isOn ? PRIMARY : BORDER,
@@ -622,6 +719,33 @@ export default function DriversPage() {
                         </div>
                       ))}
                     </div>
+
+                    {/* Last location */}
+                    {taxi.driver_id && (
+                      <div style={{ background: SURF, borderRadius: 12, marginBottom: 10, border: `1px solid ${BORDER}`, overflow: 'hidden' }}>
+                        <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: stalenessColor(taxi.location_updated_at), flexShrink: 0 }} />
+                            <div style={{ minWidth: 0 }}>
+                              <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: TEXT_MUT, margin: '0 0 2px' }}>{t.lastLocation}</p>
+                              <p style={{ fontSize: 12, fontWeight: 600, color: TEXT, margin: 0 }}>
+                                {taxi.latitude && taxi.longitude
+                                  ? `${taxi.latitude.toFixed(5)}, ${taxi.longitude.toFixed(5)}`
+                                  : t.noGpsYet}
+                              </p>
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: stalenessColor(taxi.location_updated_at), flexShrink: 0, whiteSpace: 'nowrap' }}>
+                            {relativeTime(taxi.location_updated_at)}
+                          </span>
+                        </div>
+                        {taxi.latitude && taxi.longitude && (
+                          <div style={{ height: 140, borderTop: `1px solid ${BORDER}` }}>
+                            <DriverLastLocationMap lat={taxi.latitude} lng={taxi.longitude} color={taxi.color} />
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Today's trips */}
                     {taxiBks.length > 0 && (
@@ -670,6 +794,7 @@ export default function DriversPage() {
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <p style={{ fontSize: 12, fontWeight: 700, color: AMBER_T, margin: 0 }}>
                                 {format(new Date(a.assign_date + 'T12:00:00'), 'EEE, d MMM yyyy', { locale: idLocale })}
+                                {a.start_time && a.end_time && ` · ${a.start_time.slice(0, 5)}–${a.end_time.slice(0, 5)}`}
                                 {a.assign_date === witaTodayStr && (
                                   <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: AMBER_T, background: AMBER, padding: '1px 6px', borderRadius: 4 }}>{t.today.toUpperCase()}</span>
                                 )}
@@ -681,9 +806,10 @@ export default function DriversPage() {
                               )}
                               {a.reason && <p style={{ fontSize: 11, color: AMBER_T, margin: '2px 0 0', opacity: 0.8 }}>{a.reason}</p>}
                             </div>
-                            <button onClick={e => { e.stopPropagation(); releaseFullDay(a.id) }}
-                              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 7, background: `${OFFLINE}15`, color: OFFLINE, border: `1px solid ${OFFLINE}40`, cursor: 'pointer', flexShrink: 0, fontFamily: FONT }}>
-                              <IconX /> {t.release}
+                            <button onClick={e => { e.stopPropagation(); setPendingRelease(a) }}
+                              disabled={releasingId === a.id}
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 7, background: `${OFFLINE}15`, color: OFFLINE, border: `1px solid ${OFFLINE}40`, cursor: releasingId === a.id ? 'not-allowed' : 'pointer', flexShrink: 0, fontFamily: FONT }}>
+                              <IconX /> {releasingId === a.id ? t.releasing : t.release}
                             </button>
                           </div>
                         ))
@@ -829,7 +955,7 @@ export default function DriversPage() {
 
       {/* ── Assign Full Day sheet ── */}
       {assigningTaxi && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
           onClick={() => setAssigningTaxi(null)}>
           <div style={{ background: SURF, width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', maxHeight: '80vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
@@ -845,9 +971,58 @@ export default function DriversPage() {
 
             <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_MUT, margin: '0 0 8px' }}>{t.date}</p>
             <input type="date" value={assignDate}
-              onChange={e => setAssignDate(e.target.value)}
+              onChange={e => {
+                setAssignDate(e.target.value)
+                if (assignEndDate < e.target.value) setAssignEndDate(e.target.value)
+              }}
               min={new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)}
               style={{ width: '100%', padding: '12px 14px', fontSize: 14, fontWeight: 600, border: `1.5px solid ${BORDER}`, borderRadius: 12, outline: 'none', marginBottom: 14, boxSizing: 'border-box', fontFamily: FONT, color: PRIMARY, background: SURF }} />
+
+            <SwitchRow
+              label={t.repeatSwitch}
+              description={t.repeatSwitchDesc}
+              checked={assignMode === 'recurring'}
+              onChange={v => setAssignMode(v ? 'recurring' : 'once')}
+              color={PRIMARY} border={BORDER} text={TEXT} textMuted={TEXT_MUT} surface={SURF}
+            />
+            {assignMode === 'recurring' && (
+              <div style={{ marginTop: -6, marginBottom: 14, paddingLeft: 4 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_MUT, margin: '0 0 8px' }}>{t.untilDate}</p>
+                <input type="date" value={assignEndDate}
+                  onChange={e => setAssignEndDate(e.target.value)}
+                  min={assignDate}
+                  style={{ width: '100%', padding: '12px 14px', fontSize: 14, fontWeight: 600, border: `1.5px solid ${BORDER}`, borderRadius: 12, outline: 'none', marginBottom: 8, boxSizing: 'border-box', fontFamily: FONT, color: PRIMARY, background: SURF }} />
+                {assignDate && assignEndDate && (
+                  <p style={{ fontSize: 12, color: TEXT_MUT, margin: 0 }}>
+                    {t.recurringInfo(differenceInCalendarDays(new Date(assignEndDate), new Date(assignDate)) + 1)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <SwitchRow
+              label={t.rangeSwitch}
+              description={t.rangeSwitchDesc}
+              checked={assignDuration === 'range'}
+              onChange={v => setAssignDuration(v ? 'range' : 'full')}
+              color={PRIMARY} border={BORDER} text={TEXT} textMuted={TEXT_MUT} surface={SURF}
+            />
+            {assignDuration === 'range' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: -6, marginBottom: 14, paddingLeft: 4 }}>
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_MUT, margin: '0 0 8px' }}>{t.startTime}</p>
+                  <input type="time" value={assignStartTime}
+                    onChange={e => setAssignStartTime(e.target.value)}
+                    style={{ width: '100%', padding: '12px 14px', fontSize: 14, fontWeight: 600, border: `1.5px solid ${BORDER}`, borderRadius: 12, outline: 'none', boxSizing: 'border-box', fontFamily: FONT, color: PRIMARY, background: SURF }} />
+                </div>
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_MUT, margin: '0 0 8px' }}>{t.endTime}</p>
+                  <input type="time" value={assignEndTime}
+                    onChange={e => setAssignEndTime(e.target.value)}
+                    style={{ width: '100%', padding: '12px 14px', fontSize: 14, fontWeight: 600, border: `1.5px solid ${BORDER}`, borderRadius: 12, outline: 'none', boxSizing: 'border-box', fontFamily: FONT, color: PRIMARY, background: SURF }} />
+                </div>
+              </div>
+            )}
 
             <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_MUT, margin: '0 0 8px' }}>{t.dutyDesc}</p>
             <input type="text" value={assignReason}
@@ -886,7 +1061,9 @@ export default function DriversPage() {
             )}
 
             <div style={{ background: AMBER_BG, border: `1px solid ${AMBER}`, borderRadius: 12, padding: '10px 14px', marginBottom: 20 }}>
-              <p style={{ fontSize: 12, color: AMBER_T, margin: 0, fontWeight: 500 }}>{t.dutyWarning}</p>
+              <p style={{ fontSize: 12, color: AMBER_T, margin: 0, fontWeight: 500 }}>
+                {assignDuration === 'range' ? t.dutyWarningRange(assignStartTime, assignEndTime) : t.dutyWarning}
+              </p>
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
@@ -894,10 +1071,17 @@ export default function DriversPage() {
                 style={{ flex: 1, padding: '14px', fontSize: 14, fontWeight: 700, border: `1px solid ${BORDER}`, borderRadius: 12, background: SURF_LOW, color: TEXT_MUT, cursor: 'pointer', fontFamily: FONT }}>
                 {t.cancel}
               </button>
-              <button onClick={confirmAssignFullDay} disabled={!assignDate || savingAssign}
-                style={{ flex: 2, padding: '14px', fontSize: 14, fontWeight: 700, border: 'none', borderRadius: 12, background: !assignDate || savingAssign ? BORDER : PRIMARY, color: '#fff', cursor: !assignDate || savingAssign ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
-                {savingAssign ? t.assigning : t.confirmFullDay}
-              </button>
+              {(() => {
+                const invalid = !assignDate || savingAssign
+                  || (assignMode === 'recurring' && !assignEndDate)
+                  || (assignDuration === 'range' && (!assignStartTime || !assignEndTime || assignEndTime <= assignStartTime))
+                return (
+                  <button onClick={confirmAssignFullDay} disabled={invalid}
+                    style={{ flex: 2, padding: '14px', fontSize: 14, fontWeight: 700, border: 'none', borderRadius: 12, background: invalid ? BORDER : PRIMARY, color: '#fff', cursor: invalid ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
+                    {savingAssign ? t.assigning : t.confirmFullDay}
+                  </button>
+                )
+              })()}
             </div>
           </div>
         </div>
@@ -905,7 +1089,7 @@ export default function DriversPage() {
 
       {/* ── Add Driver sheet ── */}
       {addDriverTaxi && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
           onClick={() => setAddDriverTaxi(null)}>
           <div style={{ background: SURF, width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', maxHeight: '80vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
@@ -990,7 +1174,7 @@ export default function DriversPage() {
         }
 
         return (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
             onClick={() => setReassigning(null)}>
             <div style={{ background: SURF, width: '100%', borderRadius: '20px 20px 0 0', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
               onClick={e => e.stopPropagation()}>
@@ -1095,6 +1279,77 @@ export default function DriversPage() {
               <button onClick={doRemoveDriver}
                 style={{ padding: '13px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}>
                 {t.removeDriver}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toggle free/offline confirmation modal */}
+      {pendingToggle && (() => {
+        const willGoFree = !pendingToggle.is_available
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+            onClick={() => !toggling && setPendingToggle(null)}>
+            <div style={{ background: SURF, borderRadius: 20, padding: '24px', maxWidth: 340, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: willGoFree ? `${ONLINE}18` : `${OFFLINE}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={willGoFree ? ONLINE : OFFLINE} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="9"/>
+                  <path d="M12 7v5l3 3"/>
+                </svg>
+              </div>
+              <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: TEXT, fontFamily: FONT }}>
+                {willGoFree ? t.setFree : t.setOffline}
+              </h3>
+              <p style={{ margin: '0 0 6px', fontSize: 14, color: TEXT_SUB, fontFamily: FONT }}>
+                {willGoFree ? t.confirmSetFree : t.confirmSetOffline}
+              </p>
+              <p style={{ margin: '0 0 24px', fontSize: 13, color: TEXT_MUT, fontFamily: FONT }}>
+                {pendingToggle.name} · {pendingToggle.driver_name}
+                <br />{willGoFree ? t.setFreeDesc : t.setOfflineDesc}
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <button onClick={() => setPendingToggle(null)} disabled={!!toggling}
+                  style={{ padding: '13px', background: SURF_LOW, color: TEXT_SUB, border: `1px solid ${BORDER}`, borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: toggling ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
+                  {t.cancel}
+                </button>
+                <button onClick={doToggleAvail} disabled={!!toggling}
+                  style={{ padding: '13px', background: willGoFree ? ONLINE : OFFLINE, color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: toggling ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
+                  {toggling ? t.saving : (willGoFree ? t.setFree : t.setOffline)}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Release duty confirmation modal */}
+      {pendingRelease && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          onClick={() => !releasingId && setPendingRelease(null)}>
+          <div style={{ background: SURF, borderRadius: 20, padding: '24px', maxWidth: 340, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              </svg>
+            </div>
+            <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: TEXT, fontFamily: FONT }}>{t.release}</h3>
+            <p style={{ margin: '0 0 6px', fontSize: 14, color: TEXT_SUB, fontFamily: FONT }}>{t.confirmReleaseDuty}</p>
+            <p style={{ margin: '0 0 24px', fontSize: 13, color: TEXT_MUT, fontFamily: FONT }}>
+              {format(new Date(pendingRelease.assign_date + 'T12:00:00'), 'EEE, d MMM yyyy', { locale: idLocale })}
+              {pendingRelease.start_time && pendingRelease.end_time && ` · ${pendingRelease.start_time.slice(0, 5)}–${pendingRelease.end_time.slice(0, 5)}`}
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <button onClick={() => setPendingRelease(null)} disabled={!!releasingId}
+                style={{ padding: '13px', background: SURF_LOW, color: TEXT_SUB, border: `1px solid ${BORDER}`, borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: releasingId ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
+                {t.cancel}
+              </button>
+              <button onClick={doReleaseFullDay} disabled={!!releasingId}
+                style={{ padding: '13px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: releasingId ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
+                {releasingId ? t.releasing : t.release}
               </button>
             </div>
           </div>

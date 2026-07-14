@@ -1,4 +1,4 @@
-// TaxiBook Design System
+// Ridr Design System
 // Based on Material You + Plus Jakarta Sans
 // Primary: Deep teal #006064 | Secondary: Amber #feb300
 

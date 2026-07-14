@@ -358,7 +358,7 @@ export default function DriverTripsPage() {
       {selectedTrip && (
         <div
           onClick={() => setSelectedTrip(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -438,7 +438,6 @@ export default function DriverTripsPage() {
                 <SectionLabel>Vehicle</SectionLabel>
                 <DetailTable rows={[
                   { label: 'Taxi',   value: selectedTrip.taxi_name },
-                  ...(selectedTrip.taxi_plate ? [{ label: 'Plate',  value: selectedTrip.taxi_plate }] : []),
                   ...(selectedTrip.driver_name ? [{ label: 'Driver', value: selectedTrip.driver_name }] : []),
                   ...(selectedTrip.driver_phone ? [{ label: "Driver's phone", value: selectedTrip.driver_phone }] : []),
                 ]} />

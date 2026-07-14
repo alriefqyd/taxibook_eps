@@ -20,9 +20,11 @@ export interface DayAssignment {
   taxi_plate?:    string | null
   driver_name?:   string | null
   passenger_name?: string | null
+  start_time?:    string | null
+  end_time?:      string | null
 }
 
-const HOUR_START = 7
+const HOUR_START = 5
 const HOUR_END   = 19
 const HOUR_W     = 80
 const DAY_W      = 100
@@ -223,11 +225,26 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAssi
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#EF4444', position: 'absolute', top: -3, left: -2 }} />
                 </div>
               ) : null}
-              overlay={isFullDay && fullDayAssignment ? (
-                <div onClick={() => onSelectDayAssignment(fullDayAssignment)} style={{ position: 'absolute', inset: 0, background: 'rgba(254,243,199,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderTop: '2px solid #FCD34D', borderBottom: '2px solid #FCD34D', cursor: 'pointer' }}>
-                  <span style={{ fontSize: 10, fontWeight: 800, color: '#92400E', letterSpacing: '0.05em' }}>★ FULL DAY DUTY · tap for detail</span>
-                </div>
-              ) : undefined}
+              overlay={isFullDay && fullDayAssignment ? (() => {
+                const hasRange = !!(fullDayAssignment.start_time && fullDayAssignment.end_time)
+                const parseHour = (t: string) => {
+                  const [h, m] = t.split(':').map(Number)
+                  return h + m / 60
+                }
+                const startH = hasRange ? Math.max(parseHour(fullDayAssignment.start_time!), HOUR_START) : HOUR_START
+                const endH   = hasRange ? Math.min(parseHour(fullDayAssignment.end_time!), HOUR_END)     : HOUR_END
+                const left   = (startH - HOUR_START) * HOUR_W
+                const width  = Math.max((endH - startH) * HOUR_W, 4)
+                return (
+                  <div onClick={() => onSelectDayAssignment(fullDayAssignment)} style={{ position: 'absolute', left, width, top: 0, bottom: 0, background: 'rgba(254,243,199,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderTop: '2px solid #FCD34D', borderBottom: '2px solid #FCD34D', cursor: 'pointer', overflow: 'hidden' }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: '#92400E', letterSpacing: '0.05em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 4px' }}>
+                      {hasRange
+                        ? `★ ${fullDayAssignment.start_time!.slice(0, 5)}–${fullDayAssignment.end_time!.slice(0, 5)} · tap for detail`
+                        : '★ FULL DAY DUTY · tap for detail'}
+                    </span>
+                  </div>
+                )
+              })() : undefined}
               bookings={dayBks.filter(b => b.taxi_id === taxi.id)}
               renderBlock={(b) => {
                 const dt          = new Date(b.scheduled_at)
@@ -593,15 +610,17 @@ function DayAssignmentSheet({ assignment: a, onClose }: { assignment: DayAssignm
 
   return createPortal(
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1100 }} />
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1101, background: '#fff', borderRadius: '20px 20px 0 0', padding: '20px 20px 32px', maxHeight: '80vh', overflowY: 'auto' }}>
+      <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.45)', zIndex: 1100 }} />
+      <div style={{ position: 'fixed', bottom: 74, left: 0, right: 0, zIndex: 1101, background: '#fff', borderRadius: '20px 20px 0 0', padding: '20px 20px 32px', maxHeight: '80vh', overflowY: 'auto' }}>
         {/* Handle */}
         <div style={{ width: 36, height: 4, borderRadius: 9999, background: 'rgba(0,0,0,0.12)', margin: '0 auto 16px' }} />
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0, letterSpacing: '0.04em' }}>★ FULL DAY DUTY</p>
-          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9999, background: '#FEF3C7', color: '#92400E' }}>Full Day</span>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0, letterSpacing: '0.04em' }}>★ {a.start_time && a.end_time ? 'PARTIAL DAY DUTY' : 'FULL DAY DUTY'}</p>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9999, background: '#FEF3C7', color: '#92400E' }}>
+            {a.start_time && a.end_time ? `${a.start_time.slice(0, 5)}–${a.end_time.slice(0, 5)}` : 'Full Day'}
+          </span>
         </div>
 
         {/* Date */}

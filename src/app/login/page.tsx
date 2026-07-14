@@ -7,6 +7,8 @@ import { useLang } from '@/lib/language'
 
 const MSG = {
   en: {
+    tagline:     'Internal Taxi Booking',
+    department:  'Engineering & Project Services · PT Vale Indonesia',
     emailLabel:  'Work email',
     pwdLabel:    'Password',
     signingIn:   'Signing in...',
@@ -14,6 +16,8 @@ const MSG = {
     roleNote:    'Role is assigned by your admin',
   },
   id: {
+    tagline:     'Booking Taksi Internal',
+    department:  'Engineering & Project Services · PT Vale Indonesia',
     emailLabel:  'Email kerja',
     pwdLabel:    'Password',
     signingIn:   'Masuk...',
@@ -104,10 +108,18 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <img src="/vale-logo.svg" alt="PT Vale" style={{ height: '48px', margin: '0 auto 14px', display: 'block' }} />
-          <h1 style={{ fontSize: '20px', fontWeight: '600', margin: 0, color: '#006064' }}>
-            TaxiBook EPS
-          </h1>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <img src="/icon-192.png" alt="" style={{ width: '40px', height: '40px', display: 'block', borderRadius: '11px', boxShadow: '0 4px 14px rgba(0,96,100,0.3)' }} />
+            <h1 style={{ fontSize: '26px', fontWeight: '800', margin: 0, color: '#006064', letterSpacing: '-0.5px' }}>
+              Ridr
+            </h1>
+          </div>
+          <p style={{ fontSize: '13px', color: '#6f7979', margin: '10px 0 0' }}>
+            {t.tagline}
+          </p>
+          <p style={{ fontSize: '11px', color: '#9ca3af', margin: '4px 0 0' }}>
+            {t.department}
+          </p>
         </div>
 
         {/* Form */}

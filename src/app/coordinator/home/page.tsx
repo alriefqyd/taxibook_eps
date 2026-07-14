@@ -26,6 +26,8 @@ const MSG = {
     dispatchBoard:    'Dispatch Board',
     savedLocations:   'Saved Locations',
     tripReport:       'Trip Report',
+    analytics:        'Analytics',
+    issues:           'Issues',
     feedback:         'Feedback',
     newBooking:       '+ New booking',
     viewCalendar:     'Calendar',
@@ -45,12 +47,9 @@ const MSG = {
     approve:          'Approve',
     reassign:         '🔄 Reassign taxi',
     cancel:           'Cancel',
-    toastConfirmed:   'Booking confirmed',
-    toastPending:     'Booking submitted — pending approval',
     rejectBooking:    'Reject booking',
     reasonOptional:   'Reason (optional)',
     reasonPlaceholder:'e.g. No drivers available for this time',
-    viewAllBookings:  'View all bookings →',
     scheduledLabel:   'Scheduled',
     durationLabel:    'Duration',
     passengerLabel:   'Passenger',
@@ -90,6 +89,8 @@ const MSG = {
     dispatchBoard:    'Papan Dispatch',
     savedLocations:   'Lokasi Tersimpan',
     tripReport:       'Laporan Perjalanan',
+    analytics:        'Analitik',
+    issues:           'Masalah',
     feedback:         'Masukan',
     newBooking:       '+ Booking Baru',
     viewCalendar:     'Kalender',
@@ -109,12 +110,9 @@ const MSG = {
     approve:          'Setujui',
     reassign:         '🔄 Tugaskan ulang',
     cancel:           'Batal',
-    toastConfirmed:   'Booking dikonfirmasi',
-    toastPending:     'Booking dikirim — menunggu persetujuan',
     rejectBooking:    'Tolak booking',
     reasonOptional:   'Alasan (opsional)',
     reasonPlaceholder:'mis. Tidak ada driver untuk waktu ini',
-    viewAllBookings:  'Lihat semua booking →',
     scheduledLabel:   'Dijadwalkan',
     durationLabel:    'Durasi',
     passengerLabel:   'Penumpang',
@@ -161,6 +159,11 @@ interface TaxiRow {
   trips_today: number
 }
 
+type IssueItem =
+  | { kind: 'gps'; id: string; taxiName: string; plate: string | null; driverName: string | null }
+  | { kind: 'overdue'; id: string; passengerName: string; destination: string; scheduledAt: string }
+  | { kind: 'offline'; id: string; taxiName: string | null; passengerName: string; destination: string; scheduledAt: string }
+
 export default function CoordinatorHomePage() {
   const router   = useRouter()
   const supabase = createClient()
@@ -170,8 +173,11 @@ export default function CoordinatorHomePage() {
   const [user,             setUser]             = useState<User | null>(null)
   const [pendingAll,       setPendingAll]       = useState<BookingDetail[]>([])
   const [calendarBookings, setCalendarBookings] = useState<BookingDetail[]>([])
-  const [latestTrips,      setLatestTrips]      = useState<BookingDetail[]>([])
   const [tripsToday,       setTripsToday]       = useState(0)
+  const [issueCount,       setIssueCount]       = useState(0)
+  const [issueItems,       setIssueItems]       = useState<IssueItem[]>([])
+  const [weekStats,        setWeekStats]        = useState({ total: 0, completionRate: 0, avgDuration: 0 })
+  const [topDriver,        setTopDriver]        = useState<{ name: string; count: number } | null>(null)
   const [taxis,            setTaxis]            = useState<TaxiRow[]>([])
   const [dayAssignments,   setDayAssignments]   = useState<import('@/components/GanttCalendar').DayAssignment[]>([])
   const [loading,          setLoading]          = useState(true)
@@ -185,20 +191,6 @@ export default function CoordinatorHomePage() {
   const [cancellingModal,  setCancellingModal]  = useState(false)
   const [unreadCount,  setUnreadCount]  = useState(0)
   const [menuOpen,    setMenuOpen]    = useState(false)
-  const [bookingToast, setBookingToast] = useState<{ code: string; taxi?: string; driver?: string; pending?: boolean } | null>(null)
-
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search)
-    const code = p.get('booked')
-    if (!code) return
-    const taxi    = p.get('taxi')    || undefined
-    const driver  = p.get('driver')  || undefined
-    const pending = p.get('pending') === '1'
-    setBookingToast({ code, taxi, driver, pending })
-    window.history.replaceState({}, '', '/coordinator/home')
-    const toastTimer = setTimeout(() => setBookingToast(null), 8000)
-    return () => clearTimeout(toastTimer)
-  }, [])
 
 
   const loadData = useCallback(async () => {
@@ -209,7 +201,9 @@ export default function CoordinatorHomePage() {
     const todayWitaStart = new Date(`${witaDate}T00:00:00+08:00`).toISOString()
     const todayWitaEnd   = new Date(`${witaDate}T23:59:59+08:00`).toISOString()
 
-    const [{ data: allBks }, { data: txs }, { data: pendingBks }, { data: latestBks }, { count: todayCount }] = await Promise.all([
+    const weekAgo = new Date(Date.now() - 7 * 24 * 3600000)
+
+    const [{ data: allBks }, { data: txs }, { data: pendingBks }, { data: weekBks }, { count: todayCount }] = await Promise.all([
       // Wide window for Calendar tab
       supabase
         .from('booking_details')
@@ -228,12 +222,11 @@ export default function CoordinatorHomePage() {
         .select('*')
         .eq('status', 'pending_coordinator_approval')
         .order('scheduled_at', { ascending: true }),
+      // Lightweight — all statuses, last 7 days, just for the Analytics teaser stats
       supabase
         .from('booking_details')
-        .select('*')
-        .not('status', 'in', '("cancelled","rejected")')
-        .order('scheduled_at', { ascending: false })
-        .limit(5),
+        .select('status, scheduled_at, completed_at, driver_name')
+        .gte('scheduled_at', weekAgo.toISOString()),
       supabase
         .from('booking_details')
         .select('id', { count: 'exact', head: true })
@@ -241,6 +234,45 @@ export default function CoordinatorHomePage() {
         .lte('scheduled_at', todayWitaEnd)
         .not('status', 'in', '("cancelled","rejected")'),
     ])
+
+    // ── Issues — mirrors the logic on /coordinator/issues, reusing
+    // data already fetched above instead of firing extra queries ──
+    const nowMs = Date.now()
+    const staleCutoff = new Date(nowMs - 60 * 60 * 1000)
+    const upcomingWindow = new Date(nowMs + 2 * 60 * 60 * 1000)
+    const gpsStaleItems: IssueItem[] = (txs || [])
+      .filter((tx: any) => tx.is_available && tx.driver_id && (!tx.location_updated_at || new Date(tx.location_updated_at) < staleCutoff))
+      .map((tx: any) => ({ kind: 'gps', id: tx.id, taxiName: tx.name, plate: tx.plate, driverName: tx.users?.name || null }))
+    const overdueItems: IssueItem[] = (allBks || [])
+      .filter((b: any) => b.status === 'booked' && new Date(b.scheduled_at) < new Date(nowMs))
+      .map((b: any) => ({ kind: 'overdue', id: b.id, passengerName: b.passenger_name, destination: b.destination, scheduledAt: b.scheduled_at }))
+    const offlineTaxiIds = new Set((txs || []).filter((tx: any) => tx.is_available === false).map((tx: any) => tx.id))
+    const offlineItems: IssueItem[] = (allBks || [])
+      .filter((b: any) =>
+        b.status === 'booked' && b.taxi_id && offlineTaxiIds.has(b.taxi_id)
+        && new Date(b.scheduled_at) >= new Date(nowMs) && new Date(b.scheduled_at) <= upcomingWindow)
+      .map((b: any) => ({ kind: 'offline', id: b.id, taxiName: b.taxi_name, passengerName: b.passenger_name, destination: b.destination, scheduledAt: b.scheduled_at }))
+    // Pending approvals get their own dedicated section further down, so they're
+    // counted in the tile total but not duplicated in the inline issue list.
+    const otherIssues = [...gpsStaleItems, ...overdueItems, ...offlineItems]
+    setIssueItems(otherIssues)
+    setIssueCount(otherIssues.length + (pendingBks || []).length)
+
+    // ── Analytics teaser stats (last 7 days) ──
+    const weekTotal = (weekBks || []).length
+    const weekCompleted = (weekBks || []).filter((b: any) => b.status === 'completed')
+    const weekCompletionRate = weekTotal > 0 ? Math.round((weekCompleted.length / weekTotal) * 100) : 0
+    const weekDurations = weekCompleted
+      .filter((b: any) => b.completed_at)
+      .map((b: any) => Math.round((new Date(b.completed_at).getTime() - new Date(b.scheduled_at).getTime()) / 60000))
+      .filter((m: number) => m >= 0)
+    const weekAvgDuration = weekDurations.length ? Math.round(weekDurations.reduce((s: number, m: number) => s + m, 0) / weekDurations.length) : 0
+    setWeekStats({ total: weekTotal, completionRate: weekCompletionRate, avgDuration: weekAvgDuration })
+
+    const driverTripCounts: Record<string, number> = {}
+    ;(weekBks || []).forEach((b: any) => { if (b.driver_name) driverTripCounts[b.driver_name] = (driverTripCounts[b.driver_name] || 0) + 1 })
+    const topDriverEntry = Object.entries(driverTripCounts).sort((a, b) => b[1] - a[1])[0]
+    setTopDriver(topDriverEntry ? { name: topDriverEntry[0], count: topDriverEntry[1] } : null)
 
     const enriched = await Promise.all(
       (txs || []).map(async (taxi: any) => {
@@ -266,7 +298,7 @@ export default function CoordinatorHomePage() {
     const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
     const { data: dayAssign } = await supabase
       .from('driver_day_assignments')
-      .select('taxi_id, assign_date, reason, passenger_name_other, passenger_id, taxis(name, plate, users!driver_id(name))')
+      .select('taxi_id, assign_date, reason, passenger_name_other, passenger_id, start_time, end_time, taxis(name, plate, users!driver_id(name))')
       .gte('assign_date', witaToday)
 
     // Resolve registered passenger names in one batch query
@@ -279,13 +311,14 @@ export default function CoordinatorHomePage() {
 
     setPendingAll(pendingBks || [])
     setCalendarBookings(allBks || [])
-    setLatestTrips(latestBks || [])
     setTripsToday(todayCount || 0)
     setTaxis(enriched)
     setDayAssignments((dayAssign || []).map((a: any) => ({
       taxi_id:        a.taxi_id,
       assign_date:    a.assign_date,
       reason:         a.reason ?? null,
+      start_time:     a.start_time ?? null,
+      end_time:       a.end_time ?? null,
       taxi_name:      a.taxis?.name ?? null,
       taxi_plate:     a.taxis?.plate ?? null,
       driver_name:    (a.taxis as any)?.users?.name ?? null,
@@ -404,25 +437,7 @@ export default function CoordinatorHomePage() {
   const initials = user?.name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') || 'C'
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif", height: '100dvh', background: '#F5F5F2', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
-      {/* ── Booking success toast ── */}
-      {bookingToast && (
-        <div style={{ position: 'fixed', top: 16, left: 16, right: 16, zIndex: 9999, background: bookingToast.pending ? '#FEF3C7' : '#D8F3DC', border: `1px solid ${bookingToast.pending ? '#FDE68A' : '#B7E4C7'}`, borderRadius: 16, padding: '12px 14px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-          <span style={{ fontSize: 18, flexShrink: 0 }}>{bookingToast.pending ? '⏳' : '✅'}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 2px', color: bookingToast.pending ? '#92400E' : '#2D6A4F' }}>
-              {bookingToast.pending ? t.toastPending : t.toastConfirmed}
-            </p>
-            <p style={{ fontSize: 12, color: bookingToast.pending ? '#92400E' : '#2D6A4F', margin: 0, opacity: 0.8 }}>
-              {bookingToast.code}
-              {bookingToast.taxi && ` · ${bookingToast.taxi}`}
-              {bookingToast.driver && ` · ${bookingToast.driver}`}
-            </p>
-          </div>
-          <button onClick={() => setBookingToast(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16, color: bookingToast.pending ? '#92400E' : '#2D6A4F', opacity: 0.6, padding: 0, flexShrink: 0 }}>✕</button>
-        </div>
-      )}
+    <div style={{ fontFamily: "'Inter', sans-serif", position: 'fixed', inset: 0, background: '#F5F5F2', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       {/* ── TopAppBar — in normal flow; flex layout keeps it above the scroll area ── */}
       <header style={{
@@ -433,8 +448,12 @@ export default function CoordinatorHomePage() {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', height: 64 }}>
           {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img src="/vale-logo.svg" alt="PT Vale" style={{ height: 32, display: 'block' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <img src="/icon-192.png" alt="" style={{ width: 28, height: 28, borderRadius: 8, display: 'block' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, lineHeight: 1 }}>
+              <span style={{ fontSize: 17, fontWeight: 800, color: '#006064', letterSpacing: '-0.3px' }}>Ridr</span>
+              <span style={{ fontSize: 9, color: '#9ca3af', fontWeight: 500, marginTop: 2 }}>PT Vale Indonesia</span>
+            </div>
           </div>
           {/* Right: fullscreen + bell + avatar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -474,6 +493,14 @@ export default function CoordinatorHomePage() {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>
                       <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>{t.tripReport}</p>
                     </button>
+                    <button onClick={() => { setMenuOpen(false); router.push('/coordinator/analytics') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>{t.analytics}</p>
+                    </button>
+                    <button onClick={() => { setMenuOpen(false); router.push('/coordinator/issues') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#DC2626' }}>{t.issues}</p>
+                    </button>
                     <button onClick={() => { setMenuOpen(false); router.push('/coordinator/feedback') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                       <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>{t.feedback}</p>
@@ -510,20 +537,30 @@ export default function CoordinatorHomePage() {
             </h1>
             <p style={{ fontSize: 13, color: '#6f7979', margin: 0, fontWeight: 500 }}>{t.role}</p>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ textAlign: 'center', background: pendingApproval.length > 0 ? '#FEF3C7' : '#F5F5F2', borderRadius: 12, padding: '10px 14px' }}>
-              <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: pendingApproval.length > 0 ? '#92400E' : '#9ca3af', margin: '0 0 2px', opacity: 0.8 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ textAlign: 'center', background: pendingApproval.length > 0 ? '#FEF3C7' : '#F5F5F2', borderRadius: 12, padding: '8px 10px' }}>
+              <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: pendingApproval.length > 0 ? '#92400E' : '#9ca3af', margin: '0 0 2px', opacity: 0.8 }}>
                 {lang === 'id' ? 'Approval' : 'Approval'}
               </p>
-              <p style={{ fontSize: 26, fontWeight: 800, margin: 0, color: pendingApproval.length > 0 ? '#D97706' : '#9ca3af', letterSpacing: '-1px', lineHeight: 1 }}>{pendingApproval.length}</p>
-              <p style={{ fontSize: 11, color: pendingApproval.length > 0 ? '#92400E' : '#9ca3af', margin: '2px 0 0', opacity: 0.7 }}>{lang === 'id' ? 'menunggu' : 'pending'}</p>
+              <p style={{ fontSize: 22, fontWeight: 800, margin: 0, color: pendingApproval.length > 0 ? '#D97706' : '#9ca3af', letterSpacing: '-1px', lineHeight: 1 }}>{pendingApproval.length}</p>
+              <p style={{ fontSize: 10, color: pendingApproval.length > 0 ? '#92400E' : '#9ca3af', margin: '2px 0 0', opacity: 0.7 }}>{lang === 'id' ? 'menunggu' : 'pending'}</p>
             </div>
-            <div style={{ textAlign: 'center', background: 'rgba(0,96,100,0.06)', borderRadius: 12, padding: '10px 14px' }}>
-              <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: PRIMARY, margin: '0 0 2px', opacity: 0.75 }}>
+            <div
+              onClick={() => router.push('/coordinator/issues')}
+              style={{ textAlign: 'center', background: issueCount > 0 ? '#FEE2E2' : '#F5F5F2', borderRadius: 12, padding: '8px 10px', cursor: 'pointer' }}
+            >
+              <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: issueCount > 0 ? '#991B1B' : '#9ca3af', margin: '0 0 2px', opacity: 0.8 }}>
+                {t.issues}
+              </p>
+              <p style={{ fontSize: 22, fontWeight: 800, margin: 0, color: issueCount > 0 ? '#DC2626' : '#9ca3af', letterSpacing: '-1px', lineHeight: 1 }}>{issueCount}</p>
+              <p style={{ fontSize: 10, color: issueCount > 0 ? '#991B1B' : '#9ca3af', margin: '2px 0 0', opacity: 0.7 }}>{lang === 'id' ? 'perhatian' : 'attention'}</p>
+            </div>
+            <div style={{ textAlign: 'center', background: 'rgba(0,96,100,0.06)', borderRadius: 12, padding: '8px 10px' }}>
+              <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: PRIMARY, margin: '0 0 2px', opacity: 0.75 }}>
                 {lang === 'id' ? 'Trip' : 'Trips'}
               </p>
-              <p style={{ fontSize: 26, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-1px', lineHeight: 1 }}>{tripsToday}</p>
-              <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>{lang === 'id' ? 'hari ini' : 'today'}</p>
+              <p style={{ fontSize: 22, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-1px', lineHeight: 1 }}>{tripsToday}</p>
+              <p style={{ fontSize: 10, color: '#9ca3af', margin: '2px 0 0' }}>{lang === 'id' ? 'hari ini' : 'today'}</p>
             </div>
           </div>
         </div>
@@ -547,6 +584,61 @@ export default function CoordinatorHomePage() {
           </div>
         )}
 
+        {/* ── Issues — separate section from Approval; only surfaced inline when small (1–2), else use the tile/teaser above/below ── */}
+        {issueItems.length > 0 && issueItems.length <= 2 && (
+          <div style={{ marginBottom: 16, paddingTop: pendingApproval.length > 0 ? 0 : 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#DC2626', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
+                {issueItems.length}
+              </div>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#991B1B', margin: 0, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                {t.issues}
+              </p>
+            </div>
+            {issueItems.map(item => (
+              <div
+                key={`${item.kind}-${item.id}`}
+                onClick={() => router.push('/coordinator/issues')}
+                style={{ background: '#ffffff', borderRadius: 16, padding: '12px 16px', marginBottom: 10, boxShadow: '0 2px 8px rgba(0,96,100,0.06)', border: '1px solid rgba(220,38,38,0.18)', borderLeft: '3px solid #DC2626', cursor: 'pointer' }}
+              >
+                {item.kind === 'gps' && (
+                  <>
+                    <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{item.taxiName}{item.plate ? ` · ${item.plate}` : ''}</p>
+                    <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>
+                      {lang === 'id' ? 'GPS tidak update' : 'GPS stale'} · {item.driverName || (lang === 'id' ? 'Tidak ada driver' : 'No driver')}
+                    </p>
+                    <p style={{ fontSize: 11, color: '#b0b6b6', margin: '4px 0 0', lineHeight: 1.4 }}>
+                      {lang === 'id' ? 'Driver aktif yang lokasinya tidak update lebih dari 1 jam' : 'On-duty driver whose location has not updated in over an hour'}
+                    </p>
+                  </>
+                )}
+                {item.kind === 'overdue' && (
+                  <>
+                    <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{item.passengerName} → {item.destination}</p>
+                    <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>
+                      {lang === 'id' ? 'Trip terlambat' : 'Overdue trip'} · {format(new Date(item.scheduledAt), 'HH:mm')}
+                    </p>
+                    <p style={{ fontSize: 11, color: '#b0b6b6', margin: '4px 0 0', lineHeight: 1.4 }}>
+                      {lang === 'id' ? 'Booking sudah lewat jadwal tapi belum di-start driver' : 'Booked trip past its scheduled time that the driver has not started'}
+                    </p>
+                  </>
+                )}
+                {item.kind === 'offline' && (
+                  <>
+                    <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{item.passengerName} → {item.destination}</p>
+                    <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>
+                      {lang === 'id' ? 'Driver offline, trip segera' : 'Driver offline, trip soon'}{item.taxiName ? ` · ${item.taxiName}` : ''} · {format(new Date(item.scheduledAt), 'HH:mm')}
+                    </p>
+                    <p style={{ fontSize: 11, color: '#b0b6b6', margin: '4px 0 0', lineHeight: 1.4 }}>
+                      {lang === 'id' ? 'Driver ditugaskan tapi offline padahal ada trip segera' : 'Assigned driver is offline but has an upcoming trip'}
+                    </p>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* ── CALENDAR / MAP ── */}
         <div style={{ margin: '0 -16px', background: '#fff', borderTop: '1px solid rgba(0,0,0,0.08)', borderBottom: '1px solid rgba(0,0,0,0.08)', position: 'relative', zIndex: 0 }}>
           <GanttCalendar
@@ -564,35 +656,45 @@ export default function CoordinatorHomePage() {
         </div>
 
         {view === 'calendar' && (
-          <>
-            {/* ── Latest 5 trips ── */}
-            {latestTrips.length > 0 && (
-              <div style={{ marginTop: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <p style={{ fontSize: 12, fontWeight: 700, color: '#6f7979', margin: 0, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                    {lang === 'id' ? 'Trip terbaru' : 'Latest trips'}
-                  </p>
-                  <button
-                    onClick={() => router.push('/coordinator/report')}
-                    style={{ fontSize: 11, fontWeight: 700, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
-                  >
-                    {t.viewAllBookings}
-                  </button>
-                </div>
-                {latestTrips.map(b => (
-                  <BookingCard
-                    key={b.id}
-                    booking={b}
-                    isProcessing={processing === b.id}
-                    processingAction={processing === b.id ? processingAction : null}
-                    onApprove={() => handleApprove(b.id)}
-                    onReject={() => setRejectId(b.id)}
-                    onCancel={b.created_by === user?.id && ['submitted','booked','pending_coordinator_approval'].includes(b.status) ? () => handleCancel(b.id) : undefined}
-                  />
-                ))}
+          <div style={{ marginTop: 20 }}>
+            {/* ── Analytics teaser ── */}
+            <div
+              onClick={() => router.push('/coordinator/analytics')}
+              style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 14, padding: '14px', cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#6f7979', margin: 0, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  {lang === 'id' ? 'Analitik · 7 hari terakhir' : 'Analytics · Last 7 days'}
+                </p>
+                <span style={{ fontSize: 11, fontWeight: 700, color: PRIMARY }}>
+                  {lang === 'id' ? 'Lihat semua ›' : 'View all ›'}
+                </span>
               </div>
-            )}
-          </>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: 20, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.5px' }}>{weekStats.total}</p>
+                  <p style={{ fontSize: 10, color: '#9ca3af', margin: '2px 0 0' }}>{lang === 'id' ? 'trip' : 'trips'}</p>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: 20, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.5px' }}>{weekStats.completionRate}%</p>
+                  <p style={{ fontSize: 10, color: '#9ca3af', margin: '2px 0 0' }}>{lang === 'id' ? 'selesai' : 'completion'}</p>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: 20, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.5px' }}>{weekStats.avgDuration}</p>
+                  <p style={{ fontSize: 10, color: '#9ca3af', margin: '2px 0 0' }}>{lang === 'id' ? 'menit rata²' : 'avg min'}</p>
+                </div>
+              </div>
+              {topDriver && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                  <span style={{ fontSize: 15, flexShrink: 0 }}>🏆</span>
+                  <p style={{ fontSize: 12, color: '#3f4949', margin: 0, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontWeight: 700 }}>{topDriver.name}</span> · {lang === 'id' ? 'driver teratas' : 'top driver'}
+                  </p>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: PRIMARY, flexShrink: 0 }}>{topDriver.count} {lang === 'id' ? 'trip' : 'trips'}</span>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* ── FLEET TAB ── */}
@@ -639,7 +741,7 @@ export default function CoordinatorHomePage() {
 
       {/* Reject modal */}
       {rejectId && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}>
           <style>{`@keyframes card-spin { to { transform: rotate(360deg) } }`}</style>
           <div style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 14px' }}>{t.rejectBooking}</h2>
@@ -672,7 +774,7 @@ export default function CoordinatorHomePage() {
 
       {/* Cancel confirmation modal */}
       {cancelConfirmId && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1200 }}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1200 }}
           onClick={() => !cancellingModal && setCancelConfirmId(null)}>
           <div onClick={e => e.stopPropagation()}
             style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', boxSizing: 'border-box' }}>
@@ -719,7 +821,7 @@ function buildWaMessage(b: BookingDetail): string {
   const type = b.trip_type === 'DROP' ? 'Drop (antar saja)' : `Waiting ${b.wait_minutes} menit (tunggu penumpang)`
   const taxi = b.taxi_name ? `${b.taxi_name}${b.taxi_plate ? ` (${b.taxi_plate})` : ''}` : null
   return [
-    `📋 *TaxiBook – Penugasan Perjalanan*`,
+    `📋 *Ridr – Penugasan Perjalanan*`,
     `━━━━━━━━━━━━━━━━━━`,
     `🔖 Kode Booking: *${b.booking_code}*`,
     ``,

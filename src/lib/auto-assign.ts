@@ -7,6 +7,44 @@ interface AssignResult {
   error?: string
 }
 
+// Full-day duties (no time range) block the taxi entirely; time-range duties
+// only block the overlapping window, leaving the rest of the day free for auto-assign.
+export async function getDayAssignmentBlocks(supabase: ReturnType<typeof createAdminClient>, witaDate: string) {
+  const { data } = await supabase
+    .from('driver_day_assignments')
+    .select('taxi_id, start_time, end_time')
+    .eq('assign_date', witaDate)
+
+  const fullDay = new Set<string>()
+  const ranges: Record<string, { start: Date; end: Date }[]> = {}
+
+  for (const d of (data || []) as any[]) {
+    if (!d.start_time || !d.end_time) {
+      fullDay.add(d.taxi_id)
+    } else {
+      if (!ranges[d.taxi_id]) ranges[d.taxi_id] = []
+      ranges[d.taxi_id].push({
+        start: new Date(`${witaDate}T${d.start_time.slice(0, 5)}:00+08:00`),
+        end:   new Date(`${witaDate}T${d.end_time.slice(0, 5)}:00+08:00`),
+      })
+    }
+  }
+  return { fullDay, ranges }
+}
+
+export function isTaxiDayBlocked(
+  taxiId: string,
+  fullDay: Set<string>,
+  ranges: Record<string, { start: Date; end: Date }[]>,
+  bookingStart: Date,
+  bookingEnd: Date,
+): boolean {
+  if (fullDay.has(taxiId)) return true
+  const blocks = ranges[taxiId]
+  if (!blocks) return false
+  return blocks.some(b => b.start < bookingEnd && b.end > bookingStart)
+}
+
 export async function autoAssignDriver(
   bookingId: string,
   scheduledAt: string,
@@ -27,14 +65,12 @@ export async function autoAssignDriver(
       return { success: false, error: 'No taxis available' }
     }
 
-    // Exclude taxis with a full-day assignment on the booking's WITA date
+    // Exclude taxis whose day-duty (full-day, or overlapping time range) blocks this booking
     const witaDate = new Date(new Date(scheduledAt).getTime() + 8 * 3600000).toISOString().slice(0, 10)
-    const { data: dayAssigned } = await supabase
-      .from('driver_day_assignments')
-      .select('taxi_id')
-      .eq('assign_date', witaDate)
-    const dayAssignedIds = new Set((dayAssigned || []).map((d: any) => d.taxi_id))
-    const candidates = taxis.filter((t: Taxi) => !dayAssignedIds.has(t.id))
+    const { fullDay, ranges } = await getDayAssignmentBlocks(supabase, witaDate)
+    const bookingStart = new Date(scheduledAt)
+    const bookingEnd   = new Date(autoCompleteAt)
+    const candidates = taxis.filter((t: Taxi) => !isTaxiDayBlocked(t.id, fullDay, ranges, bookingStart, bookingEnd))
 
     if (candidates.length === 0) {
       return { success: false, error: 'No driver available at that time' }
@@ -101,14 +137,12 @@ export async function getAvailableTaxisForTime(
 
   if (!taxis) return []
 
-  // Exclude taxis with a full-day assignment on the booking's WITA date
+  // Exclude taxis whose day-duty (full-day, or overlapping time range) blocks this booking
   const witaDate = new Date(new Date(scheduledAt).getTime() + 8 * 3600000).toISOString().slice(0, 10)
-  const { data: dayAssigned } = await supabase
-    .from('driver_day_assignments')
-    .select('taxi_id')
-    .eq('assign_date', witaDate)
-  const dayAssignedIds = new Set((dayAssigned || []).map((d: any) => d.taxi_id))
-  const candidates = taxis.filter((t: any) => !dayAssignedIds.has(t.id))
+  const { fullDay, ranges } = await getDayAssignmentBlocks(supabase, witaDate)
+  const bookingStart = new Date(scheduledAt)
+  const bookingEnd   = new Date(autoCompleteAt)
+  const candidates = taxis.filter((t: any) => !isTaxiDayBlocked(t.id, fullDay, ranges, bookingStart, bookingEnd))
 
   const available: string[] = []
 

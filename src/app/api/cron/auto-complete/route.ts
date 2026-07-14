@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
       notified_coord:            0,
       reminded_pending_approval: 0,
       driver_offline_warned:     0,
+      gps_stale_warned:          0,
     }
 
     // ── 0. AUTO-CANCEL bookings not started 15+ min after scheduled_at ──
@@ -473,6 +474,75 @@ export async function GET(request: NextRequest) {
           await notify(coordNotifs)
           results.driver_offline_warned++
         }
+      }
+    }
+
+    // ── 7. DRIVER GPS STALE WARNING ────────────────────────────────
+    // Any on-duty driver whose GPS hasn't updated in 60+ min gets warned.
+    // Runs every cron tick (5 min) but throttled to ~10 min between repeat
+    // notifications per driver, so it effectively fires on a 10-min cadence.
+    const gpsStaleCutoff = new Date(now.getTime() - 60 * 60 * 1000)
+
+    const { data: onDutyTaxis } = await admin
+      .from('taxis')
+      .select('id, name, driver_id, location_updated_at, users!driver_id(name)')
+      .eq('is_available', true)
+      .not('driver_id', 'is', null)
+
+    const staleTaxis = (onDutyTaxis || []).filter((tx: any) =>
+      !tx.location_updated_at || new Date(tx.location_updated_at) < gpsStaleCutoff
+    )
+
+    if (staleTaxis.length) {
+      const { data: coordinators } = await admin
+        .from('users').select('id').eq('role', 'coordinator').eq('is_active', true)
+
+      for (const tx of staleTaxis as any[]) {
+        // Throttle: skip if this driver was already warned within the last ~10 min
+        const { data: lastWarn } = await admin
+          .from('notifications')
+          .select('created_at')
+          .eq('user_id', tx.driver_id)
+          .eq('type', 'gps_stale_warning')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (lastWarn) {
+          const minsSince = (now.getTime() - new Date(lastWarn.created_at).getTime()) / 60000
+          if (minsSince < 9.5) continue
+        }
+
+        const minsStale = tx.location_updated_at
+          ? Math.round((now.getTime() - new Date(tx.location_updated_at).getTime()) / 60000)
+          : null
+        const staleText = minsStale === null
+          ? 'no GPS signal has ever been received'
+          : minsStale >= 60
+            ? `${Math.floor(minsStale / 60)}h ${minsStale % 60}m`
+            : `${minsStale}m`
+
+        const driverName = tx.users?.name || tx.name
+
+        const notifs: any[] = [
+          {
+            user_id: tx.driver_id,
+            title:   '⚠️ Your GPS location is not updating',
+            body:    `Your location hasn't updated in ${staleText}. Please check location permissions and keep the app open.`,
+            type:    'gps_stale_warning',
+            url:     '/driver/home',
+          },
+          ...(coordinators || []).map((c: any) => ({
+            user_id: c.id,
+            title:   '⚠️ Driver GPS not updating',
+            body:    `${driverName} (${tx.name}) — GPS hasn't updated in ${staleText}.`,
+            type:    'gps_stale_warning',
+            url:     '/coordinator/drivers',
+          })),
+        ]
+
+        await notify(notifs)
+        results.gps_stale_warned++
       }
     }
 

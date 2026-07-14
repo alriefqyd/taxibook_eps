@@ -1,5 +1,5 @@
 -- ============================================================
--- TaxiBook v1 — Supabase Database Schema
+-- Ridr v1 — Supabase Database Schema
 -- Run this in your Supabase SQL Editor
 -- ============================================================
 

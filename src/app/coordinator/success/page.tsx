@@ -17,8 +17,15 @@ const MSG = {
     statusSubmit:   'Submitted',
     infoAssigned:   'A driver has been assigned to your trip. You will be notified when the trip starts.',
     infoPending:    'Coordinator will review and assign a driver. You will be notified once confirmed.',
-    backBtn:        'Back to schedule',
+    backBtn:        'Back to home',
     bookAgainBtn:   '+ Book another trip',
+    dutyTitle:      'Duty assigned!',
+    dutySub:        'The driver has been assigned to this duty.',
+    dutyTaxi:       'Taxi',
+    dutyDate:       'Date',
+    dutyReason:     'Notes',
+    dutyBackBtn:    'Back to Drivers',
+    dutyAgainBtn:   '+ Assign another duty',
   },
   id: {
     title:          'Booking terkirim!',
@@ -31,8 +38,15 @@ const MSG = {
     statusSubmit:   'Terkirim',
     infoAssigned:   'Driver telah ditugaskan untuk perjalanan Anda. Anda akan diberitahu saat perjalanan dimulai.',
     infoPending:    'Koordinator akan meninjau dan menugaskan driver. Anda akan diberitahu setelah dikonfirmasi.',
-    backBtn:        'Kembali ke jadwal',
+    backBtn:        'Kembali ke beranda',
     bookAgainBtn:   '+ Pesan perjalanan lain',
+    dutyTitle:      'Tugas ditetapkan!',
+    dutySub:        'Driver telah ditugaskan untuk tugas ini.',
+    dutyTaxi:       'Taksi',
+    dutyDate:       'Tanggal',
+    dutyReason:     'Keterangan',
+    dutyBackBtn:    'Kembali ke Drivers',
+    dutyAgainBtn:   '+ Tugaskan lagi',
   },
 }
 
@@ -65,7 +79,84 @@ function buildWaMessage(params: {
   ].join('\n')
 }
 
-function SuccessContent() {
+function DutySuccessContent() {
+  const lang   = useLang()
+  const t      = MSG[lang]
+  const params = useSearchParams()
+  const taxiName   = params.get('taxi')     || ''
+  const driverName = params.get('driver')   || ''
+  const date       = params.get('date')     || ''
+  const endDate    = params.get('endDate')  || ''
+  const startTime  = params.get('startTime')|| ''
+  const endTime    = params.get('endTime')  || ''
+  const reason     = params.get('reason')   || ''
+
+  const fmtDate = (d: string) => d
+    ? new Date(d + 'T12:00:00').toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : ''
+  const dateLabel = endDate ? `${fmtDate(date)} – ${fmtDate(endDate)}` : fmtDate(date)
+
+  return (
+    <div style={{ fontFamily: "var(--font-inter), 'Inter', sans-serif", minHeight: '100vh', background: '#F5F5F2', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{ width: '100%', maxWidth: '360px' }}>
+
+        {/* Icon */}
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#065F46" strokeWidth="2.5">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <h1 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.3px' }}>
+            {t.dutyTitle}
+          </h1>
+          <p style={{ fontSize: '13px', color: '#3f4949', margin: 0 }}>
+            {t.dutySub}
+          </p>
+        </div>
+
+        {/* Duty details */}
+        <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid #F0EEE8' }}>
+            <span style={{ fontSize: '12px', color: '#3f4949' }}>{t.dutyTaxi}</span>
+            <span style={{ fontSize: '12px', fontWeight: 600, textAlign: 'right' }}>{taxiName}{driverName ? ` · ${driverName}` : ''}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px', borderBottom: startTime || reason ? '1px solid #F0EEE8' : 'none' }}>
+            <span style={{ fontSize: '12px', color: '#3f4949' }}>{t.dutyDate}</span>
+            <span style={{ fontSize: '12px', fontWeight: 600, textAlign: 'right', maxWidth: '65%' }}>{dateLabel}</span>
+          </div>
+          {startTime && endTime && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px', borderBottom: reason ? '1px solid #F0EEE8' : 'none' }}>
+              <span style={{ fontSize: '12px', color: '#3f4949' }}>{lang === 'id' ? 'Jam' : 'Time'}</span>
+              <span style={{ fontSize: '12px', fontWeight: 600 }}>{startTime}–{endTime}</span>
+            </div>
+          )}
+          {reason && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px' }}>
+              <span style={{ fontSize: '12px', color: '#3f4949' }}>{t.dutyReason}</span>
+              <span style={{ fontSize: '12px', fontWeight: 600, textAlign: 'right', maxWidth: '65%' }}>{reason}</span>
+            </div>
+          )}
+        </div>
+
+        <Link href="/coordinator/home" style={{ textDecoration: 'none', display: 'block', marginBottom: 10 }}>
+          <button style={{ width: '100%', padding: '14px', background: '#006064', color: '#fff', border: 'none', borderRadius: 16, fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+            {t.dutyBackBtn}
+          </button>
+        </Link>
+
+        <Link href="/coordinator/book" style={{ textDecoration: 'none', display: 'block' }}>
+          <button style={{ width: '100%', padding: '12px', background: 'transparent', color: '#006064', border: '1.5px solid rgba(0,0,0,0.08)', borderRadius: 16, fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            {t.dutyAgainBtn}
+          </button>
+        </Link>
+
+      </div>
+    </div>
+  )
+}
+
+function TripSuccessContent() {
   const lang       = useLang()
   const t          = MSG[lang]
   const params     = useSearchParams()
@@ -153,13 +244,13 @@ function SuccessContent() {
           </a>
         )}
 
-        <Link href="/staff/home" style={{ textDecoration: 'none', display: 'block', marginBottom: 10 }}>
+        <Link href="/coordinator/home" style={{ textDecoration: 'none', display: 'block', marginBottom: 10 }}>
           <button style={{ width: '100%', padding: '14px', background: '#006064', color: '#fff', border: 'none', borderRadius: 16, fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
             {t.backBtn}
           </button>
         </Link>
 
-        <Link href="/staff/book" style={{ textDecoration: 'none', display: 'block' }}>
+        <Link href="/coordinator/book" style={{ textDecoration: 'none', display: 'block' }}>
           <button style={{ width: '100%', padding: '12px', background: 'transparent', color: '#006064', border: '1.5px solid rgba(0,0,0,0.08)', borderRadius: 16, fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             {t.bookAgainBtn}
           </button>
@@ -170,7 +261,12 @@ function SuccessContent() {
   )
 }
 
-export default function SuccessPage() {
+function SuccessRouter() {
+  const params = useSearchParams()
+  return params.get('kind') === 'duty' ? <DutySuccessContent /> : <TripSuccessContent />
+}
+
+export default function CoordinatorSuccessPage() {
   return (
     <Suspense fallback={
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -178,7 +274,7 @@ export default function SuccessPage() {
         <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(0,96,100,0.15)', borderTop: '3px solid #006064', animation: 'spin 0.8s linear infinite' }} />
       </div>
     }>
-      <SuccessContent />
+      <SuccessRouter />
     </Suspense>
   )
 }

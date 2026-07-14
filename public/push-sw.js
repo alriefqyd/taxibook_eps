@@ -4,7 +4,7 @@ self.addEventListener('activate', function() { self.clients.claim() })
 self.addEventListener('push', function(event) {
   if (!event.data) return
   var data  = event.data.json()
-  var title = data.title || 'TaxiBook'
+  var title = data.title || 'Ridr'
   event.waitUntil(
     self.registration.showNotification(title, {
       body:    data.body  || '',

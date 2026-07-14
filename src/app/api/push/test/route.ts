@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     // Send test push
     await sendPushToUser(
       user.id,
-      '🔔 TaxiBook Test',
+      '🔔 Ridr Test',
       'Push notifications are working! 🎉',
       '/'
     )

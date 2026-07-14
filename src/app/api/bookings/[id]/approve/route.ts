@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notify } from '@/lib/notify'
+import { getDayAssignmentBlocks, isTaxiDayBlocked } from '@/lib/auto-assign'
 
 export async function POST(
   request: NextRequest,
@@ -58,15 +59,13 @@ export async function POST(
       const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
       const scheduledWita     = new Date(new Date(booking.scheduled_at).getTime() + 8 * 3600000)
-      const scheduledHourWita = scheduledWita.getUTCHours()
       const scheduledWitaDate = scheduledWita.toISOString().slice(0, 10)
       const todayWitaDate     = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
       const isFutureDay       = scheduledWitaDate > todayWitaDate
-      const isLunchBreak      = scheduledHourWita >= 12 && scheduledHourWita < 13
 
       let assignedTaxi = null
 
-      if (!isLunchBreak) {
+      {
         let taxiQuery = admin
           .from('taxis')
           .select('id, name, driver_id, users!driver_id(name)')
@@ -78,12 +77,10 @@ export async function POST(
 
         if (taxis?.length) {
           const witaDate = scheduledWitaDate
-          const { data: dayAssigned } = await admin
-            .from('driver_day_assignments')
-            .select('taxi_id')
-            .eq('assign_date', witaDate)
-          const dayAssignedIds = new Set((dayAssigned || []).map((d: any) => d.taxi_id))
-          const eligibleTaxis = taxis.filter((t: any) => !dayAssignedIds.has(t.id))
+          const { fullDay, ranges } = await getDayAssignmentBlocks(admin, witaDate)
+          const bookingStart = new Date(booking.scheduled_at)
+          const bookingEnd   = new Date(booking.auto_complete_at)
+          const eligibleTaxis = taxis.filter((t: any) => !isTaxiDayBlocked(t.id, fullDay, ranges, bookingStart, bookingEnd))
 
           const avail = await Promise.all(
             eligibleTaxis.map(async (taxi: any) => {

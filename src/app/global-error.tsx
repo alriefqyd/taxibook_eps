@@ -10,7 +10,7 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error('[TaxiBook global error]', error)
+    console.error('[Ridr global error]', error)
   }, [error])
 
   return (

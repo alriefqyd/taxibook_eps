@@ -3,7 +3,7 @@ self.addEventListener('push', function(event) {
   if (!event.data) return
 
   const data = event.data.json()
-  const title = data.title || 'TaxiBook'
+  const title = data.title || 'Ridr'
   const options = {
     body:    data.body || '',
     icon:    '/icon-192.png',

@@ -57,7 +57,7 @@ export function exportBookingsExcel(rows: ExportRow[], dateFrom: string, dateTo:
   const topDriver = topEntry(driverByCount)
 
   const summaryData = [
-    ['TaxiBook — Booking Report Export'],
+    ['Ridr — Booking Report Export'],
     ['Date Range', `${dateFrom}  →  ${dateTo}`],
     ['Generated at', fmt(new Date().toISOString())],
     [],
@@ -234,7 +234,7 @@ export function exportBookingsExcel(rows: ExportRow[], dateFrom: string, dateTo:
   XLSX.utils.book_append_sheet(wb, wsMonth, 'Monthly Trend')
 
   // ── Download ────────────────────────────────────────────────────────────────
-  const filename = `taxibook-report_${dateFrom}_${dateTo}.xlsx`
+  const filename = `ridr-report_${dateFrom}_${dateTo}.xlsx`
   XLSX.writeFile(wb, filename)
 }
 
@@ -278,6 +278,6 @@ export function exportFeedbackExcel(rows: FeedbackExportRow[]) {
   ws['!cols'] = [5, 18, 14, 22, 14, 60].map(w => ({ wch: w }))
   XLSX.utils.book_append_sheet(wb, ws, 'Feedback')
 
-  const filename = `taxibook-feedback_${format(new Date(), 'yyyy-MM-dd')}.xlsx`
+  const filename = `ridr-feedback_${format(new Date(), 'yyyy-MM-dd')}.xlsx`
   XLSX.writeFile(wb, filename)
 }

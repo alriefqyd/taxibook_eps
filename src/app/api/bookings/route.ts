@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notify } from '@/lib/notify'
 import { getRouteDurationSeconds } from '@/lib/routing'
+import { getDayAssignmentBlocks, isTaxiDayBlocked } from '@/lib/auto-assign'
 
 export async function POST(request: NextRequest) {
   try {
@@ -260,10 +261,7 @@ async function autoAssign(
   const todayStart    = new Date(nowWita.getTime() - WITA_MS)
   const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
-  // No auto-assignment for trips scheduled during 12:00–13:00 WITA (lunch & prayer break)
-  const scheduledWita     = new Date(new Date(scheduledAt).getTime() + 8 * 3600000)
-  const scheduledHourWita = scheduledWita.getUTCHours()
-  if (scheduledHourWita >= 12 && scheduledHourWita < 13) return { taxi: null }
+  const scheduledWita = new Date(new Date(scheduledAt).getTime() + 8 * 3600000)
 
   // For future-day trips drivers may be offline (end of shift) — only check is_available for same-day trips
   const scheduledWitaDate = scheduledWita.toISOString().slice(0, 10)
@@ -284,14 +282,12 @@ async function autoAssign(
 
   if (!taxis?.length) return { taxi: null }
 
-  // Exclude taxis with a full-day assignment on the booking's WITA date
+  // Exclude taxis whose day-duty (full-day, or overlapping time range) blocks this booking
   const witaDate = new Date(new Date(scheduledAt).getTime() + 8 * 3600000).toISOString().slice(0, 10)
-  const { data: dayAssigned } = await admin
-    .from('driver_day_assignments')
-    .select('taxi_id')
-    .eq('assign_date', witaDate)
-  const dayAssignedIds = new Set((dayAssigned || []).map((d: any) => d.taxi_id))
-  const candidates = taxis.filter((t: any) => !dayAssignedIds.has(t.id))
+  const { fullDay, ranges } = await getDayAssignmentBlocks(admin, witaDate)
+  const bookingStart = new Date(scheduledAt)
+  const bookingEnd   = new Date(autoCompleteAt)
+  const candidates = taxis.filter((t: any) => !isTaxiDayBlocked(t.id, fullDay, ranges, bookingStart, bookingEnd))
 
   if (!candidates.length) return { taxi: null }
 

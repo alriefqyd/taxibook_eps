@@ -15,7 +15,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title:       'TaxiBook',
+  title:       'Ridr',
   description: 'Company fleet booking system — PT Vale Indonesia',
   manifest:    '/manifest.json',
 }
@@ -38,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="TaxiBook EPS" />
+        <meta name="apple-mobile-web-app-title" content="Ridr EPS" />
         <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
         <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
       </head>

@@ -28,7 +28,7 @@ function buildWaMessage(b: BookingDetail): string {
   const taxi = b.taxi_name ? `${b.taxi_name}${b.taxi_plate ? ` (${b.taxi_plate})` : ''}` : null
 
   return [
-    `📋 *TaxiBook – Penugasan Perjalanan*,`,
+    `📋 *Ridr – Penugasan Perjalanan*,`,
     `━━━━━━━━━━━━━━━━━━`,
     `🔖 Kode Booking: *${b.booking_code}*`,
     ``,
@@ -136,20 +136,28 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
   const statusColor = STATUS_COLORS[booking.status]
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }} onClick={onClose}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }} onClick={onClose}>
       <div
         style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px', maxHeight: '85vh', overflowY: 'auto', boxSizing: 'border-box' }}
         onClick={e => e.stopPropagation()}
       >
         <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.08)', margin: '0 auto 20px' }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-          <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
             <p style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.3px' }}>{booking.destination}</p>
             <p style={{ fontSize: 13, color: '#6f7979', margin: 0 }}>{scheduledAt}</p>
           </div>
-          <span style={{ fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 9999, background: statusColor.bg, color: statusColor.text, whiteSpace: 'nowrap' }}>
-            {label}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 9999, background: statusColor.bg, color: statusColor.text, whiteSpace: 'nowrap' }}>
+              {label}
+            </span>
+            <button
+              onClick={onClose}
+              style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: '#F5F5F2', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
         </div>
 
         {['booked', 'on_trip', 'waiting_trip'].includes(booking.status) && booking.taxi_id && (
@@ -186,16 +194,6 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
             <DetailRow label="Driver" value={booking.driver_name || 'Not assigned'} highlight={!!booking.driver_name} />
             {booking.driver_phone && <DetailRow label="Driver phone" value={booking.driver_phone} link={`tel:${booking.driver_phone}`} />}
             <DetailRow label="Taxi" value={booking.taxi_name || '—'} />
-            {booking.taxi_plate && <DetailRow label="Plate" value={booking.taxi_plate} />}
-            {booking.taxi_color && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                <p style={{ fontSize: 12, color: '#9ca3af', margin: 0, fontWeight: 600 }}>Taxi color</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: booking.taxi_color, border: '1px solid rgba(0,0,0,0.1)' }} />
-                  <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{booking.taxi_color}</p>
-                </div>
-              </div>
-            )}
           </Section>
 
           <Section title="Trip Route">

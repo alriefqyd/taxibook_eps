@@ -60,8 +60,6 @@ const MSG = {
     rowDriver:        'Driver',
     rowDriverPhone:   "Driver's phone",
     rowTaxi:          'Taxi',
-    rowPlate:         'Plate',
-    rowTaxiColor:     'Taxi color',
     rowFrom:          'From',
     rowDest:          'Destination',
     rowTripType:      'Trip type',
@@ -133,8 +131,6 @@ const MSG = {
     rowDriver:        'Driver',
     rowDriverPhone:   'No. HP driver',
     rowTaxi:          'Taksi',
-    rowPlate:         'Plat',
-    rowTaxiColor:     'Warna taksi',
     rowFrom:          'Dari',
     rowDest:          'Tujuan',
     rowTripType:      'Jenis trip',
@@ -520,7 +516,7 @@ export default function CoordinatorReportPage() {
 
       {/* Cancel confirmation modal */}
       {cancelRow && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1200, display: 'flex', alignItems: 'flex-end' }}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.5)', zIndex: 1200, display: 'flex', alignItems: 'flex-end' }}
           onClick={() => !cancelling && setCancelRow(null)}>
           <div onClick={e => e.stopPropagation()}
             style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', boxSizing: 'border-box' }}>
@@ -551,7 +547,7 @@ export default function CoordinatorReportPage() {
 
       {/* Reassign modal */}
       {reassignRow && (
-        <div onClick={() => setReassignRow(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'flex-end' }}>
+        <div onClick={() => setReassignRow(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'flex-end' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
             {/* Handle */}
             <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px', flexShrink: 0 }}>
@@ -705,7 +701,7 @@ function DetailModal({ row: r, onClose, canCancel, onCancel }: {
   return (
     <div
       onClick={onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'flex-end' }}
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'flex-end' }}
     >
       <div
         onClick={e => e.stopPropagation()}
@@ -762,16 +758,6 @@ function DetailModal({ row: r, onClose, canCancel, onCancel }: {
               <DetailRow label={t.rowDriverPhone} value={r.driver_phone} link={`tel:${r.driver_phone}`} />
             )}
             <DetailRow label={t.rowTaxi}   value={r.taxi_name ?? '—'} />
-            {r.taxi_plate && <DetailRow label={t.rowPlate} value={r.taxi_plate} />}
-            {r.taxi_color && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                <p style={{ fontSize: 12, color: '#9ca3af', margin: 0, fontWeight: 600 }}>{t.rowTaxiColor}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: r.taxi_color, border: '1px solid rgba(0,0,0,0.1)' }} />
-                  <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{r.taxi_color}</p>
-                </div>
-              </div>
-            )}
           </Section>
 
           {/* ── Route ── */}
