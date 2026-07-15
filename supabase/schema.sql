@@ -134,9 +134,16 @@ declare
   code  text;
 begin
   yr  := to_char(now(), 'YYYY');
-  select count(*) + 1 into seq
+  -- Serialize concurrent inserts for the same year so two near-simultaneous bookings can't
+  -- compute the same next number (lock auto-releases at commit).
+  perform pg_advisory_xact_lock(72190001, yr::int);
+  -- Base the next number on the MAX sequence number already used this year, not count(*).
+  -- count(*) breaks as soon as any row is ever deleted (gaps make it undercount), which was
+  -- causing every new booking to collide with an already-used code and fail with 23505,
+  -- mislabeled as "you already have a booking at this time".
+  select coalesce(max(substring(booking_code from '\d+$')::int), 0) + 1 into seq
   from public.bookings
-  where extract(year from created_at) = extract(year from now());
+  where booking_code like 'TXB-' || yr || '-%';
   code := 'TXB-' || yr || '-' || lpad(seq::text, 4, '0');
   new.booking_code := code;
   return new;
@@ -499,3 +506,18 @@ begin
   end if;
 end;
 $$;
+
+-- ============================================================
+-- MIGRATION: fix false "already booked" conflicts for passengers
+-- auto_complete_at includes the driver's drive back to base (round trip), which was
+-- also being used to gate the PASSENGER's own next booking — over-blocking DROP trips,
+-- where the passenger is free the moment they arrive. passenger_end_at tracks when the
+-- passenger themself is actually free (one-way for DROP, same as auto_complete_at for
+-- WAITING). Backfill copies the old value so historical rows stay conservative.
+-- ============================================================
+alter table public.bookings
+  add column if not exists passenger_end_at timestamptz;
+
+update public.bookings
+  set passenger_end_at = auto_complete_at
+  where passenger_end_at is null;

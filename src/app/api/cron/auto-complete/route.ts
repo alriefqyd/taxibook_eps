@@ -481,13 +481,22 @@ export async function GET(request: NextRequest) {
     // Any on-duty driver whose GPS hasn't updated in 60+ min gets warned.
     // Runs every cron tick (5 min) but throttled to ~10 min between repeat
     // notifications per driver, so it effectively fires on a 10-min cadence.
+    // Only checked during operating hours (06:00–18:00 WITA) — drivers who
+    // simply lock their phone for the night without tapping "Set Offline"
+    // stay is_available=true with dead GPS, and got spammed with warnings
+    // every night. Coordinators handle actual off-duty follow-up manually.
+    const nowWitaHour = new Date(now.getTime() + 8 * 3600000).getUTCHours()
+    const inOperatingHours = nowWitaHour >= 6 && nowWitaHour < 18
+
     const gpsStaleCutoff = new Date(now.getTime() - 60 * 60 * 1000)
 
-    const { data: onDutyTaxis } = await admin
-      .from('taxis')
-      .select('id, name, driver_id, location_updated_at, users!driver_id(name)')
-      .eq('is_available', true)
-      .not('driver_id', 'is', null)
+    const { data: onDutyTaxis } = inOperatingHours
+      ? await admin
+          .from('taxis')
+          .select('id, name, driver_id, location_updated_at, users!driver_id(name)')
+          .eq('is_available', true)
+          .not('driver_id', 'is', null)
+      : { data: [] }
 
     const staleTaxis = (onDutyTaxis || []).filter((tx: any) =>
       !tx.location_updated_at || new Date(tx.location_updated_at) < gpsStaleCutoff

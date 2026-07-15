@@ -37,23 +37,37 @@ export async function POST(request: NextRequest) {
 
     // ── Compute auto_complete_at: pickup→destination + destination→pickup + wait + 15 min ──
     // Window covers the full round trip so the driver isn't double-booked until back at base.
-    const MARGIN_S   = 15 * 60   // 15 min buffer
-    const FALLBACK_S = 2 * 3600  // 2h fallback when route unavailable
-    const waitSec    = trip_type === 'WAITING' ? (wait_minutes || 0) * 60 : 0
+    const MARGIN_S          = 15 * 60   // 15 min buffer
+    const FALLBACK_S        = 2 * 3600  // 2h fallback when route unavailable (driver/taxi side)
+    const ONEWAY_FALLBACK_S = 25 * 60   // 25 min fallback for a single leg (passenger side)
+    const waitSec           = trip_type === 'WAITING' ? (wait_minutes || 0) * 60 : 0
 
-    let routeSec = FALLBACK_S
+    let forward: number | null = null
+    let back: number | null = null
     if (pickup_lat && pickup_lng && destination_lat && destination_lng) {
-      const [forward, back] = await Promise.all([
+      ;[forward, back] = await Promise.all([
         getRouteDurationSeconds(pickup_lat, pickup_lng, destination_lat, destination_lng),
         getRouteDurationSeconds(destination_lat, destination_lng, pickup_lat, pickup_lng),
       ])
-      if (forward != null && back != null) routeSec = forward + back
-      else if (forward != null)            routeSec = forward * 2  // mirror if return leg fails
     }
+
+    let routeSec = FALLBACK_S
+    if (forward != null && back != null) routeSec = forward + back
+    else if (forward != null)            routeSec = forward * 2  // mirror if return leg fails
 
     const auto_complete_at = new Date(
       new Date(scheduled_at).getTime() + (routeSec + MARGIN_S + waitSec) * 1000
     ).toISOString()
+
+    // ── Compute passenger_end_at: when is the PASSENGER (not the taxi) actually free again? ──
+    // auto_complete_at above includes the driver's drive back to base, which the passenger isn't
+    // part of for a DROP trip — they're done once they arrive. WAITING trips genuinely keep the
+    // passenger occupied for the full round trip, so those reuse auto_complete_at as-is.
+    const passenger_end_at = trip_type === 'WAITING'
+      ? auto_complete_at
+      : new Date(
+          new Date(scheduled_at).getTime() + ((forward ?? ONEWAY_FALLBACK_S) + MARGIN_S) * 1000
+        ).toISOString()
 
     // Coordinators are fully exempt from the overlap checks below — they may need to serve
     // multiple (possibly different) vendors with overlapping windows at once.
@@ -61,14 +75,16 @@ export async function POST(request: NextRequest) {
 
     // ── Same passenger overlap check (server-side guard) ──
     // A passenger can't be in two places at once — their bookings' time windows must not overlap.
+    // Compared against passenger_end_at (not auto_complete_at) so a DROP trip's driver-return
+    // leg doesn't falsely block the passenger's next booking.
     if (!isCoordinator) {
       const { data: passengerConflict } = await admin
         .from('bookings')
         .select('booking_code, scheduled_at, destination')
         .eq('passenger_id', passengerId)
         .not('status', 'in', '(rejected,cancelled,completed)')
-        .lt('scheduled_at', auto_complete_at)
-        .gt('auto_complete_at', scheduled_at)
+        .lt('scheduled_at', passenger_end_at)
+        .gt('passenger_end_at', scheduled_at)
         .limit(1)
         .maybeSingle()
 
@@ -150,6 +166,7 @@ export async function POST(request: NextRequest) {
         scheduled_at,
         status,
         auto_complete_at,
+        passenger_end_at,
         created_by:       user.id,
         pickup_lat,
         pickup_lng,
@@ -162,8 +179,11 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Insert error:', insertError)
       if (insertError.code === '23505') {
+        // The only unique constraint on bookings is booking_code — this is a code-generation
+        // collision (or retry), not an actual double-booking. Real time-slot conflicts are
+        // caught above, before we ever reach this insert.
         return NextResponse.json(
-          { error: 'You already have a booking at this time.' },
+          { error: 'Could not create the booking due to a temporary conflict. Please try again.' },
           { status: 409 }
         )
       }

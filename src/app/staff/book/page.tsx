@@ -304,13 +304,15 @@ export default function BookPage() {
 
       // Same passenger overlap pre-check — a passenger can't be in two places at once.
       // Server is the authoritative check; this gives quick pre-flight feedback.
+      // Compared against passenger_end_at (not auto_complete_at) so a past DROP trip's
+      // driver-return leg doesn't falsely block this new booking.
       const estimatedEnd = new Date(scheduledDate.getTime() + 3 * 60 * 60 * 1000)
       const { data: passengerConflicts } = await supabase.from('bookings')
         .select('booking_code, scheduled_at, destination')
         .eq('passenger_id', user.id)
         .not('status', 'in', '(rejected,cancelled,completed)')
         .lt('scheduled_at', estimatedEnd.toISOString())
-        .gt('auto_complete_at', scheduledDate.toISOString())
+        .gt('passenger_end_at', scheduledDate.toISOString())
 
       if (passengerConflicts?.length) {
         const c = passengerConflicts[0]

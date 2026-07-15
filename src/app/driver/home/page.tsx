@@ -69,9 +69,18 @@ export default function DriverHomePage() {
   // Broadcast GPS to Supabase whenever driver has a taxi assigned
   useGpsReporting(myTaxi?.id ?? null)
 
-  // Re-render every 30s so the GPS staleness banner's elapsed time keeps ticking
+  // Re-render every 30s so the GPS staleness banner's elapsed time keeps ticking, and re-fetch
+  // the taxi row directly as a fallback — if the realtime channel below ever drops, myTaxi
+  // would otherwise stay frozen on a stale location_updated_at and the red banner would never
+  // clear even after GPS reporting actually resumes.
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 30_000)
+    const id = setInterval(async () => {
+      setTick(t => t + 1)
+      if (!uidRef.current) return
+      const { data: taxi } = await supabase
+        .from('taxis').select('*, users!driver_id(name)').eq('driver_id', uidRef.current).single()
+      if (taxi) setMyTaxi({ ...taxi, driver_name: taxi.users?.name || '' })
+    }, 30_000)
     return () => clearInterval(id)
   }, [])
 
@@ -224,13 +233,17 @@ export default function DriverHomePage() {
 
   const tabColor = myTaxi?.color || '#2563EB'
 
-  // GPS staleness — only nag while on duty; matches the 1h server-side threshold
+  // GPS staleness — only nag while on duty; matches the 1h server-side threshold.
+  // Also only during operating hours (06:00–18:00 WITA), same as the server-side cron —
+  // otherwise a driver who forgets to tap "Set Offline" gets nagged all night.
+  const nowWitaHour = new Date(Date.now() + 8 * 3600000).getUTCHours()
+  const inOperatingHours = nowWitaHour >= 6 && nowWitaHour < 18
   const gpsStaleMinutes = myTaxi && myTaxi.is_available !== false
     ? (myTaxi.location_updated_at
         ? Math.floor((Date.now() - new Date(myTaxi.location_updated_at).getTime()) / 60000)
         : Infinity)
     : null
-  const showGpsStaleBanner = gpsStaleMinutes !== null && gpsStaleMinutes >= 60
+  const showGpsStaleBanner = inOperatingHours && gpsStaleMinutes !== null && gpsStaleMinutes >= 60
   const gpsStaleText = gpsStaleMinutes === Infinity
     ? 'never'
     : gpsStaleMinutes !== null
