@@ -7,14 +7,58 @@ import type { BookingDetail, User } from '@/types'
 import { STATUS_COLORS, STATUS_LABELS } from '@/types'
 import StaffBookingSheet from '@/components/StaffBookingSheet'
 import PageLoader from '@/components/PageLoader'
+import { useLang } from '@/lib/language'
 
 type StatusGroup = 'all' | 'active' | 'pending' | 'completed'
 
-const STATUS_GROUPS: { key: StatusGroup; label: string }[] = [
-  { key: 'all',       label: 'All' },
-  { key: 'active',    label: 'Active' },
-  { key: 'pending',   label: 'Pending' },
-  { key: 'completed', label: 'Completed' },
+const MSG = {
+  en: {
+    myTrips:            'My trips',
+    allTrips:           'All trips',
+    statusAll:          'All',
+    statusActive:       'Active',
+    statusPending:      'Pending',
+    statusCompleted:    'Completed',
+    from:               'From',
+    to:                 'To',
+    showingPrefix:      'Showing',
+    resultWord:         (n: number) => n !== 1 ? 'results' : 'result',
+    dateRange:          'date range',
+    clearAll:           'Clear all',
+    noTripsFound:       'No trips found',
+    tryChangingFilter:  'Try changing your filter',
+    dropLabel:          'Drop',
+    waitMin:            (n: number) => `Wait ${n} min`,
+    awaitingApproval:   'Awaiting approval',
+    unassigned:         'Unassigned',
+  },
+  id: {
+    myTrips:            'Trip saya',
+    allTrips:           'Semua trip',
+    statusAll:          'Semua',
+    statusActive:       'Aktif',
+    statusPending:      'Pending',
+    statusCompleted:    'Selesai',
+    from:               'Dari',
+    to:                 'Sampai',
+    showingPrefix:      'Menampilkan',
+    resultWord:         (_n: number) => 'hasil',
+    dateRange:          'rentang tanggal',
+    clearAll:           'Hapus semua',
+    noTripsFound:       'Trip tidak ditemukan',
+    tryChangingFilter:  'Coba ubah filter Anda',
+    dropLabel:          'Drop',
+    waitMin:            (n: number) => `Tunggu ${n} menit`,
+    awaitingApproval:   'Menunggu persetujuan',
+    unassigned:         'Belum diassign',
+  },
+}
+
+const STATUS_GROUP_KEYS: { key: StatusGroup; labelKey: 'statusAll' | 'statusActive' | 'statusPending' | 'statusCompleted' }[] = [
+  { key: 'all',       labelKey: 'statusAll' },
+  { key: 'active',    labelKey: 'statusActive' },
+  { key: 'pending',   labelKey: 'statusPending' },
+  { key: 'completed', labelKey: 'statusCompleted' },
 ]
 
 const ACTIVE_STATUSES  = ['booked', 'on_trip', 'waiting_trip']
@@ -31,6 +75,8 @@ function matchesGroup(status: string, group: StatusGroup) {
 export default function StaffTripsPage() {
   const router   = useRouter()
   const supabase = createClient()
+  const lang     = useLang()
+  const t        = MSG[lang]
 
   const [user,        setUser]        = useState<User | null>(null)
   const [bookings,    setBookings]    = useState<BookingDetail[]>([])
@@ -110,8 +156,8 @@ export default function StaffTripsPage() {
       <div style={{ background:'#ffffff', borderBottom:'1px solid rgba(0,0,0,0.06)', padding:'20px 16px 0' }}>
         <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, marginBottom:16 }}>
           <div>
-            <p style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#9ca3af', margin:'0 0 3px' }}>My trips</p>
-            <h1 style={{ fontSize:22, fontWeight:800, color:'#006064', margin:0, letterSpacing:'-0.5px' }}>All trips</h1>
+            <p style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#9ca3af', margin:'0 0 3px' }}>{t.myTrips}</p>
+            <h1 style={{ fontSize:22, fontWeight:800, color:'#006064', margin:0, letterSpacing:'-0.5px' }}>{t.allTrips}</h1>
           </div>
           <button
             onClick={refresh}
@@ -128,7 +174,7 @@ export default function StaffTripsPage() {
 
         {/* ── Status chips ── */}
         <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:14, scrollbarWidth:'none' as any }}>
-          {STATUS_GROUPS.map(sg => {
+          {STATUS_GROUP_KEYS.map(sg => {
             const active = statusGroup === sg.key
             const count  = sg.key === 'all'
               ? bookings.length
@@ -154,7 +200,7 @@ export default function StaffTripsPage() {
                   transition: 'all 0.15s',
                 }}
               >
-                {sg.label}
+                {t[sg.labelKey]}
                 <span style={{
                   fontSize: 10,
                   fontWeight: 800,
@@ -179,7 +225,7 @@ export default function StaffTripsPage() {
         {/* ── Date range — always visible ── */}
         <div style={{ display:'flex', gap:10, alignItems:'center', padding:'0 0 14px' }}>
           <div style={{ flex:1, background:'#F5F5F2', borderRadius:12, padding:'10px 12px' }}>
-            <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:'#9ca3af', margin:'0 0 4px' }}>From</p>
+            <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:'#9ca3af', margin:'0 0 4px' }}>{t.from}</p>
             <input
               type="date"
               value={dateFrom}
@@ -191,7 +237,7 @@ export default function StaffTripsPage() {
             <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
           </svg>
           <div style={{ flex:1, background:'#F5F5F2', borderRadius:12, padding:'10px 12px' }}>
-            <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:'#9ca3af', margin:'0 0 4px' }}>To</p>
+            <p style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:'#9ca3af', margin:'0 0 4px' }}>{t.to}</p>
             <input
               type="date"
               value={dateTo}
@@ -216,15 +262,15 @@ export default function StaffTripsPage() {
       {(statusGroup !== 'all' || hasDateFilter) && (
         <div style={{ padding:'10px 16px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <p style={{ fontSize:11, color:'#6f7979', margin:0 }}>
-            Showing <strong style={{ color:'#006064' }}>{filtered.length}</strong> result{filtered.length !== 1 ? 's' : ''}
-            {statusGroup !== 'all' && <> · <span style={{ color:'#006064' }}>{STATUS_GROUPS.find(s => s.key === statusGroup)?.label}</span></>}
-            {hasDateFilter && <> · date range</>}
+            {t.showingPrefix} <strong style={{ color:'#006064' }}>{filtered.length}</strong> {t.resultWord(filtered.length)}
+            {statusGroup !== 'all' && <> · <span style={{ color:'#006064' }}>{t[STATUS_GROUP_KEYS.find(s => s.key === statusGroup)!.labelKey]}</span></>}
+            {hasDateFilter && <> · {t.dateRange}</>}
           </p>
           <button
             onClick={clearFilters}
             style={{ fontSize:11, fontWeight:700, color:'#006064', background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:'inherit' }}
           >
-            Clear all
+            {t.clearAll}
           </button>
         </div>
       )}
@@ -236,8 +282,8 @@ export default function StaffTripsPage() {
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin:'0 auto 10px', display:'block' }}>
               <path d="M3 6h18M3 12h18M3 18h18"/>
             </svg>
-            <p style={{ fontSize:13, fontWeight:600, color:'#9ca3af', margin:'0 0 4px' }}>No trips found</p>
-            <p style={{ fontSize:11, color:'#c4c9c9', margin:0 }}>Try changing your filter</p>
+            <p style={{ fontSize:13, fontWeight:600, color:'#9ca3af', margin:'0 0 4px' }}>{t.noTripsFound}</p>
+            <p style={{ fontSize:11, color:'#c4c9c9', margin:0 }}>{t.tryChangingFilter}</p>
           </div>
         ) : (
           filtered.map(b => {
@@ -271,7 +317,7 @@ export default function StaffTripsPage() {
                 </div>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center', marginTop:10, paddingTop:10, borderTop:'1px solid rgba(0,0,0,0.06)' }}>
                   <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:9999, background: b.trip_type === 'DROP' ? '#DBEAFE' : '#EDE9FE', color: b.trip_type === 'DROP' ? '#1E3A5F' : '#4C1D95' }}>
-                    {b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes} min`}
+                    {b.trip_type === 'DROP' ? t.dropLabel : t.waitMin(b.wait_minutes)}
                   </span>
                   {b.taxi_name ? (
                     <span style={{ fontSize:10, color:'#6f7979', display:'flex', alignItems:'center', gap:5 }}>
@@ -280,7 +326,7 @@ export default function StaffTripsPage() {
                     </span>
                   ) : (
                     <span style={{ fontSize:10, color:'#9ca3af', fontStyle:'italic' }}>
-                      {b.status === 'pending_coordinator_approval' ? 'Awaiting approval' : 'Unassigned'}
+                      {b.status === 'pending_coordinator_approval' ? t.awaitingApproval : t.unassigned}
                     </span>
                   )}
                 </div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { notify } from '@/lib/notify'
+import { notify, LocalizedText } from '@/lib/notify'
 import { getRouteDurationSeconds } from '@/lib/routing'
 import { getDayAssignmentBlocks, isTaxiDayBlocked } from '@/lib/auto-assign'
 
@@ -213,8 +213,11 @@ export async function POST(request: NextRequest) {
         await notify({
           user_id:    result.taxi.driver_id,
           booking_id: booking.id,
-          title:      'Trip assigned to you',
-          body:       `You have been assigned to pick up ${passenger?.name} → ${destination} at ${time}. Please be ready on time.`,
+          title:      { en: 'Trip assigned to you', id: 'Perjalanan ditugaskan kepada Anda' },
+          body: {
+            en: `You have been assigned to pick up ${passenger?.name} → ${destination} at ${time}. Please be ready on time.`,
+            id: `Anda ditugaskan menjemput ${passenger?.name} → ${destination} pukul ${time}. Mohon siap tepat waktu.`,
+          },
           type:       'driver_assigned',
         })
 
@@ -240,8 +243,11 @@ export async function POST(request: NextRequest) {
 
     // ── Pending approval — notify coordinator ──
     await notifyCoordinators(admin, booking, passengerId, destination,
-      'Booking needs your approval',
-      `Waiting trip — ${wait_minutes} min wait time requires coordinator approval.`
+      { en: 'Booking needs your approval', id: 'Booking memerlukan persetujuan Anda' },
+      {
+        en: `Waiting trip — ${wait_minutes} min wait time requires coordinator approval.`,
+        id: `Trip tunggu — waktu tunggu ${wait_minutes} menit memerlukan persetujuan koordinator.`,
+      }
     )
 
     return NextResponse.json({ booking, assigned: false }, { status: 201 })
@@ -413,7 +419,7 @@ async function autoAssign(
 // ── Notify all coordinators ──────────────────────────────────────────────────
 async function notifyCoordinators(
   admin: any, booking: any, passengerId: string,
-  destination: string, title: string, extraBody: string
+  destination: string, title: LocalizedText, extraBody: LocalizedText
 ) {
   const [{ data: coordinators }, { data: passenger }] = await Promise.all([
     admin.from('users').select('id').eq('role', 'coordinator').eq('is_active', true),
@@ -427,7 +433,10 @@ async function notifyCoordinators(
       user_id:    c.id,
       booking_id: booking.id,
       title,
-      body:       `${passenger?.name} → ${destination}. ${extraBody}`,
+      body: {
+        en: `${passenger?.name} → ${destination}. ${extraBody.en}`,
+        id: `${passenger?.name} → ${destination}. ${extraBody.id}`,
+      },
       type:       'needs_approval',
     }))
   )

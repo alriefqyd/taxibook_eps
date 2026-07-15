@@ -5,8 +5,92 @@ import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import type { BookingDetail } from '@/types'
 import { STATUS_COLORS, STATUS_LABELS } from '@/types'
+import { useLang } from '@/lib/language'
 
 const TrackingMap = dynamic(() => import('@/components/map/TrackingMap'), { ssr: false })
+
+const MSG = {
+  en: {
+    sessionExpired:   'Session expired',
+    failedCancel:     'Failed to cancel',
+    sectionTime:      'Time',
+    sectionPassenger: 'Passenger',
+    sectionDriver:    'Driver & Vehicle',
+    sectionRoute:     'Trip Route',
+    sectionNotes:     'Notes',
+    bookingId:        'Booking ID',
+    created:          'Created',
+    scheduled:        'Scheduled',
+    completed:        'Completed',
+    windowEnd:        'Window end',
+    actualDuration:   'Actual duration',
+    min:              'min',
+    bookingWindow:    'Booking window',
+    name:             'Name',
+    phone:            'Phone',
+    driver:           'Driver',
+    notAssigned:      'Not assigned',
+    driverPhone:      'Driver phone',
+    taxi:             'Taxi',
+    from:             'From',
+    to:               'To',
+    tripType:         'Trip type',
+    drop:             'Drop',
+    waitMin:          (n: number) => `Wait ${n} min`,
+    rejectionReason:  'Rejection reason',
+    callDriver:       'Call Driver',
+    whatsappDriver:   'WhatsApp Driver',
+    cancelBooking:    'Cancel this booking',
+    reasonLabel:      'Reason for cancellation *',
+    reasonPlaceholder:'e.g. I no longer need the taxi',
+    errReasonRequired:'Please enter a reason for cancelling',
+    goBack:           'Go back',
+    cancelling:       'Cancelling...',
+    confirmCancel:    'Confirm cancel',
+    tripCompleted:    'This trip has been completed.',
+    cannotCancel:     'This booking cannot be cancelled.',
+  },
+  id: {
+    sessionExpired:   'Sesi telah berakhir',
+    failedCancel:     'Gagal membatalkan booking',
+    sectionTime:      'Waktu',
+    sectionPassenger: 'Penumpang',
+    sectionDriver:    'Driver & Kendaraan',
+    sectionRoute:     'Rute Perjalanan',
+    sectionNotes:     'Catatan',
+    bookingId:        'ID Booking',
+    created:          'Dibuat',
+    scheduled:        'Dijadwalkan',
+    completed:        'Selesai',
+    windowEnd:        'Akhir jendela',
+    actualDuration:   'Durasi aktual',
+    min:              'menit',
+    bookingWindow:    'Jendela booking',
+    name:             'Nama',
+    phone:            'Telepon',
+    driver:           'Driver',
+    notAssigned:      'Belum ditugaskan',
+    driverPhone:      'Telepon driver',
+    taxi:             'Taksi',
+    from:             'Dari',
+    to:               'Tujuan',
+    tripType:         'Jenis perjalanan',
+    drop:             'Drop',
+    waitMin:          (n: number) => `Tunggu ${n} menit`,
+    rejectionReason:  'Alasan penolakan',
+    callDriver:       'Telepon Driver',
+    whatsappDriver:   'WhatsApp Driver',
+    cancelBooking:    'Batalkan booking ini',
+    reasonLabel:      'Alasan pembatalan *',
+    reasonPlaceholder:'cth. Saya tidak jadi membutuhkan taksi',
+    errReasonRequired:'Mohon isi alasan pembatalan',
+    goBack:           'Kembali',
+    cancelling:       'Membatalkan...',
+    confirmCancel:    'Konfirmasi batal',
+    tripCompleted:    'Perjalanan ini telah selesai.',
+    cannotCancel:     'Booking ini tidak dapat dibatalkan.',
+  },
+}
 
 function toWaNumber(phone: string): string {
   let n = phone.replace(/\D/g, '')
@@ -89,6 +173,8 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
   onClose: () => void
   onCancelled: () => void
 }) {
+  const lang = useLang()
+  const t = MSG[lang]
   const supabase = createClient()
   const [cancelling, setCancelling] = React.useState(false)
   const [showCancel, setShowCancel] = React.useState(false)
@@ -96,11 +182,12 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
   const [error, setError] = React.useState('')
 
   async function handleCancel() {
+    if (!cancelReason.trim()) { setError(t.errReasonRequired); return }
     setCancelling(true)
     setError('')
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
-      setError('Session expired')
+      setError(t.sessionExpired)
       setCancelling(false)
       return
     }
@@ -116,7 +203,7 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      setError(data.error || 'Failed to cancel')
+      setError(data.error || t.failedCancel)
       setCancelling(false)
       return
     }
@@ -175,37 +262,37 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: booking.taxi_id ? 16 : 0 }}>
-          <Section title="Time">
-            <DetailRow label="Booking ID" value={booking.booking_code} highlight />
-            <DetailRow label="Created" value={createdAt} />
-            <DetailRow label="Scheduled" value={scheduledAt} highlight />
-            {completedAt && <DetailRow label="Completed" value={completedAt} valueColor="#059669" />}
-            {booking.auto_complete_at && <DetailRow label="Window end" value={new Date(booking.auto_complete_at).toLocaleString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} valueColor="#6f7979" />}
-            {durationMin != null && <DetailRow label="Actual duration" value={`${durationMin} min`} highlight />}
-            {windowMin != null && <DetailRow label="Booking window" value={`${windowMin} min`} />}
+          <Section title={t.sectionTime}>
+            <DetailRow label={t.bookingId} value={booking.booking_code} highlight />
+            <DetailRow label={t.created} value={createdAt} />
+            <DetailRow label={t.scheduled} value={scheduledAt} highlight />
+            {completedAt && <DetailRow label={t.completed} value={completedAt} valueColor="#059669" />}
+            {booking.auto_complete_at && <DetailRow label={t.windowEnd} value={new Date(booking.auto_complete_at).toLocaleString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} valueColor="#6f7979" />}
+            {durationMin != null && <DetailRow label={t.actualDuration} value={`${durationMin} ${t.min}`} highlight />}
+            {windowMin != null && <DetailRow label={t.bookingWindow} value={`${windowMin} ${t.min}`} />}
           </Section>
 
-          <Section title="Passenger">
-            <DetailRow label="Name" value={booking.passenger_name} highlight />
-            {booking.passenger_phone && <DetailRow label="Phone" value={booking.passenger_phone} link={`tel:${booking.passenger_phone}`} />}
+          <Section title={t.sectionPassenger}>
+            <DetailRow label={t.name} value={booking.passenger_name} highlight />
+            {booking.passenger_phone && <DetailRow label={t.phone} value={booking.passenger_phone} link={`tel:${booking.passenger_phone}`} />}
           </Section>
 
-          <Section title="Driver & Vehicle">
-            <DetailRow label="Driver" value={booking.driver_name || 'Not assigned'} highlight={!!booking.driver_name} />
-            {booking.driver_phone && <DetailRow label="Driver phone" value={booking.driver_phone} link={`tel:${booking.driver_phone}`} />}
-            <DetailRow label="Taxi" value={booking.taxi_name || '—'} />
+          <Section title={t.sectionDriver}>
+            <DetailRow label={t.driver} value={booking.driver_name || t.notAssigned} highlight={!!booking.driver_name} />
+            {booking.driver_phone && <DetailRow label={t.driverPhone} value={booking.driver_phone} link={`tel:${booking.driver_phone}`} />}
+            <DetailRow label={t.taxi} value={booking.taxi_name || '—'} />
           </Section>
 
-          <Section title="Trip Route">
-            <DetailRow label="From" value={booking.pickup} highlight />
-            <DetailRow label="To" value={booking.destination} highlight />
-            <DetailRow label="Trip type" value={booking.trip_type === 'DROP' ? 'Drop' : `Wait ${booking.wait_minutes} min`} />
+          <Section title={t.sectionRoute}>
+            <DetailRow label={t.from} value={booking.pickup} highlight />
+            <DetailRow label={t.to} value={booking.destination} highlight />
+            <DetailRow label={t.tripType} value={booking.trip_type === 'DROP' ? t.drop : t.waitMin(booking.wait_minutes)} />
           </Section>
 
           {(booking.notes || booking.rejection_reason) && (
-            <Section title="Notes">
-              {booking.notes && <DetailRow label="Notes" value={booking.notes} />}
-              {booking.rejection_reason && <DetailRow label="Rejection reason" value={booking.rejection_reason} valueColor="#DC2626" />}
+            <Section title={t.sectionNotes}>
+              {booking.notes && <DetailRow label={t.sectionNotes} value={booking.notes} />}
+              {booking.rejection_reason && <DetailRow label={t.rejectionReason} value={booking.rejection_reason} valueColor="#DC2626" />}
             </Section>
           )}
         </div>
@@ -216,7 +303,7 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
               href={`tel:${booking.driver_phone}`}
               style={{ padding: '12px 8px', background: '#EFF6FF', color: '#0369A1', border: '1px solid #BAE6FD', borderRadius: 16, fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxSizing: 'border-box' }}
             >
-              Call Driver
+              {t.callDriver}
             </a>
             <a
               href={`https://wa.me/${toWaNumber(booking.driver_phone)}?text=${encodeURIComponent(buildWaMessage(booking))}`}
@@ -224,7 +311,7 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
               rel="noopener noreferrer"
               style={{ padding: '12px 8px', background: '#25D366', color: '#ffffff', border: 'none', borderRadius: 16, fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxSizing: 'border-box' }}
             >
-              WhatsApp Driver
+              {t.whatsappDriver}
             </a>
           </div>
         )}
@@ -234,7 +321,7 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
             onClick={() => setShowCancel(true)}
             style={{ width: '100%', padding: '12px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: 16, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 16 }}
           >
-            Cancel this booking
+            {t.cancelBooking}
           </button>
         )}
 
@@ -242,13 +329,13 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
           <div style={{ marginTop: 16 }}>
             <div style={{ marginBottom: 10 }}>
               <label style={{ display: 'block', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', marginBottom: 6 }}>
-                Reason for cancellation
+                {t.reasonLabel}
               </label>
               <input
                 type="text"
                 value={cancelReason}
                 onChange={e => setCancelReason(e.target.value)}
-                placeholder="e.g. I no longer need the taxi"
+                placeholder={t.reasonPlaceholder}
                 style={{ width: '100%', padding: '11px 14px', fontSize: 14, border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 10, boxSizing: 'border-box', outline: 'none' }}
               />
             </div>
@@ -257,14 +344,14 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
             )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <button onClick={() => setShowCancel(false)} style={{ padding: '12px', background: 'transparent', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                Go back
+                {t.goBack}
               </button>
               <button
                 onClick={handleCancel}
-                disabled={cancelling}
-                style={{ padding: '12px', background: '#991B1B', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                disabled={cancelling || !cancelReason.trim()}
+                style={{ padding: '12px', background: cancelling || !cancelReason.trim() ? '#c9a0a0' : '#991B1B', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: cancelling || !cancelReason.trim() ? 'not-allowed' : 'pointer' }}
               >
-                {cancelling ? 'Cancelling...' : 'Confirm cancel'}
+                {cancelling ? t.cancelling : t.confirmCancel}
               </button>
             </div>
           </div>
@@ -273,7 +360,7 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
         {!canCancel && (
           <div style={{ background: '#F5F5F2', borderRadius: 10, padding: '10px 14px', textAlign: 'center', marginTop: 16 }}>
             <p style={{ fontSize: 12, color: '#6f7979', margin: 0 }}>
-              {booking.status === 'completed' ? 'This trip has been completed.' : 'This booking cannot be cancelled.'}
+              {booking.status === 'completed' ? t.tripCompleted : t.cannotCancel}
             </p>
           </div>
         )}

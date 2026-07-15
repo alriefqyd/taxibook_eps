@@ -15,9 +15,95 @@ import { STATUS_COLORS, STATUS_LABELS } from '@/types'
 import OnboardingTour from '@/components/OnboardingTour'
 import StaffBookingSheet from '@/components/StaffBookingSheet'
 import PageLoader from '@/components/PageLoader'
+import { useLang } from '@/lib/language'
 
 const TrackingMap    = dynamic(() => import('@/components/map/TrackingMap'),    { ssr: false })
 const DriverFleetMap = dynamic(() => import('@/components/map/DriverFleetMap'), { ssr: false })
+
+const MSG = {
+  en: {
+    pullToRefresh:     'Pull to refresh',
+    releaseToRefresh:  'Release to refresh',
+    refreshTitle:      'Refresh',
+    roleStaff:         'Staff',
+    viewProfile:       'View profile',
+    viewAllTrips:      'View all trips',
+    signOut:           'Sign out',
+    greetMorning:      'Good morning',
+    greetAfternoon:    'Good afternoon',
+    greetEvening:      'Good evening',
+    statActive:        'Active',
+    statPending:       'Pending',
+    statMyTrips:       'My trips',
+    newBooking:        'New booking',
+    viewLabels:        { day: 'Day', week: 'Week', month: 'Month' },
+    myBookingsLabel:   'My bookings',
+    noBookingsYet:     'No bookings yet',
+    tripDrop:          'Drop',
+    tripWaitMin:       (n: number) => `Wait ${n}min`,
+    tripWaitMinShort:  (n: number) => `Wait ${n}m`,
+    awaitingApproval:  'Awaiting approval',
+    unassigned:        'Unassigned',
+    loadMore:          'Load more',
+    scrollDay:         '← scroll to see full day →',
+    scrollWeek:        '← scroll to see full week →',
+    bookingCount:      (n: number) => `${n} booking${n !== 1 ? 's' : ''}`,
+    bookingsThisWeek:  (n: number) => `${n} bookings this week`,
+    tripsCount:        (n: number) => `${n} trip${n > 1 ? 's' : ''}`,
+    fullDayBadge:      '★ FULL DAY DUTY',
+    unavailable:       'Unavailable',
+    free:              'Free',
+    tapDayHint:        'Tap day → Day view',
+    pending:           'Pending',
+    confirmedTaxiColor: 'Confirmed (taxi color)',
+    fullDayDutyLabel:  'Full Day Duty',
+    now:               'Now',
+    confirmed:         'Confirmed',
+    fullDayShort:      '★ full day',
+    noDriver:          'No driver',
+  },
+  id: {
+    pullToRefresh:     'Tarik untuk muat ulang',
+    releaseToRefresh:  'Lepas untuk muat ulang',
+    refreshTitle:      'Muat ulang',
+    roleStaff:         'Staf',
+    viewProfile:       'Lihat profil',
+    viewAllTrips:      'Lihat semua trip',
+    signOut:           'Keluar',
+    greetMorning:      'Selamat pagi',
+    greetAfternoon:    'Selamat siang',
+    greetEvening:      'Selamat malam',
+    statActive:        'Aktif',
+    statPending:       'Pending',
+    statMyTrips:       'Trip saya',
+    newBooking:        'Booking baru',
+    viewLabels:        { day: 'Hari', week: 'Minggu', month: 'Bulan' },
+    myBookingsLabel:   'Booking saya',
+    noBookingsYet:     'Belum ada booking',
+    tripDrop:          'Drop',
+    tripWaitMin:       (n: number) => `Tunggu ${n}mnt`,
+    tripWaitMinShort:  (n: number) => `Tunggu ${n}m`,
+    awaitingApproval:  'Menunggu persetujuan',
+    unassigned:        'Belum diassign',
+    loadMore:          'Muat lebih banyak',
+    scrollDay:         '← geser untuk lihat sehari penuh →',
+    scrollWeek:        '← geser untuk lihat seminggu penuh →',
+    bookingCount:      (n: number) => `${n} booking`,
+    bookingsThisWeek:  (n: number) => `${n} booking minggu ini`,
+    tripsCount:        (n: number) => `${n} trip`,
+    fullDayBadge:      '★ TUGAS SEHARIAN PENUH',
+    unavailable:       'Tidak tersedia',
+    free:              'Bebas',
+    tapDayHint:        'Ketuk tanggal → Tampilan Hari',
+    pending:           'Pending',
+    confirmedTaxiColor: 'Dikonfirmasi (warna taksi)',
+    fullDayDutyLabel:  'Tugas Seharian',
+    now:               'Sekarang',
+    confirmed:         'Dikonfirmasi',
+    fullDayShort:      '★ seharian penuh',
+    noDriver:          'Tidak ada driver',
+  },
+}
 
 type ViewMode = 'day' | 'week' | 'month' | 'map'
 
@@ -30,6 +116,8 @@ const ROW_H      = 52   // px per taxi row
 export default function StaffHomePage() {
   const router   = useRouter()
   const supabase = createClient()
+  const lang = useLang()
+  const t = MSG[lang]
 
   const [user,        setUser]        = useState<User | null>(null)
   const [bookings,    setBookings]    = useState<BookingDetail[]>([])
@@ -87,7 +175,7 @@ export default function StaffHomePage() {
     setBkPage(0)
     setTaxis((txs || []).map((t: any) => ({
       ...t,
-      driver_name: t.users?.name || 'No driver',
+      driver_name: t.users?.name || MSG[lang].noDriver,
     })))
   }
 
@@ -100,7 +188,7 @@ export default function StaffHomePage() {
       .order('name')
     setTaxis((txs || []).map((t: any) => ({
       ...t,
-      driver_name: t.users?.name || 'No driver',
+      driver_name: t.users?.name || MSG[lang].noDriver,
     })))
   }
 
@@ -207,7 +295,7 @@ export default function StaffHomePage() {
         <div style={{ height: pullY, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#E0F2F1', overflow: 'hidden' }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: '#006064', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ display: 'inline-block', transform: pullY >= PULL_THRESHOLD ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>↓</span>
-            {pullY >= PULL_THRESHOLD ? 'Release to refresh' : 'Pull to refresh'}
+            {pullY >= PULL_THRESHOLD ? t.releaseToRefresh : t.pullToRefresh}
           </span>
         </div>
       )}
@@ -230,7 +318,7 @@ export default function StaffHomePage() {
             <button
               onClick={refresh}
               disabled={refreshing}
-              title="Refresh"
+              title={t.refreshTitle}
               style={{ width:40, height:40, borderRadius:'50%', background:'none', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', padding:0, color:'#006064' }}
             >
               <span style={{ display:'flex', animation: refreshing ? 'spin 0.7s linear infinite' : 'none' }}>
@@ -259,19 +347,19 @@ export default function StaffHomePage() {
                   <div style={{ position: 'absolute', top: 44, right: 0, background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 99, minWidth: 220, overflow: 'hidden' }}>
                     <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: '#F5F5F2' }}>
                       <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 2px', color: '#1a1c1b' }}>{user?.name}</p>
-                      <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>Staff</p>
+                      <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{t.roleStaff}</p>
                     </div>
                     <button onClick={() => { setMenuOpen(false); router.push('/staff/profile') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>View profile</p>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>{t.viewProfile}</p>
                     </button>
                     <button onClick={() => { setMenuOpen(false); router.push('/staff/trips') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>View all trips</p>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>{t.viewAllTrips}</p>
                     </button>
                     <button onClick={async () => { setMenuOpen(false); await supabase.auth.signOut(); router.push('/login') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ba1a1a" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#ba1a1a' }}>Sign out</p>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#ba1a1a' }}>{t.signOut}</p>
                     </button>
                   </div>
                 </>
@@ -286,7 +374,7 @@ export default function StaffHomePage() {
       <div style={{ background:'#ffffff', borderBottom:'1px solid rgba(0,0,0,0.06)', padding:'20px 20px 0' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
           <div>
-            <p style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#9ca3af', margin:'0 0 3px', fontFamily:"'Plus Jakarta Sans',sans-serif" }}>Good {getGreeting()}</p>
+            <p style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#9ca3af', margin:'0 0 3px', fontFamily:"'Plus Jakarta Sans',sans-serif" }}>{getGreeting(t)}</p>
             <h1 style={{ fontSize:24, fontWeight:800, color:'#006064', margin:'0 0 3px', letterSpacing:'-0.5px', fontFamily:"'Plus Jakarta Sans',sans-serif" }}>
               {user?.name?.split(' ')[0]} 👋
             </h1>
@@ -299,15 +387,15 @@ export default function StaffHomePage() {
         {/* Stat cards — matching reference design */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:16 }}>
           <div style={{ background:'rgba(0,96,100,0.06)', borderRadius:12, padding:'12px 10px', textAlign:'center' }}>
-            <p style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#006064', margin:'0 0 4px', opacity:0.75 }}>Active</p>
+            <p style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#006064', margin:'0 0 4px', opacity:0.75 }}>{t.statActive}</p>
             <p style={{ fontSize:26, fontWeight:800, margin:0, color:'#006064', letterSpacing:'-1px', lineHeight:1 }}>{todayBookings.length}</p>
           </div>
           <div style={{ background:'#fff8e6', borderRadius:12, padding:'12px 10px', textAlign:'center' }}>
-            <p style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#7e5700', margin:'0 0 4px', opacity:0.75 }}>Pending</p>
+            <p style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#7e5700', margin:'0 0 4px', opacity:0.75 }}>{t.statPending}</p>
             <p style={{ fontSize:26, fontWeight:800, margin:0, color:'#7e5700', letterSpacing:'-1px', lineHeight:1 }}>{pendingCount}</p>
           </div>
           <div style={{ background:'#f0fce8', borderRadius:12, padding:'12px 10px', textAlign:'center' }}>
-            <p style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#344500', margin:'0 0 4px', opacity:0.75 }}>My trips</p>
+            <p style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'#344500', margin:'0 0 4px', opacity:0.75 }}>{t.statMyTrips}</p>
             <p style={{ fontSize:26, fontWeight:800, margin:0, color:'#344500', letterSpacing:'-1px', lineHeight:1 }}>{myBookings.length}</p>
           </div>
         </div>
@@ -316,7 +404,7 @@ export default function StaffHomePage() {
         <div style={{ marginBottom:16 }}>
           <Link href="/staff/book" style={{ textDecoration:'none', display:'block' }}>
             <button style={{ width:'100%', padding:'14px', background:'#006064', color:'#ffffff', border:'none', borderRadius:9999, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:"'Plus Jakarta Sans',sans-serif", display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-              <span style={{ fontSize:18 }}>+</span> New booking
+              <span style={{ fontSize:18 }}>+</span> {t.newBooking}
             </button>
           </Link>
         </div>
@@ -360,7 +448,7 @@ export default function StaffHomePage() {
                   color: view === v ? '#0F1923' : '#9ca3af',
                   textTransform:'capitalize',
                 }}>
-                  {v}
+                  {t.viewLabels[v]}
                 </button>
               ))}
             </div>
@@ -393,12 +481,12 @@ export default function StaffHomePage() {
       <div style={{ padding: '16px 16px 100px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: 0 }}>
-            My bookings {myBookings.length > 0 && `· ${myBookings.length}`}
+            {t.myBookingsLabel} {myBookings.length > 0 && `· ${myBookings.length}`}
           </p>
         </div>
         {myBookings.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '24px', color: '#9ca3af', background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)' }}>
-            <p style={{ fontSize: '13px', margin: 0 }}>No bookings yet</p>
+            <p style={{ fontSize: '13px', margin: 0 }}>{t.noBookingsYet}</p>
           </div>
         ) : (
           <>
@@ -429,7 +517,7 @@ export default function StaffHomePage() {
                 </div>
                 <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: b.trip_type === 'DROP' ? '#DBEAFE' : '#EDE9FE', color: b.trip_type === 'DROP' ? '#1E3A5F' : '#4C1D95' }}>
-                    {b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}min`}
+                    {b.trip_type === 'DROP' ? t.tripDrop : t.tripWaitMin(b.wait_minutes)}
                   </span>
                   {b.taxi_name
                     ? <span style={{ fontSize: 10, color: '#6f7979', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -437,7 +525,7 @@ export default function StaffHomePage() {
                         {b.taxi_name} · {b.driver_name}
                       </span>
                     : <span style={{ fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>
-                        {b.status === 'pending_coordinator_approval' ? 'Awaiting approval' : 'Unassigned'}
+                        {b.status === 'pending_coordinator_approval' ? t.awaitingApproval : t.unassigned}
                       </span>
                   }
                 </div>
@@ -449,7 +537,7 @@ export default function StaffHomePage() {
               <button
                 style={{ width: '100%', padding: '13px', marginTop: 10, background: '#ffffff', boxShadow: '0 2px 8px rgba(0,96,100,0.06)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, fontSize: 13, fontWeight: 700, color: '#006064', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
               >
-                Load more
+                {t.loadMore}
               </button>
             </Link>
           )}
@@ -480,6 +568,8 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, current
   currentUserId?: string
   dayAssignments?: { taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null }[]
 }) {
+  const lang = useLang()
+  const t = MSG[lang]
   const today    = new Date()
   const cursorDateStr = format(cursor, 'yyyy-MM-dd')
   const dayBks = bookings.filter(b => isSameDay(new Date(b.scheduled_at), cursor))
@@ -489,8 +579,8 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, current
   return (
     <div style={{ paddingBottom: 20 }}>
       <div style={{ padding:'10px 16px 6px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <span style={{ fontSize:'11px', color:'#6B7C8F' }}>← scroll to see full day →</span>
-        <span style={{ fontSize:'11px', color:'#6B7C8F' }}>{dayBks.length} booking{dayBks.length !== 1 ? 's' : ''}</span>
+        <span style={{ fontSize:'11px', color:'#6B7C8F' }}>{t.scrollDay}</span>
+        <span style={{ fontSize:'11px', color:'#6B7C8F' }}>{t.bookingCount(dayBks.length)}</span>
       </div>
       <div style={{ overflowX:'auto' }} ref={scrollRef}>
         <div style={{ minWidth: totalW + 90 }}>
@@ -534,7 +624,7 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, current
                     pointerEvents: 'none',
                   }}>
                     <span style={{ fontSize: 9, fontWeight: 800, color: '#7e5700', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
-                      {hasRange ? `★ ${fullDayAssignment.start_time!.slice(0, 5)}–${fullDayAssignment.end_time!.slice(0, 5)}` : '★ FULL DAY DUTY'}
+                      {hasRange ? `★ ${fullDayAssignment.start_time!.slice(0, 5)}–${fullDayAssignment.end_time!.slice(0, 5)}` : t.fullDayBadge}
                     </span>
                   </div>
                 )
@@ -609,6 +699,8 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef }: {
   cursor: Date
   scrollRef: React.RefObject<HTMLDivElement>
 }) {
+  const lang = useLang()
+  const t = MSG[lang]
   const today    = new Date()
   const monday   = startOfWeek(cursor, { weekStartsOn: 1 })
   const days     = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
@@ -617,9 +709,9 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef }: {
   return (
     <div style={{ paddingBottom:20 }}>
       <div style={{ padding:'10px 16px 6px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <span style={{ fontSize:'11px', color:'#6B7C8F' }}>← scroll to see full week →</span>
+        <span style={{ fontSize:'11px', color:'#6B7C8F' }}>{t.scrollWeek}</span>
         <span style={{ fontSize:'11px', color:'#6B7C8F' }}>
-          {bookings.filter(b => days.some(d => isSameDay(new Date(b.scheduled_at), d))).length} bookings this week
+          {t.bookingsThisWeek(bookings.filter(b => days.some(d => isSameDay(new Date(b.scheduled_at), d))).length)}
         </span>
       </div>
       <div style={{ overflowX:'auto' }} ref={scrollRef}>
@@ -644,7 +736,7 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef }: {
                   </p>
                   {dayBkCount > 0 && (
                     <p style={{ fontSize:'9px', color: isToday ? 'rgba(255,255,255,0.6)' : '#9ca3af', margin:0 }}>
-                      {dayBkCount} trip{dayBkCount > 1 ? 's' : ''}
+                      {t.tripsCount(dayBkCount)}
                     </p>
                   )}
                 </div>
@@ -682,7 +774,7 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef }: {
                         {b.destination}
                       </p>
                       <p style={{ fontSize:'9px', color:taxi.color, opacity:0.8, margin:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                        {format(dt,'HH:mm')} · {b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes}m`}
+                        {format(dt,'HH:mm')} · {b.trip_type === 'DROP' ? t.tripDrop : t.tripWaitMinShort(b.wait_minutes)}
                       </p>
                     </div>
                   )
@@ -723,6 +815,8 @@ function GanttRow({ taxi, idx, bookings, renderBlock, nowLine, gridLines, totalW
   totalW: number
   overlay?: React.ReactNode
 }) {
+  const lang = useLang()
+  const t = MSG[lang]
   return (
     <div style={{ display:'flex', borderBottom:'1px solid rgba(0,0,0,0.08)', background: idx % 2 === 0 ? '#fff' : '#f9f9f6' }}>
       {/* Label */}
@@ -741,7 +835,7 @@ function GanttRow({ taxi, idx, bookings, renderBlock, nowLine, gridLines, totalW
           </span>
         </div>
         <span style={{ fontSize:'9px', color:'#6B7C8F', paddingLeft:12, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-          {taxi.is_available ? taxi.driver_name : 'Unavailable'}
+          {taxi.is_available ? taxi.driver_name : t.unavailable}
         </span>
       </div>
 
@@ -756,7 +850,7 @@ function GanttRow({ taxi, idx, bookings, renderBlock, nowLine, gridLines, totalW
         {bookings.map(b => renderBlock(b))}
         {bookings.length === 0 && taxi.is_available && !overlay && (
           <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', paddingLeft:12 }}>
-            <span style={{ fontSize:'10px', color:'#D1D5DB', fontWeight:600 }}>Free</span>
+            <span style={{ fontSize:'10px', color:'#D1D5DB', fontWeight:600 }}>{t.free}</span>
           </div>
         )}
       </div>
@@ -771,6 +865,8 @@ function MonthView({ bookings, cursor, onDayClick, dayAssignments = [] }: {
   onDayClick: (d: Date) => void
   dayAssignments?: { taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null }[]
 }) {
+  const lang = useLang()
+  const t = MSG[lang]
   const today  = new Date()
   const start  = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 })
   const days   = Array.from({ length: 42 }, (_, i) => addDays(start, i))
@@ -820,19 +916,19 @@ function MonthView({ bookings, cursor, onDayClick, dayAssignments = [] }: {
       <div style={{ display:'flex', gap:'14px', marginTop:'10px', flexWrap:'wrap' }}>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
           <span style={{ display:'inline-block', width:16, height:2, background:'#EF4444' }} />
-          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Tap day → Day view</span>
+          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>{t.tapDayHint}</span>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
           <span style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:'#9ca3af', opacity:0.4 }} />
-          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Pending</span>
+          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>{t.pending}</span>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
           <span style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:'#2563EB' }} />
-          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Confirmed (taxi color)</span>
+          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>{t.confirmedTaxiColor}</span>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
           <span style={{ fontSize:'10px', color:'#7e5700', fontWeight:700 }}>★</span>
-          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Full Day Duty</span>
+          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>{t.fullDayDutyLabel}</span>
         </div>
       </div>
     </div>
@@ -841,19 +937,21 @@ function MonthView({ bookings, cursor, onDayClick, dayAssignments = [] }: {
 
 // ── Gantt legend ────────────────────────────────────────────
 function GanttLegend() {
+  const lang = useLang()
+  const t = MSG[lang]
   return (
     <div style={{ padding:'8px 16px', background:'#ffffff', borderTop:'1px solid rgba(0,0,0,0.08)', display:'flex', gap:'14px', flexWrap:'wrap' }}>
       <div style={{ display:'flex', alignItems:'center', gap:5 }}>
         <span style={{ display:'inline-block', width:16, height:2, background:'#EF4444' }} />
-        <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Now</span>
+        <span style={{ fontSize:'10px', color:'#6B7C8F' }}>{t.now}</span>
       </div>
       <div style={{ display:'flex', alignItems:'center', gap:5 }}>
         <span style={{ display:'inline-block', width:20, height:10, border:'1.5px dashed #9ca3af', borderRadius:2 }} />
-        <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Pending</span>
+        <span style={{ fontSize:'10px', color:'#6B7C8F' }}>{t.pending}</span>
       </div>
       <div style={{ display:'flex', alignItems:'center', gap:5 }}>
         <span style={{ display:'inline-block', width:20, height:10, border:'1.5px solid #9ca3af', borderRadius:2 }} />
-        <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Confirmed</span>
+        <span style={{ fontSize:'10px', color:'#6B7C8F' }}>{t.confirmed}</span>
       </div>
     </div>
   )
@@ -880,9 +978,9 @@ function Avatar({ name }: { name: string }) {
   )
 }
 
-function getGreeting() {
+function getGreeting(t: typeof MSG['en']) {
   const h = new Date().getHours()
-  return h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening'
+  return h < 12 ? t.greetMorning : h < 17 ? t.greetAfternoon : t.greetEvening
 }
 
 const navBtn: React.CSSProperties = {
@@ -895,6 +993,8 @@ const navBtn: React.CSSProperties = {
 
 // ── WEEK VIEW (original grid) ───────────────────────────────
 function WeekView({ bookings, cursor, onSelectBooking, dayAssignments = [] }: { bookings: BookingDetail[]; cursor: Date; onSelectBooking: (b: BookingDetail) => void; currentUserId?: string; dayAssignments?: { taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null }[] }) {
+  const lang = useLang()
+  const t = MSG[lang]
   const today  = new Date()
   const monday = startOfWeek(cursor, { weekStartsOn: 1 })
   const days   = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
@@ -935,7 +1035,7 @@ function WeekView({ bookings, cursor, onSelectBooking, dayAssignments = [] }: { 
               <div key={d.toISOString()} style={{ borderRight:'1px solid rgba(0,0,0,0.08)', padding:'4px 2px', minHeight:120, background: assignCount > 0 ? 'rgba(254,179,0,0.06)' : 'transparent', overflow:'hidden', minWidth:0 }}>
                 {assignCount > 0 && (
                   <div style={{ fontSize:'7px', fontWeight:700, color:'#7e5700', background:'rgba(254,179,0,0.18)', borderRadius:3, padding:'1px 2px', marginBottom:3, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                    ★ full day
+                    {t.fullDayShort}
                   </div>
                 )}
                 {dayBks.map(b => {
@@ -971,15 +1071,15 @@ function WeekView({ bookings, cursor, onSelectBooking, dayAssignments = [] }: { 
       <div style={{ display:'flex', gap:'14px', marginTop:'10px', flexWrap:'wrap' }}>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
           <span style={{ display:'inline-block', width:20, height:10, border:'1.5px dashed #9ca3af', borderRadius:2 }} />
-          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Pending</span>
+          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>{t.pending}</span>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
           <span style={{ display:'inline-block', width:20, height:10, border:'1.5px solid #2563EB', borderRadius:2, background:'#2563EB20' }} />
-          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Confirmed (taxi color)</span>
+          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>{t.confirmedTaxiColor}</span>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:5 }}>
           <span style={{ fontSize:'10px', color:'#7e5700', fontWeight:700 }}>★</span>
-          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>Full Day Duty</span>
+          <span style={{ fontSize:'10px', color:'#6B7C8F' }}>{t.fullDayDutyLabel}</span>
         </div>
       </div>
     </div>

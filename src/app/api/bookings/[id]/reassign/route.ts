@@ -80,8 +80,11 @@ export async function POST(
       await notify({
         user_id:    oldDriverId,
         booking_id: bookingId,
-        title:      'Trip reassigned by coordinator',
-        body:       `Your trip to ${booking.destination} has been reassigned. You are now available.`,
+        title:      { en: 'Trip reassigned by coordinator', id: 'Perjalanan dialihkan oleh koordinator' },
+        body: {
+          en: `Your trip to ${booking.destination} has been reassigned. You are now available.`,
+          id: `Perjalanan Anda ke ${booking.destination} telah dialihkan. Anda sekarang tersedia.`,
+        },
         type:       'driver_reassigned',
       })
     }
@@ -90,8 +93,11 @@ export async function POST(
     await notify({
       user_id:    booking.passenger_id,
       booking_id: bookingId,
-      title:      'Driver updated',
-      body:       `Your trip driver has been updated — ${newTaxi.name} · ${newDriverName}`,
+      title:      { en: 'Driver updated', id: 'Driver diperbarui' },
+      body: {
+        en: `Your trip driver has been updated — ${newTaxi.name} · ${newDriverName}`,
+        id: `Driver perjalanan Anda telah diperbarui — ${newTaxi.name} · ${newDriverName}`,
+      },
       type:       'booking_reassigned',
     })
 
@@ -107,8 +113,11 @@ export async function POST(
       await notify({
         user_id:    newDriverId,
         booking_id: bookingId,
-        title:      'Trip assigned to you',
-        body:       `You have been assigned to pick up ${passenger?.name} → ${booking.destination} at ${time}. Please be ready on time.`,
+        title:      { en: 'Trip assigned to you', id: 'Perjalanan ditugaskan kepada Anda' },
+        body: {
+          en: `You have been assigned to pick up ${passenger?.name} → ${booking.destination} at ${time}. Please be ready on time.`,
+          id: `Anda ditugaskan menjemput ${passenger?.name} → ${booking.destination} pukul ${time}. Mohon siap tepat waktu.`,
+        },
         type:       'driver_reassigned',
         url:        '/driver/home',
       })

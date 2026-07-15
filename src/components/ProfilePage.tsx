@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import PageLoader from '@/components/PageLoader'
-import { useLang, setLang } from '@/lib/language'
+import { useLang, setLang, getLang } from '@/lib/language'
 import type { Lang } from '@/lib/language'
 
 const MSG = {
@@ -162,6 +162,7 @@ export default function ProfilePage({ role }: Props) {
 
   function toggleLang(l: Lang) {
     setLang(l)
+    if (user?.id) supabase.from('users').update({ language: l }).eq('id', user.id).then(() => {})
   }
 
   // ── Phone editing ──────────────────────────────────────────
@@ -256,6 +257,7 @@ export default function ProfilePage({ role }: Props) {
 
       const { data: p } = await supabase.from('users').select('*').eq('id', au.id).single()
       setUser({ ...p, email: au.email })
+      if (p?.language && p.language !== getLang()) setLang(p.language)
 
       if (role === 'driver') {
         const { data: t } = await supabase

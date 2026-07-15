@@ -77,8 +77,10 @@ const MSG = {
     exportExcel:         'Export Excel',
     exporting:           'Exporting…',
     cancelBooking:       'Cancel booking',
+    callDriver:         'Call driver',
+    whatsappDriver:     'WhatsApp driver',
     cancelConfirmTitle:  'Cancel this booking?',
-    cancelReasonLabel:   'Reason (optional)',
+    cancelReasonLabel:   'Reason *',
     cancelReasonPh:      'e.g. Trip no longer needed',
     cancelBack:          'Back',
     cancellingBtn:       'Cancelling...',
@@ -149,10 +151,12 @@ const MSG = {
     exporting:           'Mengekspor…',
     cancelBooking:       'Batalkan booking',
     cancelConfirmTitle:  'Batalkan booking ini?',
-    cancelReasonLabel:   'Alasan (opsional)',
+    cancelReasonLabel:   'Alasan *',
     cancelReasonPh:      'mis. Trip sudah tidak diperlukan',
     cancelBack:          'Kembali',
     cancellingBtn:       'Membatalkan...',
+    callDriver:         'Telepon driver',
+    whatsappDriver:     'WhatsApp driver',
   },
 }
 
@@ -280,7 +284,7 @@ export default function CoordinatorReportPage() {
   }
 
   async function handleCancelBook() {
-    if (!cancelRow) return
+    if (!cancelRow || !cancelReason.trim()) return
     setCancelling(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setCancelling(false); return }
@@ -536,8 +540,8 @@ export default function CoordinatorReportPage() {
                 style={{ padding: '13px', background: 'transparent', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                 {t.cancelBack}
               </button>
-              <button onClick={handleCancelBook} disabled={cancelling}
-                style={{ padding: '13px', background: cancelling ? '#9ca3af' : '#991B1B', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: cancelling ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+              <button onClick={handleCancelBook} disabled={cancelling || !cancelReason.trim()}
+                style={{ padding: '13px', background: cancelling || !cancelReason.trim() ? '#9ca3af' : '#991B1B', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: cancelling || !cancelReason.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
                 {cancelling ? t.cancellingBtn : t.cancelBooking}
               </button>
             </div>
@@ -760,6 +764,25 @@ function DetailModal({ row: r, onClose, canCancel, onCancel }: {
             <DetailRow label={t.rowTaxi}   value={r.taxi_name ?? '—'} />
           </Section>
 
+          {r.driver_phone && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+              <a
+                href={`tel:${r.driver_phone}`}
+                style={{ padding: '12px 8px', background: '#EFF6FF', color: '#0369A1', border: '1px solid #BAE6FD', borderRadius: 16, fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxSizing: 'border-box' }}
+              >
+                {t.callDriver}
+              </a>
+              <a
+                href={`https://wa.me/${toWaNumber(r.driver_phone)}?text=${encodeURIComponent(buildWaMessage(r))}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ padding: '12px 8px', background: '#25D366', color: '#ffffff', border: 'none', borderRadius: 16, fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxSizing: 'border-box' }}
+              >
+                {t.whatsappDriver}
+              </a>
+            </div>
+          )}
+
           {/* ── Route ── */}
           <Section title={t.sectionRoute}>
             <DetailRow label={t.rowFrom}     value={r.pickup}      highlight />
@@ -794,6 +817,43 @@ function DetailModal({ row: r, onClose, canCancel, onCancel }: {
       </div>
     </div>
   )
+}
+
+function toWaNumber(phone: string): string {
+  let n = phone.replace(/\D/g, '')
+  if (n.startsWith('0')) n = '62' + n.slice(1)
+  return n
+}
+
+function buildWaMessage(r: ReportRow): string {
+  const time = format(new Date(r.scheduled_at), 'EEEE, dd MMMM yyyy · HH:mm', { locale: idLocale })
+  const type = r.trip_type === 'DROP' ? 'Drop (antar saja)' : `Waiting ${r.wait_minutes ?? 0} menit (tunggu penumpang)`
+  const taxi = r.taxi_name ? `${r.taxi_name}${r.taxi_plate ? ` (${r.taxi_plate})` : ''}` : null
+
+  return [
+    `📋 *Ridr – Penugasan Perjalanan*`,
+    `━━━━━━━━━━━━━━━━━━`,
+    `🔖 Kode Booking: *${r.booking_code}*`,
+    ``,
+    `👤 *Penumpang*`,
+    `   Nama : ${r.passenger_name}`,
+    ...(r.passenger_phone ? [`   HP   : ${r.passenger_phone}`] : []),
+    ``,
+    `📍 *Rute Perjalanan*`,
+    `   Dari    : ${r.pickup}`,
+    `   Tujuan  : ${r.destination}`,
+    ``,
+    `🕐 *Jadwal*`,
+    `   ${time}`,
+    ``,
+    `🚗 *Detail Trip*`,
+    `   Jenis : ${type}`,
+    ...(taxi ? [`   Taksi : ${taxi}`] : []),
+    ...(r.notes ? [`   Catatan : ${r.notes}`] : []),
+    ``,
+    `━━━━━━━━━━━━━━━━━━`,
+    `Mohon konfirmasi kesiapan Anda untuk perjalanan ini. Terima kasih! 🙏`,
+  ].join('\n')
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────

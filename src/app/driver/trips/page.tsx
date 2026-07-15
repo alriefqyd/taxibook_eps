@@ -5,6 +5,7 @@ import { useNavRouter as useRouter } from '@/hooks/useNavRouter'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
+import { useLang } from '@/lib/language'
 import PageLoader from '@/components/PageLoader'
 
 interface DriverBooking {
@@ -37,11 +38,107 @@ type StatusGroup = 'all' | 'completed' | 'upcoming'
 
 const PRIMARY = '#006064'
 
-const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  completed:    { bg: '#d8f3dc', color: '#344500', label: 'Done' },
-  booked:       { bg: 'rgba(0,96,100,0.1)', color: '#006064', label: 'Confirmed' },
-  on_trip:      { bg: '#FEF3C7', color: '#92400E', label: 'On trip' },
-  waiting_trip: { bg: '#EDE9FE', color: '#4C1D95', label: 'Waiting' },
+const MSG = {
+  en: {
+    myTrips:            'My trips',
+    tripHistory:        'Trip history',
+    groupAll:           'All',
+    groupUpcoming:      'Upcoming',
+    groupCompleted:     'Completed',
+    statusDone:         'Done',
+    statusConfirmed:    'Confirmed',
+    statusOnTrip:       'On trip',
+    statusWaiting:      'Waiting',
+    from:               'From',
+    to:                 'To',
+    showing:            'Showing',
+    resultWord:         (n: number): string => n === 1 ? 'result' : 'results',
+    dateRangeLabel:     'date range',
+    clearAll:           'Clear all',
+    noTripsFound:       'No trips found',
+    tryChangingFilter:  'Try changing your filter',
+    tripTypeDrop:       'Drop',
+    tripTypeWait:       (n: number) => `Wait ${n} min`,
+    loading:            'Loading...',
+    loadMore:           'Load more',
+    passenger:          'Passenger',
+    tripRoute:          'Trip route',
+    pickup:             'Pickup',
+    destination:        'Destination',
+    time:               'Time',
+    scheduled:          'Scheduled',
+    created:            'Created',
+    assigned:           'Assigned',
+    completed:          'Completed',
+    completedBy:        'Completed by',
+    autoCompleteAt:     'Auto-complete at',
+    tripDetail:         'Trip detail',
+    tripType:           'Trip type',
+    dropOneWay:         'Drop — one way',
+    waitingMin:         (n: number) => `Waiting — ${n} min`,
+    notes:              'Notes',
+    rejectionReason:    'Rejection reason',
+    vehicle:            'Vehicle',
+    taxi:               'Taxi',
+    driver:             'Driver',
+    driverPhone:        "Driver's phone",
+    close:              'Close',
+  },
+  id: {
+    myTrips:            'Trip saya',
+    tripHistory:        'Riwayat trip',
+    groupAll:           'Semua',
+    groupUpcoming:      'Mendatang',
+    groupCompleted:     'Selesai',
+    statusDone:         'Selesai',
+    statusConfirmed:    'Terkonfirmasi',
+    statusOnTrip:       'Sedang jalan',
+    statusWaiting:      'Menunggu',
+    from:               'Dari',
+    to:                 'Sampai',
+    showing:            'Menampilkan',
+    resultWord:         (n: number): string => 'hasil',
+    dateRangeLabel:     'rentang tanggal',
+    clearAll:           'Hapus semua',
+    noTripsFound:       'Tidak ada trip ditemukan',
+    tryChangingFilter:  'Coba ubah filter Anda',
+    tripTypeDrop:       'Antar',
+    tripTypeWait:       (n: number) => `Tunggu ${n} menit`,
+    loading:            'Memuat...',
+    loadMore:           'Muat lebih banyak',
+    passenger:          'Penumpang',
+    tripRoute:          'Rute perjalanan',
+    pickup:             'Jemput',
+    destination:        'Tujuan',
+    time:               'Waktu',
+    scheduled:          'Dijadwalkan',
+    created:            'Dibuat',
+    assigned:           'Ditugaskan',
+    completed:          'Selesai',
+    completedBy:        'Diselesaikan oleh',
+    autoCompleteAt:     'Otomatis selesai pada',
+    tripDetail:         'Detail perjalanan',
+    tripType:           'Jenis perjalanan',
+    dropOneWay:         'Antar — sekali jalan',
+    waitingMin:         (n: number) => `Menunggu — ${n} menit`,
+    notes:              'Catatan',
+    rejectionReason:    'Alasan penolakan',
+    vehicle:            'Kendaraan',
+    taxi:               'Taksi',
+    driver:             'Driver',
+    driverPhone:        'Nomor HP driver',
+    close:              'Tutup',
+  },
+}
+
+function statusStyle(status: string, t: typeof MSG['en']): { bg: string; color: string; label: string } {
+  const map: Record<string, { bg: string; color: string; label: string }> = {
+    completed:    { bg: '#d8f3dc', color: '#344500', label: t.statusDone },
+    booked:       { bg: 'rgba(0,96,100,0.1)', color: '#006064', label: t.statusConfirmed },
+    on_trip:      { bg: '#FEF3C7', color: '#92400E', label: t.statusOnTrip },
+    waiting_trip: { bg: '#EDE9FE', color: '#4C1D95', label: t.statusWaiting },
+  }
+  return map[status] || { bg: '#F3F4F6', color: '#6B7280', label: status }
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -75,6 +172,8 @@ function matchesGroup(status: string, group: StatusGroup) {
 export default function DriverTripsPage() {
   const router   = useRouter()
   const supabase = createClient()
+  const lang     = useLang()
+  const t        = MSG[lang]
 
   const [bookings,    setBookings]    = useState<DriverBooking[]>([])
   const [loading,     setLoading]     = useState(true)
@@ -150,9 +249,9 @@ export default function DriverTripsPage() {
   const hasDateFilter = !!(dateFrom || dateTo)
 
   const GROUPS: { key: StatusGroup; label: string }[] = [
-    { key: 'all',       label: 'All' },
-    { key: 'upcoming',  label: 'Upcoming' },
-    { key: 'completed', label: 'Completed' },
+    { key: 'all',       label: t.groupAll },
+    { key: 'upcoming',  label: t.groupUpcoming },
+    { key: 'completed', label: t.groupCompleted },
   ]
 
   if (loading) return <PageLoader />
@@ -165,8 +264,8 @@ export default function DriverTripsPage() {
       <div style={{ background: '#ffffff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '20px 16px 0' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
           <div>
-            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9ca3af', margin: '0 0 3px' }}>My trips</p>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: PRIMARY, margin: 0, letterSpacing: '-0.5px' }}>Trip history</h1>
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9ca3af', margin: '0 0 3px' }}>{t.myTrips}</p>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: PRIMARY, margin: 0, letterSpacing: '-0.5px' }}>{t.tripHistory}</h1>
           </div>
           <button
             onClick={refresh}
@@ -226,7 +325,7 @@ export default function DriverTripsPage() {
         {/* ── Date range ── */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '0 0 14px' }}>
           <div style={{ flex: 1, background: '#F5F5F2', borderRadius: 12, padding: '10px 12px' }}>
-            <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 4px' }}>From</p>
+            <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 4px' }}>{t.from}</p>
             <input
               type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
               style={{ width: '100%', border: 'none', outline: 'none', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', background: 'transparent', color: PRIMARY }}
@@ -236,7 +335,7 @@ export default function DriverTripsPage() {
             <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
           </svg>
           <div style={{ flex: 1, background: '#F5F5F2', borderRadius: 12, padding: '10px 12px' }}>
-            <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 4px' }}>To</p>
+            <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 4px' }}>{t.to}</p>
             <input
               type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
               style={{ width: '100%', border: 'none', outline: 'none', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', background: 'transparent', color: PRIMARY }}
@@ -259,15 +358,15 @@ export default function DriverTripsPage() {
       {(statusGroup !== 'all' || hasDateFilter) && (
         <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <p style={{ fontSize: 11, color: '#6f7979', margin: 0 }}>
-            Showing <strong style={{ color: PRIMARY }}>{filtered.length}</strong> result{filtered.length !== 1 ? 's' : ''}
+            {t.showing} <strong style={{ color: PRIMARY }}>{filtered.length}</strong> {t.resultWord(filtered.length)}
             {statusGroup !== 'all' && <> · <span style={{ color: PRIMARY }}>{GROUPS.find(g => g.key === statusGroup)?.label}</span></>}
-            {hasDateFilter && <> · date range</>}
+            {hasDateFilter && <> · {t.dateRangeLabel}</>}
           </p>
           <button
             onClick={() => { setStatusGroup('all'); setDateFrom(''); setDateTo('') }}
             style={{ fontSize: 11, fontWeight: 700, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
           >
-            Clear all
+            {t.clearAll}
           </button>
         </div>
       )}
@@ -279,12 +378,12 @@ export default function DriverTripsPage() {
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto 10px', display: 'block' }}>
               <path d="M3 6h18M3 12h18M3 18h18"/>
             </svg>
-            <p style={{ fontSize: 13, fontWeight: 600, color: '#9ca3af', margin: '0 0 4px' }}>No trips found</p>
-            <p style={{ fontSize: 11, color: '#c4c9c9', margin: 0 }}>Try changing your filter</p>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#9ca3af', margin: '0 0 4px' }}>{t.noTripsFound}</p>
+            <p style={{ fontSize: 11, color: '#c4c9c9', margin: 0 }}>{t.tryChangingFilter}</p>
           </div>
         ) : (
           filtered.map(b => {
-            const st    = STATUS_STYLE[b.status] || { bg: '#F3F4F6', color: '#6B7280', label: b.status }
+            const st    = statusStyle(b.status, t)
             const isPast = b.status === 'completed'
             return (
               <div
@@ -327,7 +426,7 @@ export default function DriverTripsPage() {
                       background: b.trip_type === 'DROP' ? '#DBEAFE' : '#EDE9FE',
                       color: b.trip_type === 'DROP' ? '#1E3A5F' : '#4C1D95',
                     }}>
-                      {b.trip_type === 'DROP' ? 'Drop' : `Wait ${b.wait_minutes} min`}
+                      {b.trip_type === 'DROP' ? t.tripTypeDrop : t.tripTypeWait(b.wait_minutes)}
                     </span>
                     <span style={{ fontSize: 10, color: '#9ca3af', fontFamily: 'monospace' }}>{b.booking_code}</span>
                   </div>
@@ -349,7 +448,7 @@ export default function DriverTripsPage() {
             }}
             style={{ width: '100%', padding: '13px', background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, fontSize: 13, fontWeight: 600, color: loadingMore ? '#9ca3af' : PRIMARY, cursor: loadingMore ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
           >
-            {loadingMore ? 'Loading...' : 'Load more'}
+            {loadingMore ? t.loading : t.loadMore}
           </button>
         )}
       </div>
@@ -370,14 +469,14 @@ export default function DriverTripsPage() {
             {/* Status + code */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
               {(() => {
-                const st = STATUS_STYLE[selectedTrip.status] || { bg: '#F3F4F6', color: '#6B7280', label: selectedTrip.status }
+                const st = statusStyle(selectedTrip.status, t)
                 return <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 9999, background: st.bg, color: st.color }}>{st.label}</span>
               })()}
               <span style={{ fontSize: 12, color: '#9ca3af', fontFamily: 'monospace', letterSpacing: '0.05em' }}>{selectedTrip.booking_code}</span>
             </div>
 
             {/* ── Passenger ── */}
-            <SectionLabel>Passenger</SectionLabel>
+            <SectionLabel>{t.passenger}</SectionLabel>
             <div style={{ background: '#F5F5F2', borderRadius: 14, padding: '14px', marginBottom: 14 }}>
               <p style={{ fontSize: 17, fontWeight: 800, color: '#1a1c1b', margin: '0 0 6px', letterSpacing: '-0.3px' }}>{selectedTrip.passenger_name}</p>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -394,12 +493,12 @@ export default function DriverTripsPage() {
             </div>
 
             {/* ── Route ── */}
-            <SectionLabel>Trip route</SectionLabel>
+            <SectionLabel>{t.tripRoute}</SectionLabel>
             <div style={{ background: '#F5F5F2', borderRadius: 14, padding: '14px', marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: PRIMARY, flexShrink: 0, marginTop: 4 }} />
                 <div>
-                  <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Pickup</p>
+                  <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{t.pickup}</p>
                   <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{selectedTrip.pickup}</p>
                 </div>
               </div>
@@ -407,39 +506,39 @@ export default function DriverTripsPage() {
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52B788', flexShrink: 0, marginTop: 4 }} />
                 <div>
-                  <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Destination</p>
+                  <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{t.destination}</p>
                   <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{selectedTrip.destination}</p>
                 </div>
               </div>
             </div>
 
             {/* ── Time ── */}
-            <SectionLabel>Time</SectionLabel>
+            <SectionLabel>{t.time}</SectionLabel>
             <DetailTable rows={[
-              { label: 'Scheduled',   value: format(new Date(selectedTrip.scheduled_at), 'EEE, d MMM yyyy · HH:mm', { locale: idLocale }) },
-              { label: 'Created',     value: format(new Date(selectedTrip.created_at),   'EEE, d MMM yyyy · HH:mm', { locale: idLocale }) },
-              ...(selectedTrip.assigned_at     ? [{ label: 'Assigned',   value: format(new Date(selectedTrip.assigned_at),   'EEE, d MMM yyyy · HH:mm', { locale: idLocale }) }] : []),
-              ...(selectedTrip.completed_at    ? [{ label: 'Completed',  value: format(new Date(selectedTrip.completed_at),  'EEE, d MMM yyyy · HH:mm', { locale: idLocale }) }] : []),
-              ...(selectedTrip.completed_by    ? [{ label: 'Completed by', value: selectedTrip.completed_by }] : []),
-              ...(selectedTrip.auto_complete_at ? [{ label: 'Auto-complete at', value: format(new Date(selectedTrip.auto_complete_at), 'EEE, d MMM yyyy · HH:mm', { locale: idLocale }) }] : []),
+              { label: t.scheduled,   value: format(new Date(selectedTrip.scheduled_at), 'EEE, d MMM yyyy · HH:mm', { locale: idLocale }) },
+              { label: t.created,     value: format(new Date(selectedTrip.created_at),   'EEE, d MMM yyyy · HH:mm', { locale: idLocale }) },
+              ...(selectedTrip.assigned_at     ? [{ label: t.assigned,   value: format(new Date(selectedTrip.assigned_at),   'EEE, d MMM yyyy · HH:mm', { locale: idLocale }) }] : []),
+              ...(selectedTrip.completed_at    ? [{ label: t.completed,  value: format(new Date(selectedTrip.completed_at),  'EEE, d MMM yyyy · HH:mm', { locale: idLocale }) }] : []),
+              ...(selectedTrip.completed_by    ? [{ label: t.completedBy, value: selectedTrip.completed_by }] : []),
+              ...(selectedTrip.auto_complete_at ? [{ label: t.autoCompleteAt, value: format(new Date(selectedTrip.auto_complete_at), 'EEE, d MMM yyyy · HH:mm', { locale: idLocale }) }] : []),
             ]} />
 
             {/* ── Trip detail ── */}
-            <SectionLabel>Trip detail</SectionLabel>
+            <SectionLabel>{t.tripDetail}</SectionLabel>
             <DetailTable rows={[
-              { label: 'Trip type', value: selectedTrip.trip_type === 'DROP' ? 'Drop — one way' : `Waiting — ${selectedTrip.wait_minutes} min` },
-              ...(selectedTrip.notes ? [{ label: 'Notes', value: selectedTrip.notes }] : []),
-              ...(selectedTrip.rejection_reason ? [{ label: 'Rejection reason', value: selectedTrip.rejection_reason }] : []),
+              { label: t.tripType, value: selectedTrip.trip_type === 'DROP' ? t.dropOneWay : t.waitingMin(selectedTrip.wait_minutes) },
+              ...(selectedTrip.notes ? [{ label: t.notes, value: selectedTrip.notes }] : []),
+              ...(selectedTrip.rejection_reason ? [{ label: t.rejectionReason, value: selectedTrip.rejection_reason }] : []),
             ]} />
 
             {/* ── Vehicle ── */}
             {selectedTrip.taxi_name && (
               <>
-                <SectionLabel>Vehicle</SectionLabel>
+                <SectionLabel>{t.vehicle}</SectionLabel>
                 <DetailTable rows={[
-                  { label: 'Taxi',   value: selectedTrip.taxi_name },
-                  ...(selectedTrip.driver_name ? [{ label: 'Driver', value: selectedTrip.driver_name }] : []),
-                  ...(selectedTrip.driver_phone ? [{ label: "Driver's phone", value: selectedTrip.driver_phone }] : []),
+                  { label: t.taxi,   value: selectedTrip.taxi_name },
+                  ...(selectedTrip.driver_name ? [{ label: t.driver, value: selectedTrip.driver_name }] : []),
+                  ...(selectedTrip.driver_phone ? [{ label: t.driverPhone, value: selectedTrip.driver_phone }] : []),
                 ]} />
               </>
             )}
@@ -449,7 +548,7 @@ export default function DriverTripsPage() {
               onClick={() => setSelectedTrip(null)}
               style={{ width: '100%', marginTop: 8, padding: '13px', background: '#F5F5F2', border: 'none', borderRadius: 14, fontSize: 13, fontWeight: 700, color: '#6f7979', cursor: 'pointer', fontFamily: 'inherit' }}
             >
-              Close
+              {t.close}
             </button>
           </div>
         </div>

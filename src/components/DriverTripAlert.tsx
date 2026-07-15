@@ -4,6 +4,50 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
+import { useLang } from '@/lib/language'
+
+const MSG = {
+  en: {
+    overdueTitle:      (min: number) => `Trip overdue — ${min} min late`,
+    overdueSubtitle:   'Passenger is waiting. Start now.',
+    starting:          'Starting...',
+    startTripNow:      '🚗 Start trip now',
+    cannotDismiss:     'Cannot dismiss — start the trip to close this',
+    pickup:            'Pickup',
+    destination:       'Destination',
+    waitingBadge:      (n: number) => `⏱ Waiting — ${n} min`,
+    dropOnly:          '→ Drop only',
+    totalMin:          (n: number) => `~${n}min total`,
+    dropTotalApprox:   '~30min',
+    waitingTripLabel:  '⏱ Waiting trip',
+    waitingTripPre:    'You will wait',
+    waitingTripStrong: (n: number) => `${n} minutes`,
+    waitingTripSuffix: 'at destination for passenger to return.',
+    waitingTripEst:    (n: number) => `Estimated total: ~${n} min.`,
+    errorPrefix:       'Error: ',
+    errorFailed:       'Failed',
+  },
+  id: {
+    overdueTitle:      (min: number) => `Trip terlambat — ${min} menit`,
+    overdueSubtitle:   'Penumpang sedang menunggu. Segera mulai perjalanan.',
+    starting:          'Memulai...',
+    startTripNow:      '🚗 Mulai perjalanan',
+    cannotDismiss:     'Tidak bisa ditutup — mulai perjalanan untuk menutup ini',
+    pickup:            'Penjemputan',
+    destination:       'Tujuan',
+    waitingBadge:      (n: number) => `⏱ Tunggu — ${n} menit`,
+    dropOnly:          '→ Hanya antar',
+    totalMin:          (n: number) => `~${n} menit total`,
+    dropTotalApprox:   '~30 menit',
+    waitingTripLabel:  '⏱ Perjalanan tunggu',
+    waitingTripPre:    'Anda akan menunggu',
+    waitingTripStrong: (n: number) => `${n} menit`,
+    waitingTripSuffix: 'di tujuan sampai penumpang kembali.',
+    waitingTripEst:    (n: number) => `Estimasi total: ~${n} menit.`,
+    errorPrefix:       'Kesalahan: ',
+    errorFailed:       'Gagal',
+  },
+}
 
 interface UrgentBooking {
   id:             string
@@ -24,6 +68,8 @@ interface Props { userId: string }
 
 export default function DriverTripAlert({ userId }: Props) {
   const supabase = createClient()
+  const lang = useLang()
+  const t = MSG[lang]
   const [overdueTrips, setOverdueTrips] = useState<UrgentBooking[]>([])
   const [processing,   setProcessing]   = useState<string | null>(null)
   const [overdueIdx,   setOverdueIdx]   = useState(0)
@@ -68,7 +114,7 @@ export default function DriverTripAlert({ userId }: Props) {
     })
     if (!res.ok) {
       const d = await res.json().catch(() => ({}))
-      alert('Error: ' + (d.error || 'Failed'))
+      alert(t.errorPrefix + (d.error || t.errorFailed))
     }
     await load()
     setProcessing(null)
@@ -107,6 +153,8 @@ function OverdueCard({ trips, idx, setIdx, processing, onStart }: {
   processing: string | null
   onStart: (id: string) => void
 }) {
+  const lang = useLang()
+  const t = MSG[lang]
   const trip = trips[idx]
   if (!trip) return null
   const scheduledTime = new Date(trip.scheduled_at)
@@ -119,10 +167,10 @@ function OverdueCard({ trips, idx, setIdx, processing, onStart }: {
           <span style={{ fontSize: 24 }}>⚠️</span>
           <div>
             <p style={{ fontSize: 16, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '-0.3px' }}>
-              Trip overdue — {minutesLate} min late
+              {t.overdueTitle(minutesLate)}
             </p>
             <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', margin: 0 }}>
-              Passenger is waiting. Start now.
+              {t.overdueSubtitle}
             </p>
           </div>
         </div>
@@ -135,10 +183,10 @@ function OverdueCard({ trips, idx, setIdx, processing, onStart }: {
           disabled={processing === trip.id}
           style={btnStyle('#EF4444')}
         >
-          {processing === trip.id ? 'Starting...' : '🚗 Start trip now'}
+          {processing === trip.id ? t.starting : t.startTripNow}
         </button>
         <p style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', margin: '10px 0 0' }}>
-          Cannot dismiss — start the trip to close this
+          {t.cannotDismiss}
         </p>
       </div>
     </>
@@ -147,6 +195,8 @@ function OverdueCard({ trips, idx, setIdx, processing, onStart }: {
 
 // ── Shared trip body ───────────────────────────────────────
 function TripBody({ trip }: { trip: UrgentBooking }) {
+  const lang = useLang()
+  const t = MSG[lang]
   const isWaiting   = trip.trip_type === 'WAITING'
   const estDuration = isWaiting ? (2 * 60 + trip.wait_minutes) : 120 // rough estimate in minutes
   const tripAt      = new Date(trip.scheduled_at)
@@ -170,10 +220,10 @@ function TripBody({ trip }: { trip: UrgentBooking }) {
             background: isWaiting ? '#EDE9FE' : '#DBEAFE',
             color:      isWaiting ? '#4C1D95'  : '#1E3A5F',
           }}>
-            {isWaiting ? `⏱ Waiting — ${trip.wait_minutes} min` : '→ Drop only'}
+            {isWaiting ? t.waitingBadge(trip.wait_minutes) : t.dropOnly}
           </span>
           <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 500 }}>
-            ~{isWaiting ? `${trip.wait_minutes + 30}min total` : '~30min'}
+            {isWaiting ? t.totalMin(trip.wait_minutes + 30) : t.dropTotalApprox}
           </span>
         </div>
       </div>
@@ -183,7 +233,7 @@ function TripBody({ trip }: { trip: UrgentBooking }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#006064', flexShrink: 0 }} />
           <div>
-            <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 1px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Pickup</p>
+            <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 1px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{t.pickup}</p>
             <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{trip.pickup}</p>
           </div>
         </div>
@@ -191,7 +241,7 @@ function TripBody({ trip }: { trip: UrgentBooking }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52B788', flexShrink: 0 }} />
           <div>
-            <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 1px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Destination</p>
+            <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 1px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{t.destination}</p>
             <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{trip.destination}</p>
           </div>
         </div>
@@ -200,10 +250,10 @@ function TripBody({ trip }: { trip: UrgentBooking }) {
       {/* Waiting detail box */}
       {isWaiting && (
         <div style={{ background: 'rgba(0,96,100,0.1)', border: '1px solid #C4B5FD', borderRadius: 10, padding: '8px 12px', marginBottom: 10 }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: '#006064', margin: '0 0 2px' }}>⏱ Waiting trip</p>
+          <p style={{ fontSize: 12, fontWeight: 700, color: '#006064', margin: '0 0 2px' }}>{t.waitingTripLabel}</p>
           <p style={{ fontSize: 11, color: '#006064', margin: 0 }}>
-            You will wait <strong>{trip.wait_minutes} minutes</strong> at destination for passenger to return.
-            Estimated total: ~{trip.wait_minutes + 30} min.
+            {t.waitingTripPre} <strong>{t.waitingTripStrong(trip.wait_minutes)}</strong> {t.waitingTripSuffix}
+            {' '}{t.waitingTripEst(trip.wait_minutes + 30)}
           </p>
         </div>
       )}

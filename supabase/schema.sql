@@ -521,3 +521,20 @@ alter table public.bookings
 update public.bookings
   set passenger_end_at = auto_complete_at
   where passenger_end_at is null;
+
+-- ============================================================
+-- MIGRATION: per-user notification/UI language preference
+-- Drives server-rendered push/in-app notification text (src/lib/notify.ts).
+-- Existing rows backfill to 'en' automatically via the column default —
+-- no separate UPDATE needed.
+-- ============================================================
+alter table public.users
+  add column if not exists language text not null default 'en'
+  check (language in ('en', 'id'));
+
+-- Drivers default to Bahasa Indonesia (whole fleet is Indonesian-speaking).
+-- Only touches rows still on the column default — anyone who already picked a
+-- language themselves keeps their own choice.
+update public.users
+  set language = 'id'
+  where role = 'driver' and language = 'en';

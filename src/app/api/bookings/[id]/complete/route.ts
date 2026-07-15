@@ -58,8 +58,11 @@ export async function POST(
     await notify({
       user_id:    booking.passenger_id,
       booking_id: bookingId,
-      title:      'Trip completed',
-      body:       `Your trip to ${booking.destination} is complete. Driver is back at base.`,
+      title:      { en: 'Trip completed', id: 'Perjalanan selesai' },
+      body: {
+        en: `Your trip to ${booking.destination} is complete. Driver is back at base.`,
+        id: `Perjalanan Anda ke ${booking.destination} telah selesai. Driver sudah kembali ke pangkalan.`,
+      },
       type:       'trip_completed',
     })
 
@@ -69,8 +72,11 @@ export async function POST(
       await notify({
         user_id:    booking.taxis?.driver_id,
         booking_id: bookingId,
-        title:      'Trip marked as completed',
-        body:       `Trip to ${booking.destination} has been marked complete by coordinator.`,
+        title:      { en: 'Trip marked as completed', id: 'Perjalanan ditandai selesai' },
+        body: {
+          en: `Trip to ${booking.destination} has been marked complete by coordinator.`,
+          id: `Perjalanan ke ${booking.destination} telah ditandai selesai oleh koordinator.`,
+        },
         type:       'auto_completed',
       })
     }

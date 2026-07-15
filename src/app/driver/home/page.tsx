@@ -12,10 +12,120 @@ import GanttCalendar from '@/components/GanttCalendar'
 import { useGpsReporting } from '@/hooks/useGpsReporting'
 import OnboardingTour from '@/components/OnboardingTour'
 import PageLoader from '@/components/PageLoader'
+import { useLang } from '@/lib/language'
 
 const ActiveTripMap = dynamic(() => import('@/components/map/ActiveTripMap'), { ssr: false })
 
 const FONT = 'Inter, sans-serif'
+
+const MSG = {
+  en: {
+    offline:              'Offline',
+    onDuty:                'On duty',
+    driverFallback:        'Driver',
+    updating:              'Updating...',
+    setOnline:             'Set Online',
+    setOffline:            'Set Offline',
+    willReceiveTrips:      'You will receive new trips',
+    willStopTrips:         'Stop receiving new trips',
+    viewProfile:           'View profile',
+    signOut:               'Sign out',
+    never:                 'never',
+    gpsStaleBanner:        (x: string) => `Your location hasn't updated for ${x}. Please check location permissions and keep the app open.`,
+    welcomeBack:           'Welcome back',
+    today:                 'Today',
+    doneLabel:             'done',
+    tabTrips:              'My Trips',
+    tabActive:             'Active',
+    tabCalendar:           'Calendar',
+    nextTripAt:            (time: string) => `No active trip — next trip at ${time}`,
+    youreFree:             "You're free",
+    noActiveOrUpcoming:    'No active or upcoming trips',
+    allTrips:              'All trips',
+    tripInProgress:        (dest: string) => `Trip in progress — ${dest}`,
+    upcomingCount:         (n: number) => `Upcoming — ${n} trip${n > 1 ? 's' : ''}`,
+    loadMore:              'Load more',
+    loadingMore:           'Loading...',
+    recentCompleted:       'Recent completed',
+    noTripsAssigned:       'No trips assigned yet',
+    notifiedWhenAssigned:  "You'll be notified when a trip is assigned",
+    waitingAtDestination:  (min: number) => `⏱ Waiting at destination — ${min} min`,
+    tripInProgressStatus:  '🚗 Trip in progress',
+    markCompletedBackAtBase: '✓ Mark completed — back at base',
+    completing:            'Completing...',
+    bookingId:             'Booking ID',
+    tripType:              'Trip type',
+    dropOneWay:            'Drop — one way',
+    waitingMin:            (min: number) => `Waiting — ${min} min`,
+    notes:                 'Notes',
+    starting:              'Starting...',
+    scheduledNotYet:       (time: string) => `⏳ Scheduled at ${time} — not yet`,
+    startTripPickup:       '🚗 Start trip — pick up passenger',
+    markCompleted:         '✓ Mark completed',
+    statusDone:            'Done',
+    statusConfirmed:       'Confirmed',
+    fromPickup:            (pickup: string) => `from ${pickup}`,
+    pickup:                'Pickup',
+    destination:           'Destination',
+    waitBadge:             (n: number) => `⏱ Wait ${n}m`,
+    dropBadge:             '→ Drop',
+    errorPrefix:           'Error: ',
+    failed:                'Failed',
+  },
+  id: {
+    offline:              'Offline',
+    onDuty:                'Bertugas',
+    driverFallback:        'Driver',
+    updating:              'Memperbarui...',
+    setOnline:             'Aktifkan',
+    setOffline:            'Nonaktifkan',
+    willReceiveTrips:      'Anda akan menerima trip baru',
+    willStopTrips:         'Berhenti menerima trip baru',
+    viewProfile:           'Lihat profil',
+    signOut:               'Keluar',
+    never:                 'belum pernah',
+    gpsStaleBanner:        (x: string) => `Lokasi Anda belum diperbarui selama ${x}. Mohon periksa izin lokasi dan tetap buka aplikasi ini.`,
+    welcomeBack:           'Selamat datang kembali',
+    today:                 'Hari ini',
+    doneLabel:             'selesai',
+    tabTrips:              'Trip Saya',
+    tabActive:             'Aktif',
+    tabCalendar:           'Kalender',
+    nextTripAt:            (time: string) => `Tidak ada trip aktif — trip berikutnya pukul ${time}`,
+    youreFree:             'Anda sedang bebas',
+    noActiveOrUpcoming:    'Tidak ada trip aktif atau mendatang',
+    allTrips:              'Semua trip',
+    tripInProgress:        (dest: string) => `Trip sedang berlangsung — ${dest}`,
+    upcomingCount:         (n: number) => `Mendatang — ${n} trip`,
+    loadMore:              'Muat lebih banyak',
+    loadingMore:           'Memuat...',
+    recentCompleted:       'Baru selesai',
+    noTripsAssigned:       'Belum ada trip yang ditugaskan',
+    notifiedWhenAssigned:  'Anda akan diberi tahu saat ada trip yang ditugaskan',
+    waitingAtDestination:  (min: number) => `⏱ Menunggu di tujuan — ${min} menit`,
+    tripInProgressStatus:  '🚗 Trip sedang berlangsung',
+    markCompletedBackAtBase: '✓ Tandai selesai — kembali ke pangkalan',
+    completing:            'Menyelesaikan...',
+    bookingId:             'ID Booking',
+    tripType:              'Jenis trip',
+    dropOneWay:            'Antar — satu arah',
+    waitingMin:            (min: number) => `Menunggu — ${min} menit`,
+    notes:                 'Catatan',
+    starting:              'Memulai...',
+    scheduledNotYet:       (time: string) => `⏳ Dijadwalkan pukul ${time} — belum waktunya`,
+    startTripPickup:       '🚗 Mulai trip — jemput penumpang',
+    markCompleted:         '✓ Tandai selesai',
+    statusDone:            'Selesai',
+    statusConfirmed:       'Dikonfirmasi',
+    fromPickup:            (pickup: string) => `dari ${pickup}`,
+    pickup:                'Jemput',
+    destination:           'Tujuan',
+    waitBadge:             (n: number) => `⏱ Tunggu ${n}m`,
+    dropBadge:             '→ Antar',
+    errorPrefix:           'Error: ',
+    failed:                'Gagal',
+  },
+}
 
 interface DriverBooking {
   id:             string
@@ -42,6 +152,8 @@ type Tab = 'trips' | 'active' | 'calendar'
 export default function DriverHomePage() {
   const router   = useRouter()
   const supabase = createClient()
+  const lang     = useLang()
+  const t        = MSG[lang]
 
   const [user,       setUser]       = useState<User | null>(null)
   const [upcoming,   setUpcoming]   = useState<DriverBooking[]>([])
@@ -185,7 +297,7 @@ export default function DriverHomePage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     })
-    if (!res.ok) { alert('Error: ' + ((await res.json().catch(() => ({}))).error || 'Failed')); setProcessing(null); return }
+    if (!res.ok) { alert(t.errorPrefix + ((await res.json().catch(() => ({}))).error || t.failed)); setProcessing(null); return }
     setSelected(null)
     setTab('active')  // switch immediately, don't wait for reload
     if (user) await loadTrips(user.id)
@@ -199,7 +311,7 @@ export default function DriverHomePage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     })
-    if (!res.ok) { alert('Error: ' + ((await res.json().catch(() => ({}))).error || 'Failed')); setProcessing(null); return }
+    if (!res.ok) { alert(t.errorPrefix + ((await res.json().catch(() => ({}))).error || t.failed)); setProcessing(null); return }
     setSelected(null)
     setTab('trips')  // switch back to trips after completing
     if (user) await loadTrips(user.id)
@@ -234,10 +346,10 @@ export default function DriverHomePage() {
   const tabColor = myTaxi?.color || '#2563EB'
 
   // GPS staleness — only nag while on duty; matches the 1h server-side threshold.
-  // Also only during operating hours (06:00–18:00 WITA), same as the server-side cron —
+  // Also only during operating hours (07:00–16:00 WITA), same as the server-side cron —
   // otherwise a driver who forgets to tap "Set Offline" gets nagged all night.
   const nowWitaHour = new Date(Date.now() + 8 * 3600000).getUTCHours()
-  const inOperatingHours = nowWitaHour >= 6 && nowWitaHour < 18
+  const inOperatingHours = nowWitaHour >= 7 && nowWitaHour < 16
   const gpsStaleMinutes = myTaxi && myTaxi.is_available !== false
     ? (myTaxi.location_updated_at
         ? Math.floor((Date.now() - new Date(myTaxi.location_updated_at).getTime()) / 60000)
@@ -245,7 +357,7 @@ export default function DriverHomePage() {
     : null
   const showGpsStaleBanner = inOperatingHours && gpsStaleMinutes !== null && gpsStaleMinutes >= 60
   const gpsStaleText = gpsStaleMinutes === Infinity
-    ? 'never'
+    ? t.never
     : gpsStaleMinutes !== null
       ? gpsStaleMinutes >= 60
         ? `${Math.floor(gpsStaleMinutes / 60)}h ${gpsStaleMinutes % 60}m`
@@ -266,7 +378,7 @@ export default function DriverHomePage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 2 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: myTaxi?.is_available === false ? '#ba1a1a' : '#344500', display: 'inline-block' }} />
-              <span style={{ fontSize: 10, color: '#6f7979', fontWeight: 500 }}>{myTaxi?.is_available === false ? 'Offline' : 'On duty'}</span>
+              <span style={{ fontSize: 10, color: '#6f7979', fontWeight: 500 }}>{myTaxi?.is_available === false ? t.offline : t.onDuty}</span>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -289,22 +401,22 @@ export default function DriverHomePage() {
                   <div style={{ position: 'absolute', top: 44, right: 0, background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 99, minWidth: 220, overflow: 'hidden' }}>
                     <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: '#F5F5F2' }}>
                       <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 2px', color: '#1a1c1b' }}>{user?.name}</p>
-                      <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{myTaxi?.name || 'Driver'}</p>
+                      <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{myTaxi?.name || t.driverFallback}</p>
                     </div>
                     <button onClick={toggleAvailability} disabled={toggling} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <span style={{ width: 10, height: 10, borderRadius: '50%', background: myTaxi?.is_available === false ? '#EF4444' : '#52B788', flexShrink: 0, display: 'inline-block' }} />
                       <div>
-                        <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 1px', color: '#006064' }}>{toggling ? 'Updating...' : myTaxi?.is_available === false ? 'Set Online' : 'Set Offline'}</p>
-                        <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{myTaxi?.is_available === false ? 'You will receive new trips' : 'Stop receiving new trips'}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 1px', color: '#006064' }}>{toggling ? t.updating : myTaxi?.is_available === false ? t.setOnline : t.setOffline}</p>
+                        <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{myTaxi?.is_available === false ? t.willReceiveTrips : t.willStopTrips}</p>
                       </div>
                     </button>
                     <button onClick={() => { setMenuOpen(false); router.push('/driver/profile') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006064" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>View profile</p>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#006064' }}>{t.viewProfile}</p>
                     </button>
                     <button onClick={async () => { setMenuOpen(false); await supabase.auth.signOut(); router.push('/login') }} style={{ width: '100%', padding: '13px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ba1a1a" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#ba1a1a' }}>Sign out</p>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#ba1a1a' }}>{t.signOut}</p>
                     </button>
                   </div>
                 </>
@@ -320,7 +432,7 @@ export default function DriverHomePage() {
         <div style={{ background: '#DC2626', color: '#fff', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
           <p style={{ fontSize: 12.5, fontWeight: 600, margin: 0, lineHeight: 1.4 }}>
-            Your location hasn't updated for {gpsStaleText}. Please check location permissions and keep the app open.
+            {t.gpsStaleBanner(gpsStaleText)}
           </p>
         </div>
       )}
@@ -329,20 +441,20 @@ export default function DriverHomePage() {
       <div style={{ background: '#ffffff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '20px 20px 0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
-            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9ca3af', margin: '0 0 3px', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>Welcome back</p>
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9ca3af', margin: '0 0 3px', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{t.welcomeBack}</p>
             <h1 style={{ fontSize: 24, fontWeight: 800, color: '#006064', margin: '0 0 4px', letterSpacing: '-0.5px', fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{user?.name?.split(' ')[0]}</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: myTaxi?.is_available === false ? '#EF4444' : '#52B788', display: 'inline-block' }} />
               <span style={{ fontSize: 13, color: '#3f4949', fontWeight: 600 }}>
-                {myTaxi?.is_available === false ? 'Offline' : 'On duty'}
+                {myTaxi?.is_available === false ? t.offline : t.onDuty}
               </span>
               {myTaxi && <span style={{ fontSize: 13, color: '#9ca3af' }}>· {myTaxi.name}</span>}
             </div>
           </div>
           <div style={{ textAlign: 'center', background: 'rgba(0,96,100,0.06)', borderRadius: 12, padding: '10px 16px', position: 'relative' }}>
-            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#006064', margin: '0 0 3px', opacity: 0.75 }}>Today</p>
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#006064', margin: '0 0 3px', opacity: 0.75 }}>{t.today}</p>
             <p style={{ fontSize: 26, fontWeight: 800, margin: 0, color: '#006064', letterSpacing: '-1px', lineHeight: 1 }}>{doneToday}</p>
-            <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>done</p>
+            <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>{t.doneLabel}</p>
           </div>
         </div>
 
@@ -351,9 +463,9 @@ export default function DriverHomePage() {
         {/* ── Tabs ── */}
         <div style={{ display: 'flex' }}>
           {([
-            { key: 'trips',    label: 'My Trips' },
-            { key: 'active',   label: 'Active', dot: !!activeTrip },
-            { key: 'calendar', label: 'Calendar' },
+            { key: 'trips',    label: t.tabTrips },
+            { key: 'active',   label: t.tabActive, dot: !!activeTrip },
+            { key: 'calendar', label: t.tabCalendar },
           ] as { key: Tab; label: string; dot?: boolean }[]).map(({ key, label, dot }) => {
             const active = tab === key
             return (
@@ -388,7 +500,7 @@ export default function DriverHomePage() {
               <div style={{ background: 'rgba(0,96,100,0.1)', border: '1px solid #93C5FD', borderRadius: 16, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 16 }}>📋</span>
                 <p style={{ fontSize: 13, fontWeight: 600, color: '#006064', margin: 0 }}>
-                  No active trip — next trip at {format(new Date(nextTrip.scheduled_at), 'HH:mm')}
+                  {t.nextTripAt(format(new Date(nextTrip.scheduled_at), 'HH:mm'))}
                 </p>
               </div>
               <TripDetailCard trip={nextTrip} processing={processing} onStart={startTrip} />
@@ -396,8 +508,8 @@ export default function DriverHomePage() {
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 20px', background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)' }}>
               <p style={{ fontSize: 32, margin: '0 0 12px' }}>🟢</p>
-              <p style={{ fontSize: 15, fontWeight: 700, color: '#006064', margin: '0 0 4px' }}>You're free</p>
-              <p style={{ fontSize: 13, color: '#6f7979', margin: 0 }}>No active or upcoming trips</p>
+              <p style={{ fontSize: 15, fontWeight: 700, color: '#006064', margin: '0 0 4px' }}>{t.youreFree}</p>
+              <p style={{ fontSize: 13, color: '#6f7979', margin: 0 }}>{t.noActiveOrUpcoming}</p>
             </div>
           )}
         </div>
@@ -409,7 +521,7 @@ export default function DriverHomePage() {
 
           {/* Compact date filter */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: 0 }}>All trips</p>
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: 0 }}>{t.allTrips}</p>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, padding: '5px 10px' }}>
               <span style={{ fontSize: 11 }}>📅</span>
               <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
@@ -435,7 +547,7 @@ export default function DriverHomePage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 16 }}>🚗</span>
                 <p style={{ fontSize: 13, fontWeight: 700, color: '#2D6A4F', margin: 0 }}>
-                  Trip in progress — {activeTrip.destination}
+                  {t.tripInProgress(activeTrip.destination)}
                 </p>
               </div>
               <span style={{ fontSize: 13, color: '#2D6A4F' }}>→</span>
@@ -445,9 +557,9 @@ export default function DriverHomePage() {
           {/* Upcoming */}
           {filteredUpcoming.length > 0 && (
             <>
-              <SLabel>Upcoming — {filteredUpcoming.length} trip{filteredUpcoming.length > 1 ? 's' : ''}</SLabel>
-              {filteredUpcoming.map(t => (
-                <TripRow key={t.id} trip={t} onTap={() => setSelected(t)} />
+              <SLabel>{t.upcomingCount(filteredUpcoming.length)}</SLabel>
+              {filteredUpcoming.map(trip => (
+                <TripRow key={trip.id} trip={trip} onTap={() => setSelected(trip)} />
               ))}
               {hasMoreUp && (
                 <button disabled={loadingMore} onClick={async () => {
@@ -463,7 +575,7 @@ export default function DriverHomePage() {
                   }
                   setLoadingMore(false)
                 }} style={{ width: '100%', padding: '11px', marginTop: 4, background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, fontSize: 13, fontWeight: 600, color: loadingMore ? '#9ca3af' : '#006064', cursor: loadingMore ? 'not-allowed' : 'pointer', fontFamily: 'Inter, sans-serif' }}>
-                  {loadingMore ? 'Loading...' : 'Load more'}
+                  {loadingMore ? t.loadingMore : t.loadMore}
                 </button>
               )}
             </>
@@ -472,9 +584,9 @@ export default function DriverHomePage() {
           {/* Past */}
           {filteredPast.length > 0 && (
             <>
-              <SLabel>Recent completed</SLabel>
-              {filteredPast.map(t => (
-                <TripRow key={t.id} trip={t} done />
+              <SLabel>{t.recentCompleted}</SLabel>
+              {filteredPast.map(trip => (
+                <TripRow key={trip.id} trip={trip} done />
               ))}
               {hasMorePast && (
                 <button disabled={loadingMore} onClick={async () => {
@@ -490,7 +602,7 @@ export default function DriverHomePage() {
                   }
                   setLoadingMore(false)
                 }} style={{ width: '100%', padding: '11px', marginTop: 4, background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, fontSize: 13, fontWeight: 600, color: loadingMore ? '#9ca3af' : '#006064', cursor: loadingMore ? 'not-allowed' : 'pointer', fontFamily: 'Inter, sans-serif' }}>
-                  {loadingMore ? 'Loading...' : 'Load more'}
+                  {loadingMore ? t.loadingMore : t.loadMore}
                 </button>
               )}
             </>
@@ -498,8 +610,8 @@ export default function DriverHomePage() {
 
           {filteredUpcoming.length === 0 && filteredPast.length === 0 && !activeTrip && (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: '#9ca3af' }}>
-              <p style={{ fontSize: 14, margin: '0 0 4px' }}>No trips assigned yet</p>
-              <p style={{ fontSize: 12, margin: 0 }}>You'll be notified when a trip is assigned</p>
+              <p style={{ fontSize: 14, margin: '0 0 4px' }}>{t.noTripsAssigned}</p>
+              <p style={{ fontSize: 12, margin: 0 }}>{t.notifiedWhenAssigned}</p>
             </div>
           )}
         </div>
@@ -536,13 +648,15 @@ export default function DriverHomePage() {
 }
 
 // ── Active trip card (prominent) ────────────────────────────
-function ActiveTripCard({ trip: t, processing, onComplete }: {
+function ActiveTripCard({ trip: b, processing, onComplete }: {
   trip: DriverBooking; processing: string | null; onComplete: (id: string) => void
 }) {
-  const isWait   = t.trip_type === 'WAITING'
+  const lang = useLang()
+  const t    = MSG[lang]
+  const isWait   = b.trip_type === 'WAITING'
   const statusBg = isWait ? '#EDE9FE' : '#D8F3DC'
   const statusC  = isWait ? '#4C1D95' : '#2D6A4F'
-  const statusTx = isWait ? `⏱ Waiting at destination — ${t.wait_minutes} min` : '🚗 Trip in progress'
+  const statusTx = isWait ? t.waitingAtDestination(b.wait_minutes) : t.tripInProgressStatus
 
   return (
     <div style={{ background: '#ffffff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden' }}>
@@ -550,7 +664,7 @@ function ActiveTripCard({ trip: t, processing, onComplete }: {
       <div style={{ background: statusBg, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: statusC, margin: 0 }}>{statusTx}</p>
         <span style={{ fontSize: 12, color: statusC, opacity: 0.7, fontWeight: 500 }}>
-          {format(new Date(t.scheduled_at), 'HH:mm')}
+          {format(new Date(b.scheduled_at), 'HH:mm')}
         </span>
       </div>
 
@@ -558,39 +672,39 @@ function ActiveTripCard({ trip: t, processing, onComplete }: {
         {/* Passenger */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
           <div>
-            <p style={{ fontSize: 20, fontWeight: 700, margin: '0 0 3px', letterSpacing: '-0.3px' }}>{t.passenger_name}</p>
-            <p style={{ fontSize: 12, color: '#6f7979', margin: 0 }}>{t.booking_code}</p>
+            <p style={{ fontSize: 20, fontWeight: 700, margin: '0 0 3px', letterSpacing: '-0.3px' }}>{b.passenger_name}</p>
+            <p style={{ fontSize: 12, color: '#6f7979', margin: 0 }}>{b.booking_code}</p>
           </div>
-          <TypeBadge type={t.trip_type} wait={t.wait_minutes} />
+          <TypeBadge type={b.trip_type} wait={b.wait_minutes} />
         </div>
 
         {/* Route */}
-        <RouteBlock pickup={t.pickup} destination={t.destination} />
+        <RouteBlock pickup={b.pickup} destination={b.destination} />
 
-        {t.notes && (
+        {b.notes && (
           <div style={{ background: '#ffdeac', border: '1px solid #FDE68A', borderRadius: 10, padding: '8px 12px', margin: '12px 0' }}>
-            <p style={{ fontSize: 12, color: '#7e5700', margin: 0 }}>📝 {t.notes}</p>
+            <p style={{ fontSize: 12, color: '#7e5700', margin: 0 }}>📝 {b.notes}</p>
           </div>
         )}
 
         {/* Map inside card */}
         <ActiveTripMap
-          pickup={t.pickup}
-          destination={t.destination}
-          status={t.status}
-          taxiColor={t.taxi_color || '#006064'}
-          pickupLat={t.pickup_lat}
-          pickupLng={t.pickup_lng}
-          destLat={t.destination_lat}
-          destLng={t.destination_lng}
+          pickup={b.pickup}
+          destination={b.destination}
+          status={b.status}
+          taxiColor={b.taxi_color || '#006064'}
+          pickupLat={b.pickup_lat}
+          pickupLng={b.pickup_lng}
+          destLat={b.destination_lat}
+          destLng={b.destination_lng}
         />
 
         <button
-          onClick={() => onComplete(t.id)}
-          disabled={processing === t.id}
-          style={{ width: '100%', marginTop: 14, padding: '14px', background: processing === t.id ? 'rgba(0,0,0,0.08)' : '#006064', color: '#fff', border: 'none', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: processing === t.id ? 'not-allowed' : 'pointer', fontFamily: 'Inter, sans-serif' }}
+          onClick={() => onComplete(b.id)}
+          disabled={processing === b.id}
+          style={{ width: '100%', marginTop: 14, padding: '14px', background: processing === b.id ? 'rgba(0,0,0,0.08)' : '#006064', color: '#fff', border: 'none', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: processing === b.id ? 'not-allowed' : 'pointer', fontFamily: 'Inter, sans-serif' }}
         >
-          {processing === t.id ? 'Completing...' : '✓ Mark completed — back at base'}
+          {processing === b.id ? t.completing : t.markCompletedBackAtBase}
         </button>
       </div>
     </div>
@@ -598,59 +712,61 @@ function ActiveTripCard({ trip: t, processing, onComplete }: {
 }
 
 // ── Trip detail card (for sheet + active tab next trip) ─────
-function TripDetailCard({ trip: t, processing, onStart, onComplete }: {
+function TripDetailCard({ trip: b, processing, onStart, onComplete }: {
   trip: DriverBooking; processing: string | null
   onStart?: (id: string) => void; onComplete?: (id: string) => void
 }) {
+  const lang = useLang()
+  const t    = MSG[lang]
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
         <div>
-          <p style={{ fontSize: 19, fontWeight: 700, margin: '0 0 3px', letterSpacing: '-0.3px' }}>{t.passenger_name}</p>
+          <p style={{ fontSize: 19, fontWeight: 700, margin: '0 0 3px', letterSpacing: '-0.3px' }}>{b.passenger_name}</p>
           <p style={{ fontSize: 13, color: '#6f7979', margin: 0 }}>
-            {format(new Date(t.scheduled_at), 'EEE, d MMM · HH:mm', { locale: idLocale })}
+            {format(new Date(b.scheduled_at), 'EEE, d MMM · HH:mm', { locale: idLocale })}
           </p>
         </div>
-        <TypeBadge type={t.trip_type} wait={t.wait_minutes} />
+        <TypeBadge type={b.trip_type} wait={b.wait_minutes} />
       </div>
 
-      <RouteBlock pickup={t.pickup} destination={t.destination} />
+      <RouteBlock pickup={b.pickup} destination={b.destination} />
 
       <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', margin: '12px 0' }}>
         {[
-          { l: 'Booking ID', v: t.booking_code },
-          { l: 'Trip type',  v: t.trip_type === 'DROP' ? 'Drop — one way' : `Waiting — ${t.wait_minutes} min` },
-          ...(t.notes ? [{ l: 'Notes', v: t.notes }] : []),
+          { l: t.bookingId, v: b.booking_code },
+          { l: t.tripType,  v: b.trip_type === 'DROP' ? t.dropOneWay : t.waitingMin(b.wait_minutes) },
+          ...(b.notes ? [{ l: t.notes, v: b.notes }] : []),
         ].map((r, i, arr) => (
           <div key={r.l} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}>
             <span style={{ fontSize: 12, color: '#6f7979' }}>{r.l}</span>
-            <span style={{ fontSize: 12, fontWeight: 600, fontFamily: r.l === 'Booking ID' ? 'monospace' : FONT, textAlign: 'right', maxWidth: '60%' }}>{r.v}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, fontFamily: r.l === t.bookingId ? 'monospace' : FONT, textAlign: 'right', maxWidth: '60%' }}>{r.v}</span>
           </div>
         ))}
       </div>
 
-      {t.status === 'booked' && onStart && (() => {
-        const earliestStart = new Date(t.scheduled_at).getTime() - 10 * 60 * 1000
+      {b.status === 'booked' && onStart && (() => {
+        const earliestStart = new Date(b.scheduled_at).getTime() - 10 * 60 * 1000
         const tooEarly = Date.now() < earliestStart
-        const isDisabled = processing === t.id || tooEarly
+        const isDisabled = processing === b.id || tooEarly
         return (
           <button
-            onClick={() => !tooEarly && onStart(t.id)}
+            onClick={() => !tooEarly && onStart(b.id)}
             disabled={isDisabled}
             style={{ width: '100%', padding: '13px', background: isDisabled ? 'rgba(0,0,0,0.08)' : '#006064', color: isDisabled ? '#9ca3af' : '#fff', border: 'none', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: isDisabled ? 'not-allowed' : 'pointer', fontFamily: 'Inter, sans-serif' }}
           >
-            {processing === t.id ? 'Starting...' : tooEarly ? `⏳ Scheduled at ${format(new Date(t.scheduled_at), 'HH:mm')} — not yet` : '🚗 Start trip — pick up passenger'}
+            {processing === b.id ? t.starting : tooEarly ? t.scheduledNotYet(format(new Date(b.scheduled_at), 'HH:mm')) : t.startTripPickup}
           </button>
         )
       })()}
 
-      {['on_trip','waiting_trip'].includes(t.status) && onComplete && (
+      {['on_trip','waiting_trip'].includes(b.status) && onComplete && (
         <button
-          onClick={() => onComplete(t.id)}
-          disabled={processing === t.id}
-          style={{ width: '100%', padding: '13px', background: processing === t.id ? 'rgba(0,0,0,0.08)' : '#2D6A4F', color: '#fff', border: 'none', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
+          onClick={() => onComplete(b.id)}
+          disabled={processing === b.id}
+          style={{ width: '100%', padding: '13px', background: processing === b.id ? 'rgba(0,0,0,0.08)' : '#2D6A4F', color: '#fff', border: 'none', borderRadius: 16, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
         >
-          {processing === t.id ? 'Completing...' : '✓ Mark completed'}
+          {processing === b.id ? t.completing : t.markCompleted}
         </button>
       )}
     </div>
@@ -658,10 +774,12 @@ function TripDetailCard({ trip: t, processing, onStart, onComplete }: {
 }
 
 // ── Trip row in list ────────────────────────────────────────
-function TripRow({ trip: t, onTap, done }: { trip: DriverBooking; onTap?: () => void; done?: boolean }) {
+function TripRow({ trip: b, onTap, done }: { trip: DriverBooking; onTap?: () => void; done?: boolean }) {
+  const lang = useLang()
+  const t    = MSG[lang]
   const statusColor = done
-    ? { bg: '#d8f3dc', color: '#344500', label: 'Done' }
-    : { bg: 'rgba(0,96,100,0.1)', color: '#006064', label: 'Confirmed' }
+    ? { bg: '#d8f3dc', color: '#344500', label: t.statusDone }
+    : { bg: 'rgba(0,96,100,0.1)', color: '#006064', label: t.statusConfirmed }
   return (
     <div
       onClick={onTap}
@@ -679,10 +797,10 @@ function TripRow({ trip: t, onTap, done }: { trip: DriverBooking; onTap?: () => 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
         <div style={{ flex: 1, minWidth: 0, marginRight: 10 }}>
           <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 3px', color: '#1a1c1b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            {t.passenger_name}
+            {b.passenger_name}
           </p>
           <p style={{ fontSize: 12, color: '#6f7979', margin: 0 }}>
-            {format(new Date(t.scheduled_at), 'EEE, d MMM · HH:mm', { locale: idLocale })} · {t.destination}
+            {format(new Date(b.scheduled_at), 'EEE, d MMM · HH:mm', { locale: idLocale })} · {b.destination}
           </p>
         </div>
         <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 9999, background: statusColor.bg, color: statusColor.color, flexShrink: 0 }}>
@@ -690,8 +808,8 @@ function TripRow({ trip: t, onTap, done }: { trip: DriverBooking; onTap?: () => 
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: 8 }}>
-        <TypeBadge type={t.trip_type} wait={t.wait_minutes} small />
-        {t.pickup && <span style={{ fontSize: 11, color: '#9ca3af' }}>from {t.pickup}</span>}
+        <TypeBadge type={b.trip_type} wait={b.wait_minutes} small />
+        {b.pickup && <span style={{ fontSize: 11, color: '#9ca3af' }}>{t.fromPickup(b.pickup)}</span>}
       </div>
     </div>
   )
@@ -699,12 +817,14 @@ function TripRow({ trip: t, onTap, done }: { trip: DriverBooking; onTap?: () => 
 
 // ── Route block ─────────────────────────────────────────────
 function RouteBlock({ pickup, destination }: { pickup: string; destination: string }) {
+  const lang = useLang()
+  const t    = MSG[lang]
   return (
     <div style={{ background: '#F5F5F2', borderRadius: 16, padding: '12px 14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#006064', flexShrink: 0 }} />
         <div>
-          <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 1px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Pickup</p>
+          <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 1px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{t.pickup}</p>
           <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{pickup}</p>
         </div>
       </div>
@@ -712,7 +832,7 @@ function RouteBlock({ pickup, destination }: { pickup: string; destination: stri
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52B788', flexShrink: 0 }} />
         <div>
-          <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 1px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Destination</p>
+          <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 1px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{t.destination}</p>
           <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{destination}</p>
         </div>
       </div>
@@ -722,6 +842,8 @@ function RouteBlock({ pickup, destination }: { pickup: string; destination: stri
 
 // ── Type badge ──────────────────────────────────────────────
 function TypeBadge({ type, wait, small }: { type: string; wait: number; small?: boolean }) {
+  const lang = useLang()
+  const t    = MSG[lang]
   const isWait = type === 'WAITING'
   return (
     <span style={{
@@ -731,7 +853,7 @@ function TypeBadge({ type, wait, small }: { type: string; wait: number; small?: 
       background: isWait ? '#EDE9FE' : '#DBEAFE',
       color:      isWait ? '#4C1D95'  : '#1E3A5F',
     }}>
-      {isWait ? `⏱ Wait ${wait}m` : '→ Drop'}
+      {isWait ? t.waitBadge(wait) : t.dropBadge}
     </span>
   )
 }

@@ -64,10 +64,11 @@ export async function POST(request: NextRequest) {
     })
     if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
 
-    // Insert profile row
+    // Insert profile row — drivers default to Bahasa Indonesia (the whole fleet is
+    // Indonesian-speaking); other roles keep the app-wide English default.
     const { data: profile, error: profileError } = await admin
       .from('users')
-      .insert({ id: authData.user.id, name, email, role, phone: phone || null })
+      .insert({ id: authData.user.id, name, email, role, phone: phone || null, language: role === 'driver' ? 'id' : 'en' })
       .select()
       .single()
 

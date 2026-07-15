@@ -39,10 +39,16 @@ export async function POST(
       await notify({
         user_id:    booking.passenger_id,
         booking_id: bookingId,
-        title:      'Trip request rejected',
-        body:       rejection_reason
-          ? `Your trip to ${booking.destination} was rejected: ${rejection_reason}`
-          : `Your trip to ${booking.destination} was rejected by coordinator.`,
+        title:      { en: 'Trip request rejected', id: 'Permintaan perjalanan ditolak' },
+        body: rejection_reason
+          ? {
+              en: `Your trip to ${booking.destination} was rejected: ${rejection_reason}`,
+              id: `Perjalanan Anda ke ${booking.destination} ditolak: ${rejection_reason}`,
+            }
+          : {
+              en: `Your trip to ${booking.destination} was rejected by coordinator.`,
+              id: `Perjalanan Anda ke ${booking.destination} ditolak oleh koordinator.`,
+            },
         type: 'booking_rejected',
       })
 
@@ -149,16 +155,22 @@ export async function POST(
               await notify({
                 user_id:    assignedTaxi.driver_id,
                 booking_id: bookingId,
-                title:      'New trip assigned',
-                body:       `${passenger?.name} → ${booking.destination} at ${time}`,
+                title:      { en: 'New trip assigned', id: 'Perjalanan baru ditugaskan' },
+                body: {
+                  en: `${passenger?.name} → ${booking.destination} at ${time}`,
+                  id: `${passenger?.name} → ${booking.destination} pukul ${time}`,
+                },
                 type:       'driver_assigned',
               })
 
               await notify({
                 user_id:    booking.passenger_id,
                 booking_id: bookingId,
-                title:      '✅ Trip approved!',
-                body:       `Your trip to ${booking.destination} is approved and a driver has been assigned.`,
+                title:      { en: '✅ Trip approved!', id: '✅ Perjalanan disetujui!' },
+                body: {
+                  en: `Your trip to ${booking.destination} is approved and a driver has been assigned.`,
+                  id: `Perjalanan Anda ke ${booking.destination} disetujui dan driver telah ditugaskan.`,
+                },
                 type:       'booking_confirmed',
               })
             }

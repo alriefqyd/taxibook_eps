@@ -7,6 +7,7 @@ import {
   isSameDay, isSameMonth, startOfMonth,
 } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
+import { useLang } from '@/lib/language'
 import type { BookingDetail } from '@/types'
 import StaffBookingSheet from './StaffBookingSheet'
 
@@ -19,6 +20,7 @@ export interface DayAssignment {
   taxi_name?:     string | null
   taxi_plate?:    string | null
   driver_name?:   string | null
+  driver_phone?:  string | null
   passenger_name?: string | null
   start_time?:    string | null
   end_time?:      string | null
@@ -41,7 +43,81 @@ interface GanttCalendarProps {
   currentUserId?:  string
 }
 
+const MSG = {
+  en: {
+    viewDay:                 'Day',
+    viewWeek:                'Week',
+    viewMonth:               'Month',
+    scrollHint:               '← scroll →',
+    confirmedCount:           (n: number) => `${n} confirmed`,
+    doneCount:                (n: number) => `${n} done`,
+    noTrips:                  'No trips',
+    fullDayRangeTapDetail:    (s: string, e: string) => `★ ${s}–${e}`,
+    fullDayDutyTapDetail:     '★ FULL DAY DUTY',
+    doneAt:                   (time: string, dest: string) => `Done ${time} · ${dest}`,
+    confirmedThisWeek:        (n: number) => `${n} confirmed this week`,
+    fullDayVertical:          '★ FULL DAY',
+    fullDayShort:             'full day',
+    legendPending:            'Pending',
+    legendConfirmedTaxiColor: 'Confirmed (taxi color)',
+    legendCompleted:          '✓ Completed',
+    legendFullDayDuty:        'Full Day Duty',
+    noDriver:                 'No driver',
+    unavailable:              'Unavailable',
+    free:                     'Free',
+    legendNow:                'Now',
+    legendConfirmed:          'Confirmed',
+    tapMonthDay:              'Tap month day → Day view',
+    partialDayDuty:           'PARTIAL DAY DUTY',
+    fullDayDutyCaps:          'FULL DAY DUTY',
+    fullDayBadgeText:         'Full Day',
+    dateLabel:                'Date',
+    taxiDriverLabel:          'Taxi / Driver',
+    passengerLabel:           'Passenger',
+    reasonLabel:               'Reason',
+    closeLabel:               'Close',
+    monthDayLetters:          ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+  },
+  id: {
+    viewDay:                 'Hari',
+    viewWeek:                'Minggu',
+    viewMonth:               'Bulan',
+    scrollHint:               '← geser →',
+    confirmedCount:           (n: number) => `${n} terkonfirmasi`,
+    doneCount:                (n: number) => `${n} selesai`,
+    noTrips:                  'Tidak ada trip',
+    fullDayRangeTapDetail:    (s: string, e: string) => `★ ${s}–${e}`,
+    fullDayDutyTapDetail:     '★ TUGAS SEHARIAN',
+    doneAt:                   (time: string, dest: string) => `Selesai ${time} · ${dest}`,
+    confirmedThisWeek:        (n: number) => `${n} terkonfirmasi minggu ini`,
+    fullDayVertical:          '★ SEHARIAN',
+    fullDayShort:             'seharian',
+    legendPending:            'Pending',
+    legendConfirmedTaxiColor: 'Terkonfirmasi (warna taksi)',
+    legendCompleted:          '✓ Selesai',
+    legendFullDayDuty:        'Tugas Seharian',
+    noDriver:                 'Tidak ada driver',
+    unavailable:              'Tidak tersedia',
+    free:                     'Bebas',
+    legendNow:                'Sekarang',
+    legendConfirmed:          'Terkonfirmasi',
+    tapMonthDay:              'Ketuk tanggal di tampilan bulan → tampilan Hari',
+    partialDayDuty:           'TUGAS PARUH HARI',
+    fullDayDutyCaps:          'TUGAS SEHARIAN',
+    fullDayBadgeText:         'Seharian Penuh',
+    dateLabel:                'Tanggal',
+    taxiDriverLabel:          'Taksi / Driver',
+    passengerLabel:           'Penumpang',
+    reasonLabel:               'Keterangan',
+    closeLabel:               'Tutup',
+    monthDayLetters:          ['S', 'S', 'R', 'K', 'J', 'S', 'M'],
+  },
+}
+
 export default function GanttCalendar({ bookings, taxis, showCompleted = false, dayAssignments = [], onMapClick, mapActive = false, onRefresh, currentUserId }: GanttCalendarProps) {
+  const lang = useLang()
+  const t    = MSG[lang]
+  const dateLocale = lang === 'id' ? idLocale : undefined
   const [view,                    setView]                    = useState<ViewMode>('day')
   const [cursor,                  setCursor]                  = useState(new Date())
   const [selectedBooking,         setSelectedBooking]         = useState<BookingDetail | null>(null)
@@ -73,12 +149,12 @@ export default function GanttCalendar({ bookings, taxis, showCompleted = false, 
   }
 
   function getNavLabel() {
-    if (view === 'day')   return format(cursor, 'EEEE, d MMMM yyyy', { locale: idLocale })
+    if (view === 'day')   return format(cursor, 'EEEE, d MMMM yyyy', { locale: dateLocale })
     if (view === 'week') {
       const mon = startOfWeek(cursor, { weekStartsOn: 1 })
-      return `${format(mon, 'd MMM')} – ${format(addDays(mon, 6), 'd MMM yyyy')}`
+      return `${format(mon, 'd MMM', { locale: dateLocale })} – ${format(addDays(mon, 6), 'd MMM yyyy', { locale: dateLocale })}`
     }
-    return format(cursor, 'MMMM yyyy', { locale: idLocale })
+    return format(cursor, 'MMMM yyyy', { locale: dateLocale })
   }
 
   const ganttBookings = bookings.filter(b =>
@@ -129,7 +205,7 @@ export default function GanttCalendar({ bookings, taxis, showCompleted = false, 
                   color: view === v ? '#0F1923' : '#9ca3af',
                   textTransform: 'capitalize',
                 }}>
-                  {v}
+                  {v === 'day' ? t.viewDay : v === 'week' ? t.viewWeek : t.viewMonth}
                 </button>
               ))}
             </div>
@@ -176,6 +252,8 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAssi
   dayAssignments: DayAssignment[]
   onSelectDayAssignment: (a: DayAssignment) => void
 }) {
+  const lang = useLang()
+  const t    = MSG[lang]
   const today        = new Date()
   const cursorDateStr = format(cursor, 'yyyy-MM-dd')
   const dayBks       = bookings.filter(b => isSameDay(new Date(b.scheduled_at), cursor))
@@ -187,12 +265,12 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAssi
   return (
     <div style={{ paddingBottom: 4 }}>
       <div style={{ padding: '8px 16px 4px', display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '11px', color: '#9ca3af' }}>← scroll →</span>
+        <span style={{ fontSize: '11px', color: '#9ca3af' }}>{t.scrollHint}</span>
         <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-          {activeCnt > 0 && `${activeCnt} confirmed`}
+          {activeCnt > 0 && t.confirmedCount(activeCnt)}
           {activeCnt > 0 && doneCnt > 0 && ' · '}
-          {doneCnt > 0 && `${doneCnt} done`}
-          {activeCnt === 0 && doneCnt === 0 && 'No trips'}
+          {doneCnt > 0 && t.doneCount(doneCnt)}
+          {activeCnt === 0 && doneCnt === 0 && t.noTrips}
         </span>
       </div>
       <div style={{ overflowX: 'auto' }} ref={scrollRef}>
@@ -239,8 +317,9 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAssi
                   <div onClick={() => onSelectDayAssignment(fullDayAssignment)} style={{ position: 'absolute', left, width, top: 0, bottom: 0, background: 'rgba(254,243,199,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderTop: '2px solid #FCD34D', borderBottom: '2px solid #FCD34D', cursor: 'pointer', overflow: 'hidden' }}>
                     <span style={{ fontSize: 10, fontWeight: 800, color: '#92400E', letterSpacing: '0.05em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 4px' }}>
                       {hasRange
-                        ? `★ ${fullDayAssignment.start_time!.slice(0, 5)}–${fullDayAssignment.end_time!.slice(0, 5)} · tap for detail`
-                        : '★ FULL DAY DUTY · tap for detail'}
+                        ? t.fullDayRangeTapDetail(fullDayAssignment.start_time!.slice(0, 5), fullDayAssignment.end_time!.slice(0, 5))
+                        : t.fullDayDutyTapDetail}
+                      {fullDayAssignment.reason && ` · ${fullDayAssignment.reason}`}
                     </span>
                   </div>
                 )
@@ -271,7 +350,7 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAssi
                     </p>
                     <p style={{ fontSize: '9px', color: isDone ? '#94a3b8' : taxi.color, opacity: isDone ? 1 : 0.8, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {isDone && b.completed_at
-                        ? `Done ${format(new Date(b.completed_at), 'HH:mm')} · ${b.destination}`
+                        ? t.doneAt(format(new Date(b.completed_at), 'HH:mm'), b.destination)
                         : `${format(dt, 'HH:mm')} · ${b.destination}`}
                     </p>
                   </div>
@@ -293,6 +372,9 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAss
   onSelectBooking: (b: BookingDetail) => void
   dayAssignments: { taxi_id: string; assign_date: string }[]
 }) {
+  const lang = useLang()
+  const t    = MSG[lang]
+  const dateLocale = lang === 'id' ? idLocale : undefined
   const today  = new Date()
   const monday = startOfWeek(cursor, { weekStartsOn: 1 })
   const days   = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
@@ -301,9 +383,9 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAss
   return (
     <div style={{ paddingBottom: 4 }}>
       <div style={{ padding: '8px 16px 4px', display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '11px', color: '#9ca3af' }}>← scroll →</span>
+        <span style={{ fontSize: '11px', color: '#9ca3af' }}>{t.scrollHint}</span>
         <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-          {bookings.filter(b => days.some(d => isSameDay(new Date(b.scheduled_at), d))).length} confirmed this week
+          {t.confirmedThisWeek(bookings.filter(b => days.some(d => isSameDay(new Date(b.scheduled_at), d))).length)}
         </span>
       </div>
       <div style={{ overflowX: 'auto' }} ref={scrollRef}>
@@ -316,7 +398,7 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAss
               return (
                 <div key={d.toISOString()} style={{ width: DAY_W, flexShrink: 0, padding: '6px 4px', borderLeft: '1px solid rgba(0,0,0,0.08)', textAlign: 'center', background: isToday ? '#006064' : 'transparent' }}>
                   <p style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', color: isToday ? 'rgba(255,255,255,0.6)' : '#9ca3af', margin: '0 0 2px' }}>
-                    {format(d, 'EEE', { locale: idLocale })}
+                    {format(d, 'EEE', { locale: dateLocale })}
                   </p>
                   <p style={{ fontSize: '15px', fontWeight: 700, color: isToday ? '#fff' : '#006064', margin: '0 0 2px', lineHeight: 1 }}>
                     {format(d, 'd')}
@@ -352,7 +434,7 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAss
                       if (!isAssigned) return null
                       return (
                         <div key={d.toISOString()} style={{ position: 'absolute', left: i * DAY_W + 1, top: 0, width: DAY_W - 2, bottom: 0, background: 'rgba(254,243,199,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderLeft: '2px solid #FCD34D', borderRight: '1px solid #FCD34D' }}>
-                          <span style={{ fontSize: 8, fontWeight: 800, color: '#92400E', letterSpacing: '0.04em', writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap' }}>★ FULL DAY</span>
+                          <span style={{ fontSize: 8, fontWeight: 800, color: '#92400E', letterSpacing: '0.04em', writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap' }}>{t.fullDayVertical}</span>
                         </div>
                       )
                     })}
@@ -393,6 +475,9 @@ function WeekGrid({ bookings, cursor, onSelectBooking, dayAssignments = [], onSe
   dayAssignments: DayAssignment[]
   onSelectDayAssignment: (a: DayAssignment) => void
 }) {
+  const lang = useLang()
+  const t    = MSG[lang]
+  const dateLocale = lang === 'id' ? idLocale : undefined
   const today  = new Date()
   const monday = startOfWeek(cursor, { weekStartsOn: 1 })
   const days   = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
@@ -410,7 +495,7 @@ function WeekGrid({ bookings, cursor, onSelectBooking, dayAssignments = [], onSe
             return (
               <div key={d.toISOString()} style={{ textAlign: 'center', padding: '8px 2px', background: isToday ? '#006064' : assignCount > 0 ? 'rgba(254,179,0,0.12)' : 'transparent', borderRight: '1px solid rgba(0,0,0,0.08)' }}>
                 <p style={{ fontSize: '8px', fontWeight: 700, color: isToday ? 'rgba(255,255,255,0.6)' : '#9ca3af', margin: '0 0 2px', textTransform: 'uppercase' }}>
-                  {format(d, 'EEE', { locale: idLocale })}
+                  {format(d, 'EEE', { locale: dateLocale })}
                 </p>
                 <p style={{ fontSize: '15px', fontWeight: 700, color: isToday ? '#fff' : '#006064', margin: '0 0 2px', lineHeight: 1 }}>
                   {format(d, 'd')}
@@ -438,7 +523,7 @@ function WeekGrid({ bookings, cursor, onSelectBooking, dayAssignments = [], onSe
                       if (a) onSelectDayAssignment(a)
                     }}
                     style={{ fontSize: '7px', fontWeight: 700, color: '#7e5700', background: 'rgba(254,179,0,0.18)', borderRadius: 3, padding: '1px 2px', marginBottom: 3, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>
-                    ★ full day{assignCount > 1 ? ` ×${assignCount}` : ''}
+                    ★ {t.fullDayShort}{assignCount > 1 ? ` ×${assignCount}` : ''}
                   </div>
                 )}
                 {dayBks.map(b => {
@@ -473,19 +558,19 @@ function WeekGrid({ bookings, cursor, onSelectBooking, dayAssignments = [], onSe
       <div style={{ display: 'flex', gap: '14px', marginTop: '10px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px dashed #9ca3af', borderRadius: 2 }} />
-          <span style={{ fontSize: '10px', color: '#6B7C8F' }}>Pending</span>
+          <span style={{ fontSize: '10px', color: '#6B7C8F' }}>{t.legendPending}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px solid #2563EB', borderRadius: 2, background: '#2563EB20' }} />
-          <span style={{ fontSize: '10px', color: '#6B7C8F' }}>Confirmed (taxi color)</span>
+          <span style={{ fontSize: '10px', color: '#6B7C8F' }}>{t.legendConfirmedTaxiColor}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px solid #CBD5E1', borderRadius: 2, background: '#F1F5F9' }} />
-          <span style={{ fontSize: '10px', color: '#6B7C8F' }}>✓ Completed</span>
+          <span style={{ fontSize: '10px', color: '#6B7C8F' }}>{t.legendCompleted}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ fontSize: '10px', color: '#7e5700', fontWeight: 700 }}>★</span>
-          <span style={{ fontSize: '10px', color: '#6B7C8F' }}>Full Day Duty</span>
+          <span style={{ fontSize: '10px', color: '#6B7C8F' }}>{t.legendFullDayDuty}</span>
         </div>
       </div>
     </div>
@@ -497,6 +582,8 @@ function MonthView({ bookings, cursor, onDayClick, dayAssignments }: {
   bookings: BookingDetail[]; cursor: Date; onDayClick: (d: Date) => void
   dayAssignments: DayAssignment[]
 }) {
+  const lang = useLang()
+  const t    = MSG[lang]
   const today = new Date()
   const start = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 })
   const days  = Array.from({ length: 42 }, (_, i) => addDays(start, i))
@@ -505,7 +592,7 @@ function MonthView({ bookings, cursor, onDayClick, dayAssignments }: {
     <div style={{ padding: '14px 16px 20px' }}>
       <div style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-          {['M','T','W','T','F','S','S'].map((n, i) => (
+          {t.monthDayLetters.map((n, i) => (
             <div key={i} style={{ textAlign: 'center', padding: '7px 0', fontSize: '10px', fontWeight: 700, color: '#9ca3af' }}>{n}</div>
           ))}
         </div>
@@ -548,6 +635,8 @@ function GanttRow({ taxi, idx, bookings, renderBlock, nowLine, gridLines, totalW
   nowLine: React.ReactNode; gridLines: React.ReactNode; totalW: number
   overlay?: React.ReactNode
 }) {
+  const lang = useLang()
+  const t    = MSG[lang]
   return (
     <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.08)', background: idx % 2 === 0 ? '#fff' : '#f9f9f6' }}>
       <div style={{ width: 90, flexShrink: 0, padding: '8px 10px', borderRight: '1px solid rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, position: 'sticky', left: 0, background: idx % 2 === 0 ? '#fff' : '#f9f9f6', zIndex: 10 }}>
@@ -556,7 +645,7 @@ function GanttRow({ taxi, idx, bookings, renderBlock, nowLine, gridLines, totalW
           <span style={{ fontSize: '11px', fontWeight: 800, color: taxi.is_available ? '#006064' : '#9ca3af' }}>{taxi.name}</span>
         </div>
         <span style={{ fontSize: '9px', color: '#9ca3af', paddingLeft: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {taxi.is_available ? (taxi.driver_name || 'No driver') : 'Unavailable'}
+          {taxi.is_available ? (taxi.driver_name || t.noDriver) : t.unavailable}
         </span>
       </div>
       <div style={{ flex: 1, position: 'relative', height: ROW_H, minWidth: totalW }}>
@@ -569,7 +658,7 @@ function GanttRow({ taxi, idx, bookings, renderBlock, nowLine, gridLines, totalW
         {bookings.map(b => renderBlock(b))}
         {bookings.length === 0 && taxi.is_available && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', paddingLeft: 12 }}>
-            <span style={{ fontSize: '10px', color: '#D1D5DB', fontWeight: 600 }}>Free</span>
+            <span style={{ fontSize: '10px', color: '#D1D5DB', fontWeight: 600 }}>{t.free}</span>
           </div>
         )}
       </div>
@@ -578,22 +667,24 @@ function GanttRow({ taxi, idx, bookings, renderBlock, nowLine, gridLines, totalW
 }
 
 function GanttLegend() {
+  const lang = useLang()
+  const t    = MSG[lang]
   return (
     <div style={{ padding: '8px 16px', background: '#fff', borderTop: '1px solid rgba(0,0,0,0.08)', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
         <span style={{ display: 'inline-block', width: 16, height: 2, background: '#EF4444' }} />
-        <span style={{ fontSize: '10px', color: '#9ca3af' }}>Now</span>
+        <span style={{ fontSize: '10px', color: '#9ca3af' }}>{t.legendNow}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
         <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px solid #9ca3af', borderRadius: 2 }} />
-        <span style={{ fontSize: '10px', color: '#9ca3af' }}>Confirmed</span>
+        <span style={{ fontSize: '10px', color: '#9ca3af' }}>{t.legendConfirmed}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
         <span style={{ display: 'inline-block', width: 20, height: 10, border: '1.5px solid #CBD5E1', borderRadius: 2, background: '#F1F5F9' }} />
-        <span style={{ fontSize: '10px', color: '#9ca3af' }}>✓ Completed</span>
+        <span style={{ fontSize: '10px', color: '#9ca3af' }}>{t.legendCompleted}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <span style={{ fontSize: '10px', color: '#9ca3af' }}>Tap month day → Day view</span>
+        <span style={{ fontSize: '10px', color: '#9ca3af' }}>{t.tapMonthDay}</span>
       </div>
     </div>
   )
@@ -601,10 +692,14 @@ function GanttLegend() {
 
 // ── Day assignment detail bottom sheet ─────────────────────
 function DayAssignmentSheet({ assignment: a, onClose }: { assignment: DayAssignment; onClose: () => void }) {
+  const lang = useLang()
+  const t    = MSG[lang]
+  const dateLocale = lang === 'id' ? idLocale : undefined
+
   if (typeof document === 'undefined') return null
 
   const dateLabel = (() => {
-    try { return format(new Date(a.assign_date + 'T00:00:00'), 'EEEE, dd MMMM yyyy', { locale: idLocale }) }
+    try { return format(new Date(a.assign_date + 'T00:00:00'), 'EEEE, dd MMMM yyyy', { locale: dateLocale }) }
     catch { return a.assign_date }
   })()
 
@@ -617,41 +712,61 @@ function DayAssignmentSheet({ assignment: a, onClose }: { assignment: DayAssignm
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0, letterSpacing: '0.04em' }}>★ {a.start_time && a.end_time ? 'PARTIAL DAY DUTY' : 'FULL DAY DUTY'}</p>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0, letterSpacing: '0.04em' }}>★ {a.start_time && a.end_time ? t.partialDayDuty : t.fullDayDutyCaps}</p>
           <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9999, background: '#FEF3C7', color: '#92400E' }}>
-            {a.start_time && a.end_time ? `${a.start_time.slice(0, 5)}–${a.end_time.slice(0, 5)}` : 'Full Day'}
+            {a.start_time && a.end_time ? `${a.start_time.slice(0, 5)}–${a.end_time.slice(0, 5)}` : t.fullDayBadgeText}
           </span>
         </div>
 
         {/* Date */}
-        <Row label="Tanggal">
+        <Row label={t.dateLabel}>
           <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{dateLabel}</p>
         </Row>
 
         {/* Taxi / Driver */}
-        <Row label="Taxi / Driver">
+        <Row label={t.taxiDriverLabel}>
           <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 1px' }}>
             {a.taxi_name ?? '—'}{a.taxi_plate ? ` · ${a.taxi_plate}` : ''}
           </p>
-          <p style={{ fontSize: 12, color: '#6f7979', margin: 0 }}>{a.driver_name ?? 'Tidak ada driver'}</p>
+          <p style={{ fontSize: 12, color: '#6f7979', margin: 0 }}>{a.driver_name ?? t.noDriver}</p>
         </Row>
 
         {/* Passenger */}
         {a.passenger_name && (
-          <Row label="Penumpang">
+          <Row label={t.passengerLabel}>
             <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>👤 {a.passenger_name}</p>
           </Row>
         )}
 
         {/* Reason */}
         {a.reason && (
-          <Row label="Keterangan">
+          <Row label={t.reasonLabel}>
             <p style={{ fontSize: 13, margin: 0, color: '#6f7979' }}>{a.reason}</p>
           </Row>
         )}
 
+        {/* Contact actions (call / whatsapp) */}
+        {a.driver_phone && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+            <a
+              href={`tel:${a.driver_phone}`}
+              style={{ padding: '12px 8px', background: '#EFF6FF', color: '#0369A1', border: '1px solid #BAE6FD', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxSizing: 'border-box' }}
+            >
+              {t.callBtn || 'Call'}
+            </a>
+            <a
+              href={`https://wa.me/${toWaNumber(a.driver_phone)}?text=${encodeURIComponent(buildWaMessage(a))}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ padding: '12px 8px', background: '#25D366', color: '#ffffff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxSizing: 'border-box' }}
+            >
+              {t.whatsappBtn || 'WhatsApp'}
+            </a>
+          </div>
+        )}
+
         <button onClick={onClose} style={{ width: '100%', padding: '13px', background: '#92400E', color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 8 }}>
-          Tutup
+          {t.closeLabel}
         </button>
       </div>
     </>,
@@ -673,5 +788,25 @@ const navBtn: React.CSSProperties = {
   background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)',
   cursor: 'pointer', fontSize: '14px', color: '#3f4949',
   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+}
+
+function toWaNumber(phone: string): string {
+  let n = phone.replace(/\D/g, '')
+  if (n.startsWith('0')) n = '62' + n.slice(1)
+  return n
+}
+
+function buildWaMessage(a: DayAssignment): string {
+  const time = a.start_time ? `${a.start_time}${a.end_time ? `–${a.end_time}` : ''}` : ''
+  const taxi = a.taxi_name ? `${a.taxi_name}${a.taxi_plate ? ` (${a.taxi_plate})` : ''}` : ''
+  return [
+    `📋 *Ridr – Penugasan Tugas*`,
+    `━━━━━━━━━━━━━━━━━━`,
+    `📍 ${taxi}`,
+    ...(a.driver_name ? [`👤 ${a.driver_name}`] : []),
+    ...(time ? [`🕐 ${time}`] : []),
+    ...(a.passenger_name ? [`👥 ${a.passenger_name}`] : []),
+    ...(a.reason ? [`📝 ${a.reason}`] : []),
+  ].join('\n')
 }
 

@@ -298,7 +298,7 @@ export default function CoordinatorHomePage() {
     const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
     const { data: dayAssign } = await supabase
       .from('driver_day_assignments')
-      .select('taxi_id, assign_date, reason, passenger_name_other, passenger_id, start_time, end_time, taxis(name, plate, users!driver_id(name))')
+      .select('taxi_id, assign_date, reason, passenger_name_other, passenger_id, start_time, end_time, taxis(name, plate, users!driver_id(name, phone))')
       .gte('assign_date', witaToday)
 
     // Resolve registered passenger names in one batch query
@@ -322,6 +322,7 @@ export default function CoordinatorHomePage() {
       taxi_name:      a.taxis?.name ?? null,
       taxi_plate:     a.taxis?.plate ?? null,
       driver_name:    (a.taxis as any)?.users?.name ?? null,
+      driver_phone:   (a.taxis as any)?.users?.phone ?? null,
       passenger_name: a.passenger_id ? (passengerNames[a.passenger_id] ?? null) : (a.passenger_name_other ?? null),
     })))
   }, [supabase])
@@ -344,7 +345,14 @@ export default function CoordinatorHomePage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => loadData())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, () => loadData())
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+
+    // GPS staleness has no database write to react to — it's purely "time passed
+    // without a location update" — so the realtime subscription above never catches
+    // it. Poll on the same 30s cadence as /coordinator/issues so this page doesn't
+    // show fewer problems just because no booking happened to change recently.
+    const issuesPoll = setInterval(loadData, 30000)
+
+    return () => { supabase.removeChannel(ch); clearInterval(issuesPoll) }
   }, [])
 
   async function getToken() {
@@ -411,7 +419,7 @@ export default function CoordinatorHomePage() {
   }
 
   async function confirmCancel() {
-    if (!cancelConfirmId) return
+    if (!cancelConfirmId || !cancelNote.trim()) return
     setCancellingModal(true)
     setProcessing(cancelConfirmId); setProcessingAction('cancel')
     const token = await getToken()
@@ -524,6 +532,25 @@ export default function CoordinatorHomePage() {
       {/* ── Scrollable content below header ── */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingBottom: 72 }}>
       <OnboardingTour role="coordinator" />
+      <style jsx>{`
+        .dashboard-summary-item,
+        .dashboard-analytics-card,
+        .dashboard-driver-card,
+        .dashboard-issue-card {
+          transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+          will-change: transform, box-shadow;
+        }
+        .dashboard-summary-item:hover,
+        .dashboard-analytics-card:hover,
+        .dashboard-driver-card:hover,
+        .dashboard-issue-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 18px 36px rgba(0, 0, 0, 0.08);
+        }
+        .dashboard-issue-card:hover {
+          box-shadow: 0 14px 32px rgba(0, 96, 100, 0.12);
+        }
+      `}</style>
 
       {/* ── Greeting hero ── */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '20px 20px 16px' }}>
@@ -538,7 +565,7 @@ export default function CoordinatorHomePage() {
             <p style={{ fontSize: 13, color: '#6f7979', margin: 0, fontWeight: 500 }}>{t.role}</p>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
-            <div style={{ textAlign: 'center', background: pendingApproval.length > 0 ? '#FEF3C7' : '#F5F5F2', borderRadius: 12, padding: '8px 10px' }}>
+            <div className="dashboard-summary-item" style={{ textAlign: 'center', background: pendingApproval.length > 0 ? '#FEF3C7' : '#F5F5F2', borderRadius: 12, padding: '8px 10px' }}>
               <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: pendingApproval.length > 0 ? '#92400E' : '#9ca3af', margin: '0 0 2px', opacity: 0.8 }}>
                 {lang === 'id' ? 'Approval' : 'Approval'}
               </p>
@@ -546,6 +573,7 @@ export default function CoordinatorHomePage() {
               <p style={{ fontSize: 10, color: pendingApproval.length > 0 ? '#92400E' : '#9ca3af', margin: '2px 0 0', opacity: 0.7 }}>{lang === 'id' ? 'menunggu' : 'pending'}</p>
             </div>
             <div
+              className="dashboard-summary-item"
               onClick={() => router.push('/coordinator/issues')}
               style={{ textAlign: 'center', background: issueCount > 0 ? '#FEE2E2' : '#F5F5F2', borderRadius: 12, padding: '8px 10px', cursor: 'pointer' }}
             >
@@ -555,7 +583,7 @@ export default function CoordinatorHomePage() {
               <p style={{ fontSize: 22, fontWeight: 800, margin: 0, color: issueCount > 0 ? '#DC2626' : '#9ca3af', letterSpacing: '-1px', lineHeight: 1 }}>{issueCount}</p>
               <p style={{ fontSize: 10, color: issueCount > 0 ? '#991B1B' : '#9ca3af', margin: '2px 0 0', opacity: 0.7 }}>{lang === 'id' ? 'perhatian' : 'attention'}</p>
             </div>
-            <div style={{ textAlign: 'center', background: 'rgba(0,96,100,0.06)', borderRadius: 12, padding: '8px 10px' }}>
+            <div className="dashboard-summary-item" style={{ textAlign: 'center', background: 'rgba(0,96,100,0.06)', borderRadius: 12, padding: '8px 10px' }}>
               <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: PRIMARY, margin: '0 0 2px', opacity: 0.75 }}>
                 {lang === 'id' ? 'Trip' : 'Trips'}
               </p>
@@ -598,6 +626,7 @@ export default function CoordinatorHomePage() {
             {issueItems.map(item => (
               <div
                 key={`${item.kind}-${item.id}`}
+                className="dashboard-issue-card"
                 onClick={() => router.push('/coordinator/issues')}
                 style={{ background: '#ffffff', borderRadius: 16, padding: '12px 16px', marginBottom: 10, boxShadow: '0 2px 8px rgba(0,96,100,0.06)', border: '1px solid rgba(220,38,38,0.18)', borderLeft: '3px solid #DC2626', cursor: 'pointer' }}
               >
@@ -639,6 +668,52 @@ export default function CoordinatorHomePage() {
           </div>
         )}
 
+        {/* ── Analytics teaser — always visible on both calendar and map views ── */}
+        <div style={{margin: '20px -16px' }}>
+          <div
+            className="dashboard-analytics-card"
+            onClick={() => router.push('/coordinator/analytics')}
+            style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 0, padding: '18px 18px 16px', cursor: 'pointer', boxShadow: '0 18px 40px rgba(0,0,0,0.06)' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: '#6f7979', margin: 0, textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+                {lang === 'id' ? 'Analitik · 7 hari terakhir' : 'Analytics · Last 7 days'}
+              </p>
+              <span style={{ fontSize: 11, fontWeight: 700, color: PRIMARY }}>
+                {lang === 'id' ? 'Lihat semua ›' : 'View all ›'}
+              </span>
+            </div>
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div style={{ display: 'flex', background: '#F5F5F2', borderRadius: 24, border: '1px solid rgba(0,0,0,0.08)', minHeight: 100, overflow: 'hidden' }}>
+                <div style={{ flex: 1, padding: '18px 12px', textAlign: 'center' }}>
+                  <p style={{ fontSize: 26, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.7px' }}>{weekStats.total}</p>
+                  <p style={{ fontSize: 10, color: '#334f52', margin: '6px 0 0', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.15em' }}>{lang === 'id' ? 'trip' : 'trips'}</p>
+                </div>
+                <div style={{ width: 1, background: 'rgba(0,0,0,0.08)', margin: '14px 0' }} />
+                <div style={{ flex: 1, padding: '18px 12px', textAlign: 'center' }}>
+                  <p style={{ fontSize: 26, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.7px' }}>{weekStats.completionRate}%</p>
+                  <p style={{ fontSize: 10, color: '#334f52', margin: '6px 0 0', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.15em' }}>{lang === 'id' ? 'selesai' : 'completion'}</p>
+                </div>
+                <div style={{ width: 1, background: 'rgba(0,0,0,0.08)', margin: '14px 0' }} />
+                <div style={{ flex: 1, padding: '18px 12px', textAlign: 'center' }}>
+                  <p style={{ fontSize: 26, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.7px' }}>{weekStats.avgDuration}</p>
+                  <p style={{ fontSize: 10, color: '#334f52', margin: '6px 0 0', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.15em' }}>{lang === 'id' ? 'menit rata²' : 'avg min'}</p>
+                </div>
+              </div>
+              {topDriver && (
+                <div className="dashboard-driver-card" style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#ffffff', borderRadius: 20, border: '1px solid rgba(0,0,0,0.08)', padding: '14px 16px' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 14, background: '#006064', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+                    🏆
+                  </div>
+                  <p style={{ fontSize: 13, color: '#0f3d45', margin: 0, lineHeight: 1.35, fontWeight: 600 }}>
+                    <span style={{ fontWeight: 700 }}>{topDriver.name}</span> {lang === 'id' ? 'adalah driver teratas dengan' : 'is top driver with'} {topDriver.count} {lang === 'id' ? 'trip' : 'trips'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* ── CALENDAR / MAP ── */}
         <div style={{ margin: '0 -16px', background: '#fff', borderTop: '1px solid rgba(0,0,0,0.08)', borderBottom: '1px solid rgba(0,0,0,0.08)', position: 'relative', zIndex: 0 }}>
           <GanttCalendar
@@ -654,48 +729,6 @@ export default function CoordinatorHomePage() {
             </div>
           )}
         </div>
-
-        {view === 'calendar' && (
-          <div style={{ marginTop: 20 }}>
-            {/* ── Analytics teaser ── */}
-            <div
-              onClick={() => router.push('/coordinator/analytics')}
-              style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 14, padding: '14px', cursor: 'pointer' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <p style={{ fontSize: 12, fontWeight: 700, color: '#6f7979', margin: 0, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                  {lang === 'id' ? 'Analitik · 7 hari terakhir' : 'Analytics · Last 7 days'}
-                </p>
-                <span style={{ fontSize: 11, fontWeight: 700, color: PRIMARY }}>
-                  {lang === 'id' ? 'Lihat semua ›' : 'View all ›'}
-                </span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ fontSize: 20, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.5px' }}>{weekStats.total}</p>
-                  <p style={{ fontSize: 10, color: '#9ca3af', margin: '2px 0 0' }}>{lang === 'id' ? 'trip' : 'trips'}</p>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ fontSize: 20, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.5px' }}>{weekStats.completionRate}%</p>
-                  <p style={{ fontSize: 10, color: '#9ca3af', margin: '2px 0 0' }}>{lang === 'id' ? 'selesai' : 'completion'}</p>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ fontSize: 20, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.5px' }}>{weekStats.avgDuration}</p>
-                  <p style={{ fontSize: 10, color: '#9ca3af', margin: '2px 0 0' }}>{lang === 'id' ? 'menit rata²' : 'avg min'}</p>
-                </div>
-              </div>
-              {topDriver && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-                  <span style={{ fontSize: 15, flexShrink: 0 }}>🏆</span>
-                  <p style={{ fontSize: 12, color: '#3f4949', margin: 0, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <span style={{ fontWeight: 700 }}>{topDriver.name}</span> · {lang === 'id' ? 'driver teratas' : 'top driver'}
-                  </p>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: PRIMARY, flexShrink: 0 }}>{topDriver.count} {lang === 'id' ? 'trip' : 'trips'}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* ── FLEET TAB ── */}
         {false && (
@@ -783,7 +816,7 @@ export default function CoordinatorHomePage() {
               {lang === 'id' ? 'Batalkan booking ini?' : 'Cancel this booking?'}
             </p>
             <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#9ca3af', margin: '0 0 8px' }}>
-              {lang === 'id' ? 'Alasan (opsional)' : 'Reason (optional)'}
+              {lang === 'id' ? 'Alasan *' : 'Reason *'}
             </p>
             <input
               type="text"
@@ -797,8 +830,8 @@ export default function CoordinatorHomePage() {
                 style={{ padding: '13px', background: 'transparent', border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                 {lang === 'id' ? 'Kembali' : 'Back'}
               </button>
-              <button onClick={confirmCancel} disabled={cancellingModal}
-                style={{ padding: '13px', background: cancellingModal ? '#9ca3af' : '#991B1B', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: cancellingModal ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+              <button onClick={confirmCancel} disabled={cancellingModal || !cancelNote.trim()}
+                style={{ padding: '13px', background: cancellingModal || !cancelNote.trim() ? '#9ca3af' : '#991B1B', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: cancellingModal || !cancelNote.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
                 {cancellingModal ? (lang === 'id' ? 'Membatalkan...' : 'Cancelling...') : (lang === 'id' ? 'Batalkan Booking' : 'Cancel Booking')}
               </button>
             </div>

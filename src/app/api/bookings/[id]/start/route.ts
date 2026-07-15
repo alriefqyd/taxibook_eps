@@ -64,14 +64,21 @@ export async function POST(
       .from('users').select('name').eq('id', user.id).single()
 
     // Notify passenger — driver is on the way / arrived
-    const msg = booking.trip_type === 'WAITING'
-      ? `Your driver ${driver?.name} (${booking.taxis?.name}) has arrived and is waiting.`
-      : `Your driver ${driver?.name} (${booking.taxis?.name}) has picked you up. Trip started.`
+    const isWaiting = booking.trip_type === 'WAITING'
+    const msg = isWaiting
+      ? {
+          en: `Your driver ${driver?.name} (${booking.taxis?.name}) has arrived and is waiting.`,
+          id: `Driver Anda ${driver?.name} (${booking.taxis?.name}) telah tiba dan menunggu.`,
+        }
+      : {
+          en: `Your driver ${driver?.name} (${booking.taxis?.name}) has picked you up. Trip started.`,
+          id: `Driver Anda ${driver?.name} (${booking.taxis?.name}) telah menjemput Anda. Perjalanan dimulai.`,
+        }
 
     await notify({
       user_id:    booking.passenger_id,
       booking_id: bookingId,
-      title:      booking.trip_type === 'WAITING' ? 'Driver arrived' : 'Trip started',
+      title:      isWaiting ? { en: 'Driver arrived', id: 'Driver telah tiba' } : { en: 'Trip started', id: 'Perjalanan dimulai' },
       body:       msg,
       type:       'booking_confirmed',
     })

@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
       reminded_pending_approval: 0,
       driver_offline_warned:     0,
       gps_stale_warned:          0,
+      duty_window_reminded:      0,
     }
 
     // ── 0. AUTO-CANCEL bookings not started 15+ min after scheduled_at ──
@@ -61,8 +62,11 @@ export async function GET(request: NextRequest) {
         cancelNotifs.push({
           user_id:    b.passenger_id,
           booking_id: b.id,
-          title:      'Trip auto-cancelled',
-          body:       `Your trip to ${b.destination} was cancelled — driver did not start on time.`,
+          title:      { en: 'Trip auto-cancelled', id: 'Perjalanan otomatis dibatalkan' },
+          body: {
+            en: `Your trip to ${b.destination} was cancelled — driver did not start on time.`,
+            id: `Perjalanan Anda ke ${b.destination} dibatalkan — driver tidak memulai tepat waktu.`,
+          },
           type:       'booking_cancelled',
           url:        '/staff/home',
         })
@@ -70,8 +74,11 @@ export async function GET(request: NextRequest) {
           cancelNotifs.push({
             user_id:    b.taxis.driver_id,
             booking_id: b.id,
-            title:      'Trip auto-cancelled',
-            body:       `Trip to ${b.destination} was auto-cancelled. You did not start within 15 min of the scheduled time.`,
+            title:      { en: 'Trip auto-cancelled', id: 'Perjalanan otomatis dibatalkan' },
+            body: {
+              en: `Trip to ${b.destination} was auto-cancelled. You did not start within 15 min of the scheduled time.`,
+              id: `Perjalanan ke ${b.destination} otomatis dibatalkan. Anda tidak memulai dalam 15 menit sejak waktu jadwal.`,
+            },
             type:       'booking_cancelled',
             url:        '/driver/home',
           })
@@ -80,8 +87,11 @@ export async function GET(request: NextRequest) {
           cancelNotifs.push({
             user_id:    c.id,
             booking_id: b.id,
-            title:      'Trip auto-cancelled',
-            body:       `Booking to ${b.destination} was auto-cancelled — driver did not start within 15 min of scheduled time.`,
+            title:      { en: 'Trip auto-cancelled', id: 'Perjalanan otomatis dibatalkan' },
+            body: {
+              en: `Booking to ${b.destination} was auto-cancelled — driver did not start within 15 min of scheduled time.`,
+              id: `Booking ke ${b.destination} otomatis dibatalkan — driver tidak memulai dalam 15 menit sejak waktu jadwal.`,
+            },
             type:       'booking_cancelled',
             url:        '/coordinator/home',
           })
@@ -112,16 +122,22 @@ export async function GET(request: NextRequest) {
         notifications.push({
           user_id:    b.passenger_id,
           booking_id: b.id,
-          title:      'Trip auto-completed',
-          body:       `Your trip to ${b.destination} has been automatically completed.`,
+          title:      { en: 'Trip auto-completed', id: 'Perjalanan otomatis selesai' },
+          body: {
+            en: `Your trip to ${b.destination} has been automatically completed.`,
+            id: `Perjalanan Anda ke ${b.destination} telah otomatis diselesaikan.`,
+          },
           type:       'auto_completed',
         })
         if (b.taxis?.driver_id) {
           notifications.push({
             user_id:    b.taxis.driver_id,
             booking_id: b.id,
-            title:      'Trip auto-completed',
-            body:       `Trip to ${b.destination} has been automatically completed.`,
+            title:      { en: 'Trip auto-completed', id: 'Perjalanan otomatis selesai' },
+            body: {
+              en: `Trip to ${b.destination} has been automatically completed.`,
+              id: `Perjalanan ke ${b.destination} telah otomatis diselesaikan.`,
+            },
             type:       'auto_completed',
           })
         }
@@ -159,21 +175,28 @@ export async function GET(request: NextRequest) {
         : Infinity
       const gpsIsFresh = gpsAgeMin < 3
 
-      let locationLine = ''
+      let locationLine = { en: '', id: '' }
       if (gpsIsFresh && taxi?.latitude && taxi?.longitude && b.pickup_lat && b.pickup_lng) {
         const distanceKm = haversineKm(taxi.latitude, taxi.longitude, b.pickup_lat, b.pickup_lng)
         const etaMin     = Math.round((distanceKm / 30) * 60) // ~30 km/h estimate
-        locationLine     = ` Driver is ~${distanceKm < 1
+        const distText   = distanceKm < 1
           ? `${Math.round(distanceKm * 1000)}m`
-          : `${distanceKm.toFixed(1)}km`} away, ETA ~${etaMin} min.`
+          : `${distanceKm.toFixed(1)}km`
+        locationLine = {
+          en: ` Driver is ~${distText} away, ETA ~${etaMin} min.`,
+          id: ` Driver berjarak ~${distText}, estimasi tiba ~${etaMin} menit.`,
+        }
       }
 
       const notifs15: any[] = [
         {
           user_id:    b.passenger_id,
           booking_id: b.id,
-          title:      '⏰ Your trip is in 15 minutes',
-          body:       `Trip to ${b.destination} starts soon. Please head to the pickup point.${locationLine}`,
+          title:      { en: '⏰ Your trip is in 15 minutes', id: '⏰ Perjalanan Anda 15 menit lagi' },
+          body: {
+            en: `Trip to ${b.destination} starts soon. Please head to the pickup point.${locationLine.en}`,
+            id: `Perjalanan ke ${b.destination} akan segera dimulai. Mohon menuju titik jemput.${locationLine.id}`,
+          },
           type:       'reminder_15min',
           url:        '/staff/home',
         },
@@ -185,8 +208,11 @@ export async function GET(request: NextRequest) {
         notifs15.push({
           user_id:    taxi.driver_id,
           booking_id: b.id,
-          title:      '⏰ Pickup in 15 minutes',
-          body:       `Pick up ${passenger?.name} → ${b.destination} in 15 min. Head to the pickup point now.`,
+          title:      { en: '⏰ Pickup in 15 minutes', id: '⏰ Penjemputan 15 menit lagi' },
+          body: {
+            en: `Pick up ${passenger?.name} → ${b.destination} in 15 min. Head to the pickup point now.`,
+            id: `Jemput ${passenger?.name} → ${b.destination} dalam 15 menit. Segera menuju titik jemput.`,
+          },
           type:       'reminder_15min',
           url:        '/driver/home',
         })
@@ -244,11 +270,17 @@ export async function GET(request: NextRequest) {
       if (!shouldNotify) continue
 
       const passengerTitle = distanceM !== null
-        ? '🚗 Your driver is nearby'
-        : '⏰ Time to head to your pickup point'
+        ? { en: '🚗 Your driver is nearby', id: '🚗 Driver Anda sudah dekat' }
+        : { en: '⏰ Time to head to your pickup point', id: '⏰ Saatnya menuju titik jemput' }
       const passengerBody = distanceM !== null
-        ? `Your driver is ~${distanceM}m away from the pickup point. Please be ready.`
-        : `Your trip to ${b.destination} is scheduled now. Please head to the pickup point.`
+        ? {
+            en: `Your driver is ~${distanceM}m away from the pickup point. Please be ready.`,
+            id: `Driver Anda berjarak ~${distanceM}m dari titik jemput. Mohon bersiap.`,
+          }
+        : {
+            en: `Your trip to ${b.destination} is scheduled now. Please head to the pickup point.`,
+            id: `Perjalanan Anda ke ${b.destination} sudah dijadwalkan sekarang. Mohon menuju titik jemput.`,
+          }
 
       const notifs: any[] = [
         {
@@ -267,8 +299,11 @@ export async function GET(request: NextRequest) {
         notifs.push({
           user_id:    taxi.driver_id,
           booking_id: b.id,
-          title:      '🚗 Time to pick up passenger',
-          body:       `Pick up ${passenger?.name} now → ${b.destination}. Tap "Start trip" when picked up.`,
+          title:      { en: '🚗 Time to pick up passenger', id: '🚗 Saatnya menjemput penumpang' },
+          body: {
+            en: `Pick up ${passenger?.name} now → ${b.destination}. Tap "Start trip" when picked up.`,
+            id: `Jemput ${passenger?.name} sekarang → ${b.destination}. Tekan "Mulai perjalanan" setelah dijemput.`,
+          },
           type:       'reminder_start',
           url:        '/driver/home',
         })
@@ -313,15 +348,15 @@ export async function GET(request: NextRequest) {
       // ── Throttle: skip if last overdue notif was < 9.5 min ago ──
       const { data: lastNotif } = await admin
         .from('notifications')
-        .select('created_at')
+        .select('sent_at')
         .eq('booking_id', b.id)
         .eq('type', 'reminder_overdue')
-        .order('created_at', { ascending: false })
+        .order('sent_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
       if (lastNotif) {
-        const minsSince = (now.getTime() - new Date(lastNotif.created_at).getTime()) / 60000
+        const minsSince = (now.getTime() - new Date(lastNotif.sent_at).getTime()) / 60000
         if (minsSince < 9.5) continue
       }
 
@@ -329,18 +364,27 @@ export async function GET(request: NextRequest) {
 
       // ── Driver alert — always fire, tone depends on proximity ──
       if (taxi?.driver_id) {
-        let driverTitle: string
-        let driverBody: string
+        let driverTitle: { en: string; id: string }
+        let driverBody:  { en: string; id: string }
 
         if (driverAtPickup) {
-          driverTitle = `You're almost at pickup`
-          driverBody  = `You're ~${Math.round(distanceKm! * 1000)}m from the passenger. Tap "Start trip" once they're in the car.`
+          driverTitle = { en: `You're almost at pickup`, id: `Anda hampir sampai di titik jemput` }
+          driverBody  = {
+            en: `You're ~${Math.round(distanceKm! * 1000)}m from the passenger. Tap "Start trip" once they're in the car.`,
+            id: `Anda ~${Math.round(distanceKm! * 1000)}m dari penumpang. Tekan "Mulai perjalanan" setelah mereka naik.`,
+          }
         } else if (driverEnRoute) {
-          driverTitle = `Reminder: passenger is waiting`
-          driverBody  = `You're on your way (~${distanceKm!.toFixed(1)}km from pickup). Don't forget to tap "Start trip" when picked up.`
+          driverTitle = { en: `Reminder: passenger is waiting`, id: `Pengingat: penumpang sedang menunggu` }
+          driverBody  = {
+            en: `You're on your way (~${distanceKm!.toFixed(1)}km from pickup). Don't forget to tap "Start trip" when picked up.`,
+            id: `Anda dalam perjalanan (~${distanceKm!.toFixed(1)}km dari titik jemput). Jangan lupa tekan "Mulai perjalanan" setelah menjemput.`,
+          }
         } else {
-          driverTitle = `⚠️ Trip ${minutesLate} min overdue`
-          driverBody  = `Passenger is waiting for pickup to ${b.destination}. Please head there now and tap "Start trip" when picked up.`
+          driverTitle = { en: `⚠️ Trip ${minutesLate} min overdue`, id: `⚠️ Perjalanan terlambat ${minutesLate} menit` }
+          driverBody  = {
+            en: `Passenger is waiting for pickup to ${b.destination}. Please head there now and tap "Start trip" when picked up.`,
+            id: `Penumpang sedang menunggu jemputan ke ${b.destination}. Segera menuju lokasi dan tekan "Mulai perjalanan" setelah menjemput.`,
+          }
         }
 
         notifs.push({
@@ -355,21 +399,33 @@ export async function GET(request: NextRequest) {
 
       // ── Passenger alert — only once they're actually late (≥5 min) ──
       if (minutesLate >= 5) {
-        let passengerBody: string
+        let passengerBody: { en: string; id: string }
         if (driverAtPickup) {
-          passengerBody = `Your driver is almost there — ~${Math.round(distanceKm! * 1000)}m from pickup. Please be ready.`
+          passengerBody = {
+            en: `Your driver is almost there — ~${Math.round(distanceKm! * 1000)}m from pickup. Please be ready.`,
+            id: `Driver Anda hampir sampai — ~${Math.round(distanceKm! * 1000)}m dari titik jemput. Mohon bersiap.`,
+          }
         } else if (driverEnRoute) {
-          passengerBody = `Your driver is on the way (~${distanceKm!.toFixed(1)}km from pickup, ${minutesLate} min late). Please wait.`
+          passengerBody = {
+            en: `Your driver is on the way (~${distanceKm!.toFixed(1)}km from pickup, ${minutesLate} min late). Please wait.`,
+            id: `Driver Anda dalam perjalanan (~${distanceKm!.toFixed(1)}km dari titik jemput, terlambat ${minutesLate} menit). Mohon menunggu.`,
+          }
         } else if (gpsIsFresh && distanceKm !== null) {
-          passengerBody = `Your trip is ${minutesLate} min late. Driver is ${distanceKm.toFixed(1)}km away.`
+          passengerBody = {
+            en: `Your trip is ${minutesLate} min late. Driver is ${distanceKm.toFixed(1)}km away.`,
+            id: `Perjalanan Anda terlambat ${minutesLate} menit. Driver berjarak ${distanceKm.toFixed(1)}km.`,
+          }
         } else {
-          passengerBody = `Your trip to ${b.destination} is ${minutesLate} min late. Please contact the coordinator if needed.`
+          passengerBody = {
+            en: `Your trip to ${b.destination} is ${minutesLate} min late. Please contact the coordinator if needed.`,
+            id: `Perjalanan Anda ke ${b.destination} terlambat ${minutesLate} menit. Silakan hubungi koordinator bila diperlukan.`,
+          }
         }
 
         notifs.push({
           user_id:    b.passenger_id,
           booking_id: b.id,
-          title:      `Your driver is ${minutesLate} min late`,
+          title:      { en: `Your driver is ${minutesLate} min late`, id: `Driver Anda terlambat ${minutesLate} menit` },
           body:       passengerBody,
           type:       'reminder_overdue',
           url:        '/staff/home',
@@ -394,14 +450,14 @@ export async function GET(request: NextRequest) {
       // Throttle: skip if a reminder was already sent within the last 115 min
       const { data: lastApprovalReminder } = await admin
         .from('notifications')
-        .select('created_at')
+        .select('sent_at')
         .eq('type', 'pending_approval_reminder')
-        .order('created_at', { ascending: false })
+        .order('sent_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
       const minsSinceLast = lastApprovalReminder
-        ? (now.getTime() - new Date(lastApprovalReminder.created_at).getTime()) / 60000
+        ? (now.getTime() - new Date(lastApprovalReminder.sent_at).getTime()) / 60000
         : Infinity
 
       if (minsSinceLast >= 115) {
@@ -412,8 +468,14 @@ export async function GET(request: NextRequest) {
         const approvalNotifs: any[] = (coordinators || []).map((c: any) => ({
           user_id:    c.id,
           booking_id: pendingApprovals[0].id,
-          title:      `${count} booking${count > 1 ? 's' : ''} need your approval`,
-          body:       `There ${count > 1 ? 'are' : 'is'} ${count} pending booking${count > 1 ? 's' : ''} waiting for coordinator approval.`,
+          title: {
+            en: `${count} booking${count > 1 ? 's' : ''} need your approval`,
+            id: `${count} booking memerlukan persetujuan Anda`,
+          },
+          body: {
+            en: `There ${count > 1 ? 'are' : 'is'} ${count} pending booking${count > 1 ? 's' : ''} waiting for coordinator approval.`,
+            id: `Ada ${count} booking yang menunggu persetujuan koordinator.`,
+          },
           type:       'pending_approval_reminder',
           url:        '/coordinator/home',
         }))
@@ -464,8 +526,11 @@ export async function GET(request: NextRequest) {
         const coordNotifs = (coordinators || []).map((c: any) => ({
           user_id:    c.id,
           booking_id: b.id,
-          title:      '⚠️ Driver offline — trip in 30 min',
-          body:       `${driverName} is offline but has a trip to ${b.destination} at ${tripTime}. Please check or reassign.`,
+          title:      { en: '⚠️ Driver offline — trip in 30 min', id: '⚠️ Driver offline — perjalanan 30 menit lagi' },
+          body: {
+            en: `${driverName} is offline but has a trip to ${b.destination} at ${tripTime}. Please check or reassign.`,
+            id: `${driverName} sedang offline namun memiliki perjalanan ke ${b.destination} pukul ${tripTime}. Mohon periksa atau alihkan.`,
+          },
           type:       'driver_offline_warning',
           url:        '/coordinator/home',
         }))
@@ -478,19 +543,21 @@ export async function GET(request: NextRequest) {
     }
 
     // ── 7. DRIVER GPS STALE WARNING ────────────────────────────────
-    // Any on-duty driver whose GPS hasn't updated in 60+ min gets warned.
-    // Runs every cron tick (5 min) but throttled to ~10 min between repeat
-    // notifications per driver, so it effectively fires on a 10-min cadence.
-    // Only checked during operating hours (06:00–18:00 WITA) — drivers who
-    // simply lock their phone for the night without tapping "Set Offline"
-    // stay is_available=true with dead GPS, and got spammed with warnings
-    // every night. Coordinators handle actual off-duty follow-up manually.
-    const nowWitaHour = new Date(now.getTime() + 8 * 3600000).getUTCHours()
-    const inOperatingHours = nowWitaHour >= 6 && nowWitaHour < 18
+    // Any on-duty driver whose GPS hasn't updated in 60+ min gets a reminder —
+    // both the driver themself and coordinators — roughly once every 2 hours, and only
+    // during operating hours (07:00–16:00 WITA). Off-duty drivers (is_available =
+    // false) are excluded entirely by the query below, so this never fires at night
+    // for someone who tapped "Set Offline". The external trigger for this endpoint
+    // isn't controlled from this repo (no vercel.json crons entry) and may fire far
+    // more often than assumed, so the throttle below is load-bearing, not a nicety.
+    const nowWita         = new Date(now.getTime() + 8 * 3600000)
+    const witaHour        = nowWita.getUTCHours()
+    const inGpsWarnWindow = witaHour >= 7 && witaHour < 16
+    const GPS_WARN_THROTTLE_MIN = 115 // ~once per 2 hours, per recipient, per taxi
 
     const gpsStaleCutoff = new Date(now.getTime() - 60 * 60 * 1000)
 
-    const { data: onDutyTaxis } = inOperatingHours
+    const { data: onDutyTaxis } = inGpsWarnWindow
       ? await admin
           .from('taxis')
           .select('id, name, driver_id, location_updated_at, users!driver_id(name)')
@@ -507,52 +574,133 @@ export async function GET(request: NextRequest) {
         .from('users').select('id').eq('role', 'coordinator').eq('is_active', true)
 
       for (const tx of staleTaxis as any[]) {
-        // Throttle: skip if this driver was already warned within the last ~10 min
-        const { data: lastWarn } = await admin
-          .from('notifications')
-          .select('created_at')
-          .eq('user_id', tx.driver_id)
-          .eq('type', 'gps_stale_warning')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        if (lastWarn) {
-          const minsSince = (now.getTime() - new Date(lastWarn.created_at).getTime()) / 60000
-          if (minsSince < 9.5) continue
-        }
-
         const minsStale = tx.location_updated_at
           ? Math.round((now.getTime() - new Date(tx.location_updated_at).getTime()) / 60000)
           : null
+        // "Last updated at HH:mm" is more actionable than a bare duration —
+        // clear enough to act on for both the driver and the coordinator.
+        const lastUpdateClock = tx.location_updated_at
+          ? new Date(tx.location_updated_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar' })
+          : null
         const staleText = minsStale === null
-          ? 'no GPS signal has ever been received'
+          ? { en: 'no GPS signal has ever been received', id: 'belum pernah menerima sinyal GPS sama sekali' }
           : minsStale >= 60
-            ? `${Math.floor(minsStale / 60)}h ${minsStale % 60}m`
-            : `${minsStale}m`
+            ? { en: `${Math.floor(minsStale / 60)}h ${minsStale % 60}m (last seen ${lastUpdateClock})`, id: `${Math.floor(minsStale / 60)} jam ${minsStale % 60} menit (terakhir pukul ${lastUpdateClock} WITA)` }
+            : { en: `${minsStale}m (last seen ${lastUpdateClock})`, id: `${minsStale} menit (terakhir pukul ${lastUpdateClock} WITA)` }
 
         const driverName = tx.users?.name || tx.name
+        const notifs: any[] = []
 
-        const notifs: any[] = [
-          {
+        // ── Coordinator alert: throttled ~1 hour per taxi ──
+        const { data: lastCoordWarn } = await admin
+          .from('notifications')
+          .select('sent_at')
+          .eq('type', 'gps_stale_warning_coord')
+          .ilike('body', `%(${tx.name})%`)
+          .order('sent_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        const coordThrottled = lastCoordWarn
+          ? (now.getTime() - new Date(lastCoordWarn.sent_at).getTime()) / 60000 < GPS_WARN_THROTTLE_MIN
+          : false
+
+        if (!coordThrottled) {
+          notifs.push(...(coordinators || []).map((c: any) => ({
+            user_id: c.id,
+            title:   { en: '⚠️ Driver GPS not updating', id: '⚠️ GPS Driver Tidak Update' },
+            body: {
+              en: `${driverName} (${tx.name}) — GPS hasn't updated in ${staleText.en}. Please contact the driver to check on them.`,
+              id: `${driverName} (${tx.name}) — GPS tidak update selama ${staleText.id}. Segera hubungi driver untuk memastikan kondisinya.`,
+            },
+            type:    'gps_stale_warning_coord',
+            url:     '/coordinator/drivers',
+          })))
+        }
+
+        // ── Driver's own nag: throttled ~1 hour ──
+        const { data: lastDriverWarn } = await admin
+          .from('notifications')
+          .select('sent_at')
+          .eq('user_id', tx.driver_id)
+          .eq('type', 'gps_stale_warning')
+          .order('sent_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        const driverThrottled = lastDriverWarn
+          ? (now.getTime() - new Date(lastDriverWarn.sent_at).getTime()) / 60000 < GPS_WARN_THROTTLE_MIN
+          : false
+
+        if (!driverThrottled) {
+          notifs.push({
             user_id: tx.driver_id,
-            title:   '⚠️ Your GPS location is not updating',
-            body:    `Your location hasn't updated in ${staleText}. Please check location permissions and keep the app open.`,
+            title:   { en: '⚠️ Your GPS location is not updating', id: '⚠️ GPS Anda Tidak Update' },
+            body: {
+              en: `Your location hasn't updated in ${staleText.en}. Open the app now and make sure location permission is turned on.`,
+              id: `Lokasi Anda tidak update selama ${staleText.id}. Segera buka aplikasi dan pastikan izin lokasi (GPS) aktif.`,
+            },
             type:    'gps_stale_warning',
             url:     '/driver/home',
-          },
-          ...(coordinators || []).map((c: any) => ({
-            user_id: c.id,
-            title:   '⚠️ Driver GPS not updating',
-            body:    `${driverName} (${tx.name}) — GPS hasn't updated in ${staleText}.`,
-            type:    'gps_stale_warning',
-            url:     '/coordinator/drivers',
-          })),
-        ]
+          })
+        }
 
-        await notify(notifs)
-        results.gps_stale_warned++
+        if (notifs.length) {
+          await notify(notifs)
+          results.gps_stale_warned++
+        }
       }
+    }
+
+    // ── 8. SPECIAL (PARTIAL-DAY) DUTY WINDOW REMINDER ──────────────
+    // driver_day_assignments with a specific start_time/end_time (not a full-day
+    // duty) get a reminder to the assigned driver ~15 min before the window opens,
+    // so a special assignment doesn't get missed. Fires once per assignment per day.
+    const todayWita = new Date(now.getTime() + 8 * 3600000).toISOString().slice(0, 10)
+    const nowWitaDate = new Date(now.getTime() + 8 * 3600000)
+    const nowWitaMinutes = nowWitaDate.getUTCHours() * 60 + nowWitaDate.getUTCMinutes()
+
+    const { data: todaysDuties } = await admin
+      .from('driver_day_assignments')
+      .select('id, start_time, end_time, reason, taxis!taxi_id(name, driver_id, users!driver_id(name))')
+      .eq('assign_date', todayWita)
+      .not('start_time', 'is', null)
+
+    for (const duty of (todaysDuties || []) as any[]) {
+      const driverId = duty.taxis?.driver_id
+      if (!driverId || !duty.start_time) continue
+
+      const [h, m] = duty.start_time.split(':').map(Number)
+      const minsUntilStart = (h * 60 + m) - nowWitaMinutes
+      if (minsUntilStart < 12 || minsUntilStart > 18) continue // fire once, ~15 min before
+
+      const startClock = duty.start_time.slice(0, 5)
+      const endClock    = duty.end_time ? duty.end_time.slice(0, 5) : null
+
+      // Dedup: skip if this driver already got a reminder mentioning this exact start time today
+      const { count } = await admin
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', driverId)
+        .eq('type', 'duty_window_reminder')
+        .ilike('body', `%${startClock}%`)
+      if ((count || 0) > 0) continue
+
+      const timeRange = { en: endClock ? `${startClock}–${endClock}` : `${startClock}`, id: endClock ? `${startClock}–${endClock}` : `${startClock}` }
+      const reasonLine = { en: duty.reason ? `: ${duty.reason}` : '', id: duty.reason ? `: ${duty.reason}` : '' }
+
+      await notify({
+        user_id:    driverId,
+        booking_id: null,
+        title: { en: '⏰ Special duty starting soon', id: '⏰ Tugas Khusus Segera Dimulai' },
+        body: {
+          en: `Your special assignment starts at ${timeRange.en} today${reasonLine.en}. Please be ready.`,
+          id: `Tugas khusus Anda dimulai pukul ${timeRange.id} hari ini${reasonLine.id}. Segera bersiap sebelum jam tersebut.`,
+        },
+        type: 'duty_window_reminder',
+        url:  '/driver/home',
+      })
+      results.duty_window_reminded++
     }
 
     console.log('Cron results:', results)

@@ -139,28 +139,52 @@ export async function POST(request: NextRequest) {
   }
 
   const skippedCount = dates.length - created.length
-  const fmtLabel = (d: string) => new Date(d).toLocaleDateString('id-ID', {
+  const fmtLabel = (d: string, locale: string) => new Date(d).toLocaleDateString(locale, {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   })
 
-  const rangeLabel = dates.length === 1
-    ? fmtLabel(dates[0])
-    : `${fmtLabel(dates[0])} – ${fmtLabel(dates[dates.length - 1])} (${created.length} hari)`
+  const rangeLabel = {
+    en: dates.length === 1
+      ? fmtLabel(dates[0], 'en-GB')
+      : `${fmtLabel(dates[0], 'en-GB')} – ${fmtLabel(dates[dates.length - 1], 'en-GB')} (${created.length} days)`,
+    id: dates.length === 1
+      ? fmtLabel(dates[0], 'id-ID')
+      : `${fmtLabel(dates[0], 'id-ID')} – ${fmtLabel(dates[dates.length - 1], 'id-ID')} (${created.length} hari)`,
+  }
 
-  const timeLabel = start_time && end_time ? ` pukul ${start_time.slice(0, 5)}–${end_time.slice(0, 5)}` : ''
-  const dutyWord  = start_time && end_time ? 'tugas' : 'tugas penuh'
+  const timeLabel = {
+    en: start_time && end_time ? ` at ${start_time.slice(0, 5)}–${end_time.slice(0, 5)}` : '',
+    id: start_time && end_time ? ` pukul ${start_time.slice(0, 5)}–${end_time.slice(0, 5)}` : '',
+  }
+  const dutyWord = {
+    en: start_time && end_time ? 'duty' : 'full-day duty',
+    id: start_time && end_time ? 'tugas' : 'tugas penuh',
+  }
+  const reasonLine = {
+    en: reason ? `. Note: ${reason}` : '',
+    id: reason ? `. Keterangan: ${reason}` : '',
+  }
 
-  const notifs = []
+  const notifs: any[] = []
 
   // Notify driver
   if (taxi?.driver_id) {
-    const passengerLine = passengerName ? `. Penumpang: ${passengerName}` : ''
-    const skippedLine = skippedCount > 0 ? ` (${skippedCount} tanggal dilewati karena sudah ada tugas)` : ''
+    const passengerLine = {
+      en: passengerName ? `. Passenger: ${passengerName}` : '',
+      id: passengerName ? `. Penumpang: ${passengerName}` : '',
+    }
+    const skippedLine = {
+      en: skippedCount > 0 ? ` (${skippedCount} date(s) skipped — already assigned)` : '',
+      id: skippedCount > 0 ? ` (${skippedCount} tanggal dilewati karena sudah ada tugas)` : '',
+    }
     notifs.push({
       user_id:    taxi.driver_id,
       booking_id: null,
-      title:      'Tugas harian ditetapkan',
-      body:       `Anda dijadwalkan ${dutyWord} pada ${rangeLabel}${timeLabel}${skippedLine}${passengerLine}${reason ? `. Keterangan: ${reason}` : ''}.`,
+      title:      { en: 'Daily duty assigned', id: 'Tugas harian ditetapkan' },
+      body: {
+        en: `You are scheduled for ${dutyWord.en} on ${rangeLabel.en}${timeLabel.en}${skippedLine.en}${passengerLine.en}${reasonLine.en}.`,
+        id: `Anda dijadwalkan ${dutyWord.id} pada ${rangeLabel.id}${timeLabel.id}${skippedLine.id}${passengerLine.id}${reasonLine.id}.`,
+      },
       type:       'driver_day_assigned',
     })
   }
@@ -173,8 +197,11 @@ export async function POST(request: NextRequest) {
     notifs.push({
       user_id:    passenger_id,
       booking_id: null,
-      title:      'Anda dijadwalkan perjalanan',
-      body:       `Driver ${taxi?.name || 'telah'} ditugaskan untuk Anda pada ${rangeLabel}${timeLabel}${reason ? `. Keterangan: ${reason}` : ''}.`,
+      title:      { en: 'You have a scheduled trip', id: 'Anda dijadwalkan perjalanan' },
+      body: {
+        en: `Driver ${taxi?.name || ''} has been assigned for you on ${rangeLabel.en}${timeLabel.en}${reasonLine.en}.`,
+        id: `Driver ${taxi?.name || 'telah'} ditugaskan untuk Anda pada ${rangeLabel.id}${timeLabel.id}${reasonLine.id}.`,
+      },
       type:       'passenger_day_assigned',
       url:        passengerUrl,
     })

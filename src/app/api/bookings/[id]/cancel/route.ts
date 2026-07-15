@@ -19,6 +19,10 @@ export async function POST(
     const { reason } = await request.json()
     const bookingId  = params.id
 
+    if (!reason || !reason.trim()) {
+      return NextResponse.json({ error: 'A cancellation reason is required' }, { status: 400 })
+    }
+
     // Get booking
     const { data: booking } = await admin
       .from('bookings')
@@ -50,7 +54,7 @@ export async function POST(
     // Cancel booking
     await admin.from('bookings').update({
       status:           'cancelled',
-      rejection_reason: reason || null,
+      rejection_reason: reason.trim(),
     }).eq('id', bookingId)
 
     // Notify driver if already assigned
@@ -62,8 +66,11 @@ export async function POST(
       await notify({
         user_id:    driverId,
         booking_id: bookingId,
-        title:      'Booking cancelled',
-        body:       `Trip to ${booking.destination} has been cancelled${reason ? `: ${reason}` : ''}. You are now available.`,
+        title:      { en: 'Booking cancelled', id: 'Booking dibatalkan' },
+        body: {
+          en: `Trip to ${booking.destination} has been cancelled${reason ? `: ${reason}` : ''}. You are now available.`,
+          id: `Perjalanan ke ${booking.destination} telah dibatalkan${reason ? `: ${reason}` : ''}. Anda sekarang tersedia.`,
+        },
         type:       'booking_rejected',
       })
     }
@@ -72,7 +79,9 @@ export async function POST(
     const { data: coordinators } = await admin
       .from('users').select('id').eq('role', 'coordinator').eq('is_active', true)
 
-    const cancellerLabel = isCoordCreator ? 'Coordinator' : 'Staff'
+    const cancellerLabel = isCoordCreator
+      ? { en: 'Coordinator', id: 'Koordinator' }
+      : { en: 'Staff', id: 'Staf' }
 
     if (coordinators?.length) {
       const others = coordinators.filter((c: any) => c.id !== user.id)
@@ -81,8 +90,14 @@ export async function POST(
           others.map((c: any) => ({
             user_id:    c.id,
             booking_id: bookingId,
-            title:      `Booking cancelled by ${cancellerLabel}`,
-            body:       `${profile?.name} cancelled trip to ${booking.destination}${reason ? `: ${reason}` : ''}.${driverName ? ` ${taxiName} (${driverName}) is now free.` : ''}`,
+            title: {
+              en: `Booking cancelled by ${cancellerLabel.en}`,
+              id: `Booking dibatalkan oleh ${cancellerLabel.id}`,
+            },
+            body: {
+              en: `${profile?.name} cancelled trip to ${booking.destination}${reason ? `: ${reason}` : ''}.${driverName ? ` ${taxiName} (${driverName}) is now free.` : ''}`,
+              id: `${profile?.name} membatalkan perjalanan ke ${booking.destination}${reason ? `: ${reason}` : ''}.${driverName ? ` ${taxiName} (${driverName}) sekarang tersedia.` : ''}`,
+            },
             type:       'booking_rejected',
             url:        '/coordinator/home',
           }))
