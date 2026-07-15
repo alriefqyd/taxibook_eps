@@ -71,6 +71,14 @@ const MSG = {
     dropBadge:             '→ Drop',
     errorPrefix:           'Error: ',
     failed:                'Failed',
+    callPassenger:         'Call passenger',
+    whatsappPassenger:     'WhatsApp',
+    waMessage:             (code: string, pickup: string) => `Hi, I'm your driver for booking ${code}. I'm heading to pick you up at ${pickup}.`,
+    dutyToday:             'Duty Assignment Today',
+    dutyFullDay:           'Full-day duty — unavailable for passenger trips',
+    dutyTimeRange:         (start: string, end: string) => `Special duty ${start}–${end}`,
+    dutyReasonLabel:       'Reason',
+    dutyNote:              'Set by your coordinator — you will not be auto-assigned passenger trips during this window.',
   },
   id: {
     offline:              'Offline',
@@ -124,6 +132,14 @@ const MSG = {
     dropBadge:             '→ Antar',
     errorPrefix:           'Error: ',
     failed:                'Gagal',
+    callPassenger:         'Telepon penumpang',
+    whatsappPassenger:     'WhatsApp',
+    waMessage:             (code: string, pickup: string) => `Halo, saya driver untuk booking ${code}. Saya sedang menuju ke ${pickup} untuk menjemput Anda.`,
+    dutyToday:             'Tugas Hari Ini',
+    dutyFullDay:           'Tugas seharian — tidak tersedia untuk trip penumpang',
+    dutyTimeRange:         (start: string, end: string) => `Tugas khusus ${start}–${end}`,
+    dutyReasonLabel:       'Alasan',
+    dutyNote:              'Ditetapkan oleh koordinator Anda — Anda tidak akan menerima trip penumpang otomatis selama periode ini.',
   },
 }
 
@@ -131,6 +147,7 @@ interface DriverBooking {
   id:             string
   booking_code:   string
   passenger_name: string
+  passenger_phone: string | null
   pickup:         string
   destination:    string
   trip_type:      string
@@ -160,7 +177,7 @@ export default function DriverHomePage() {
   const [past,       setPast]       = useState<DriverBooking[]>([])
   const [activeTrip,  setActiveTrip]  = useState<DriverBooking | null>(null)
   const [myTaxi,        setMyTaxi]        = useState<any | null>(null)
-  const [dayAssignments, setDayAssignments] = useState<{ taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null }[]>([])
+  const [dayAssignments, setDayAssignments] = useState<{ taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null; reason?: string | null }[]>([])
   const [loading,    setLoading]    = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
   const [selected,   setSelected]   = useState<DriverBooking | null>(null)
@@ -175,6 +192,7 @@ export default function DriverHomePage() {
   const [unreadCount,  setUnreadCount]  = useState(0)
   const [menuOpen,   setMenuOpen]   = useState(false)
   const uidRef = React.useRef('')
+  const taxiIdRef = React.useRef<string | null>(null)
   const [toggling,   setToggling]   = useState(false)
   const [, setTick] = useState(0) // forces periodic re-render so the GPS-stale banner's elapsed time stays live
 
@@ -210,6 +228,14 @@ export default function DriverHomePage() {
     setToggling(false)
     setMenuOpen(false)
   }
+
+  const loadDayAssignments = useCallback(async (taxiId: string) => {
+    const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+    const { data } = await supabase.from('driver_day_assignments')
+      .select('taxi_id, assign_date, start_time, end_time, reason')
+      .eq('taxi_id', taxiId).gte('assign_date', witaToday)
+    setDayAssignments(data || [])
+  }, [supabase])
 
   const loadTrips = useCallback(async (userId: string) => {
     const { data: taxi } = await supabase
@@ -262,10 +288,8 @@ export default function DriverHomePage() {
         .from('taxis').select('*, users!driver_id(name)').eq('driver_id', au.id).single()
       if (taxi) {
         setMyTaxi({ ...taxi, driver_name: taxi.users?.name || p.name })
-        const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
-        supabase.from('driver_day_assignments').select('taxi_id, assign_date, start_time, end_time')
-          .eq('taxi_id', taxi.id).gte('assign_date', witaToday)
-          .then(({ data }) => setDayAssignments(data || []))
+        taxiIdRef.current = taxi.id
+        loadDayAssignments(taxi.id)
       }
       supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', au.id).eq('is_read', false).then(({ count }) => setUnreadCount(count || 0))
       setLoading(false)
@@ -281,6 +305,8 @@ export default function DriverHomePage() {
             .from('taxis').select('*, users!driver_id(name)').eq('driver_id', uidRef.current).single()
           if (taxi) setMyTaxi({ ...taxi, driver_name: taxi.users?.name || '' })
         })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_day_assignments' },
+        () => { if (taxiIdRef.current) loadDayAssignments(taxiIdRef.current) })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
@@ -321,6 +347,11 @@ export default function DriverHomePage() {
   const now        = new Date()
 
   const nextTrip   = upcoming[0] || null
+
+  // Coordinator-assigned duty for today (full-day or partial window) — gets the
+  // same "info card in Active" treatment as a regular now/scheduled booking.
+  const witaTodayStr = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+  const todayDuty  = dayAssignments.find(d => d.assign_date === witaTodayStr) || null
 
   const filterByDate = (list: DriverBooking[]) => list.filter(t => {
     if (!dateFrom && !dateTo) return true
@@ -464,7 +495,7 @@ export default function DriverHomePage() {
         <div style={{ display: 'flex' }}>
           {([
             { key: 'trips',    label: t.tabTrips },
-            { key: 'active',   label: t.tabActive, dot: !!activeTrip },
+            { key: 'active',   label: t.tabActive, dot: !!activeTrip || !!nextTrip || !!todayDuty },
             { key: 'calendar', label: t.tabCalendar },
           ] as { key: Tab; label: string; dot?: boolean }[]).map(({ key, label, dot }) => {
             const active = tab === key
@@ -489,6 +520,7 @@ export default function DriverHomePage() {
       {/* ── ACTIVE TAB ── */}
       {tab === 'active' && (
         <div style={{ padding: '16px 16px 100px' }}>
+          {todayDuty && <DutyAssignmentCard duty={todayDuty} />}
           {activeTrip ? (
             <ActiveTripCard
               trip={activeTrip}
@@ -496,22 +528,24 @@ export default function DriverHomePage() {
               onComplete={complete}
             />
           ) : nextTrip ? (
-            <div>
-              <div style={{ background: 'rgba(0,96,100,0.1)', border: '1px solid #93C5FD', borderRadius: 16, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16 }}>📋</span>
-                <p style={{ fontSize: 13, fontWeight: 600, color: '#006064', margin: 0 }}>
+            <div style={{ background: '#ffffff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+              <div style={{ background: 'rgba(0,96,100,0.1)', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 15 }}>📋</span>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#006064', margin: 0 }}>
                   {t.nextTripAt(format(new Date(nextTrip.scheduled_at), 'HH:mm'))}
                 </p>
               </div>
-              <TripDetailCard trip={nextTrip} processing={processing} onStart={startTrip} />
+              <div style={{ padding: '18px 16px' }}>
+                <TripDetailCard trip={nextTrip} processing={processing} onStart={startTrip} />
+              </div>
             </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '60px 20px', background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)' }}>
+          ) : !todayDuty ? (
+            <div style={{ textAlign: 'center', padding: '60px 20px', background: '#ffffff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.08)' }}>
               <p style={{ fontSize: 32, margin: '0 0 12px' }}>🟢</p>
               <p style={{ fontSize: 15, fontWeight: 700, color: '#006064', margin: '0 0 4px' }}>{t.youreFree}</p>
               <p style={{ fontSize: 13, color: '#6f7979', margin: 0 }}>{t.noActiveOrUpcoming}</p>
             </div>
-          )}
+          ) : null}
         </div>
       )}
 
@@ -551,6 +585,22 @@ export default function DriverHomePage() {
                 </p>
               </div>
               <span style={{ fontSize: 13, color: '#2D6A4F' }}>→</span>
+            </button>
+          )}
+
+          {/* Duty assignment mini banner */}
+          {todayDuty && (
+            <button
+              onClick={() => setTab('active')}
+              style={{ width: '100%', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 16, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>📋</span>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0 }}>
+                  {t.dutyToday}
+                </p>
+              </div>
+              <span style={{ fontSize: 13, color: '#92400E' }}>→</span>
             </button>
           )}
 
@@ -647,6 +697,34 @@ export default function DriverHomePage() {
   )
 }
 
+// ── Duty assignment card (coordinator-assigned full-day/special duty) ──
+function DutyAssignmentCard({ duty }: {
+  duty: { assign_date: string; start_time?: string | null; end_time?: string | null; reason?: string | null }
+}) {
+  const lang = useLang()
+  const t    = MSG[lang]
+  const isFullDay = !duty.start_time || !duty.end_time
+  return (
+    <div style={{ background: '#ffffff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden', marginBottom: 14 }}>
+      <div style={{ background: '#FEF3C7', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 15 }}>📋</span>
+        <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0 }}>{t.dutyToday}</p>
+      </div>
+      <div style={{ padding: '14px 16px' }}>
+        <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 6px', color: '#1a1c1b' }}>
+          {isFullDay ? t.dutyFullDay : t.dutyTimeRange(duty.start_time!.slice(0, 5), duty.end_time!.slice(0, 5))}
+        </p>
+        {duty.reason && (
+          <p style={{ fontSize: 12, color: '#6f7979', margin: '0 0 8px' }}>
+            <span style={{ fontWeight: 600 }}>{t.dutyReasonLabel}: </span>{duty.reason}
+          </p>
+        )}
+        <p style={{ fontSize: 11, color: '#9ca3af', margin: 0, lineHeight: 1.4 }}>{t.dutyNote}</p>
+      </div>
+    </div>
+  )
+}
+
 // ── Active trip card (prominent) ────────────────────────────
 function ActiveTripCard({ trip: b, processing, onComplete }: {
   trip: DriverBooking; processing: string | null; onComplete: (id: string) => void
@@ -677,6 +755,9 @@ function ActiveTripCard({ trip: b, processing, onComplete }: {
           </div>
           <TypeBadge type={b.trip_type} wait={b.wait_minutes} />
         </div>
+
+        {/* Contact passenger */}
+        <ContactPassengerButtons trip={b} />
 
         {/* Route */}
         <RouteBlock pickup={b.pickup} destination={b.destination} />
@@ -729,6 +810,8 @@ function TripDetailCard({ trip: b, processing, onStart, onComplete }: {
         </div>
         <TypeBadge type={b.trip_type} wait={b.wait_minutes} />
       </div>
+
+      <ContactPassengerButtons trip={b} />
 
       <RouteBlock pickup={b.pickup} destination={b.destination} />
 
@@ -864,4 +947,37 @@ function SLabel({ children }: { children: React.ReactNode }) {
       {children}
     </p>
   )
+}
+
+// ── Passenger contact buttons (call + WhatsApp) ──────────────
+function ContactPassengerButtons({ trip: b }: { trip: DriverBooking }) {
+  const lang = useLang()
+  const t    = MSG[lang]
+  if (!b.passenger_phone) return null
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+      <a
+        href={`tel:${b.passenger_phone}`}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '12px 8px', background: '#EFF6FF', color: '#0369A1', border: '1px solid #BAE6FD', borderRadius: 16, fontSize: 13, fontWeight: 700, textDecoration: 'none', boxSizing: 'border-box', fontFamily: FONT }}
+      >
+        {t.callPassenger}
+      </a>
+      <a
+        href={`https://wa.me/${toWaNumber(b.passenger_phone)}?text=${encodeURIComponent(t.waMessage(b.booking_code, b.pickup))}`}
+        target="_blank" rel="noopener noreferrer"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '12px 8px', background: '#25D366', color: '#fff', border: 'none', borderRadius: 16, fontSize: 13, fontWeight: 700, textDecoration: 'none', boxSizing: 'border-box', fontFamily: FONT }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/>
+        </svg>
+        {t.whatsappPassenger}
+      </a>
+    </div>
+  )
+}
+
+function toWaNumber(phone: string): string {
+  let n = phone.replace(/\D/g, '')
+  if (n.startsWith('0')) n = '62' + n.slice(1)
+  return n
 }

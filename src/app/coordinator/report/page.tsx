@@ -228,6 +228,11 @@ export default function CoordinatorReportPage() {
   const [search,        setSearch]        = useState('')
   const [exporting,     setExporting]     = useState(false)
 
+  // Full (unpaginated) rows for the current date range, used only for the summary
+  // stat tiles — `rows`/`filtered` below stay paginated (20 at a time) for the
+  // scrollable list, so stats must not be derived from that partial set.
+  const [statsRows, setStatsRows] = useState<ReportRow[]>([])
+
   const PAGE_SIZE = 20
 
   useEffect(() => {
@@ -250,7 +255,10 @@ export default function CoordinatorReportPage() {
         driver_name: taxi.users?.name ?? null,
       })))
 
-      await loadData(monthStart(), todayStr(), 0, false)
+      await Promise.all([
+        loadData(monthStart(), todayStr(), 0, false),
+        loadStats(monthStart(), todayStr()),
+      ])
       setLoading(false)
     }
     init()
@@ -273,11 +281,28 @@ export default function CoordinatorReportPage() {
     setHasMore(fetched.length === PAGE_SIZE)
   }
 
+  // Unpaginated fetch (up to 10 000 rows) for the current date range — feeds the
+  // summary stat tiles so they reflect the whole range, not just the 20 rows
+  // currently loaded into the scrollable list.
+  async function loadStats(from: string, to: string) {
+    const start = new Date(from); start.setHours(0, 0, 0, 0)
+    const end   = new Date(to);   end.setHours(23, 59, 59, 999)
+
+    const { data } = await supabase
+      .from('booking_details')
+      .select('id, booking_code, scheduled_at, completed_at, auto_complete_at, passenger_name, passenger_phone, driver_name, driver_phone, taxi_name, taxi_plate, taxi_color, taxi_id, pickup, destination, trip_type, wait_minutes, status, notes, rejection_reason, created_at, created_by')
+      .gte('scheduled_at', start.toISOString())
+      .lte('scheduled_at', end.toISOString())
+      .range(0, 9999)
+
+    setStatsRows(data || [])
+  }
+
   async function handleReassign() {
     if (!reassignRow || !reassignTaxiId) return
     setReassigning(true)
     await supabase.from('bookings').update({ taxi_id: reassignTaxiId }).eq('id', reassignRow.id)
-    await loadData(dateFrom, dateTo, page, false)
+    await Promise.all([loadData(dateFrom, dateTo, page, false), loadStats(dateFrom, dateTo)])
     setReassignRow(null)
     setReassignTaxiId('')
     setReassigning(false)
@@ -296,13 +321,15 @@ export default function CoordinatorReportPage() {
     setCancelRow(null)
     setCancelReason('')
     setSelectedRow(null)
-    await loadData(dateFrom, dateTo, 0, false)
+    await Promise.all([loadData(dateFrom, dateTo, 0, false), loadStats(dateFrom, dateTo)])
     setCancelling(false)
   }
 
   function setRange(from: string, to: string) {
     setPage(0)
-    setDateFrom(from); setDateTo(to); loadData(from, to, 0, false)
+    setDateFrom(from); setDateTo(to)
+    loadData(from, to, 0, false)
+    loadStats(from, to)
   }
   function thisWeekRange() {
     const d = new Date()
@@ -313,23 +340,16 @@ export default function CoordinatorReportPage() {
   async function handleExport() {
     setExporting(true)
     try {
-      const start = new Date(dateFrom); start.setHours(0, 0, 0, 0)
-      const end   = new Date(dateTo);   end.setHours(23, 59, 59, 999)
-      // Fetch all rows in range (up to 10 000) without pagination
-      const { data } = await supabase
-        .from('booking_details')
-        .select('id, booking_code, scheduled_at, completed_at, auto_complete_at, passenger_name, passenger_phone, driver_name, driver_phone, taxi_name, taxi_plate, taxi_color, taxi_id, pickup, destination, trip_type, wait_minutes, status, notes, rejection_reason, created_at, created_by')
-        .gte('scheduled_at', start.toISOString())
-        .lte('scheduled_at', end.toISOString())
-        .order('scheduled_at', { ascending: false })
-        .range(0, 9999)
-      exportBookingsExcel(data ?? [], dateFrom, dateTo)
+      // statsRows already holds every row in the current date range (unpaginated,
+      // kept fresh alongside the summary stats) — reuse it instead of re-fetching.
+      const sorted = [...statsRows].sort((a, b) => b.scheduled_at.localeCompare(a.scheduled_at))
+      exportBookingsExcel(sorted, dateFrom, dateTo)
     } finally {
       setExporting(false)
     }
   }
 
-  const filtered = rows.filter(r => {
+  function matchesFilters(r: ReportRow) {
     if (statusFilter !== 'all' && r.status !== statusFilter) return false
     if (taxiFilter !== 'all' && r.taxi_id !== taxiFilter) return false
     if (typeFilter !== 'all' && r.trip_type !== typeFilter) return false
@@ -340,14 +360,20 @@ export default function CoordinatorReportPage() {
       if (!hit) return false
     }
     return true
-  })
+  }
 
-  const total     = filtered.length
-  const completed = filtered.filter(r => r.status === 'completed').length
-  const cancelled = filtered.filter(r => ['cancelled', 'rejected'].includes(r.status)).length
-  const active    = filtered.filter(r => ['booked', 'on_trip', 'waiting_trip', 'submitted', 'pending_coordinator_approval'].includes(r.status)).length
+  // `filtered` (from the paginated `rows`) drives the visible list below.
+  // `filteredStats` (from the unpaginated `statsRows`) drives the summary tiles —
+  // these must stay separate or the tiles only reflect whatever page is loaded.
+  const filtered = rows.filter(matchesFilters)
+  const filteredStats = statsRows.filter(matchesFilters)
 
-  const completedRows = filtered.filter(r => r.status === 'completed' && r.completed_at)
+  const total     = filteredStats.length
+  const completed = filteredStats.filter(r => r.status === 'completed').length
+  const cancelled = filteredStats.filter(r => ['cancelled', 'rejected'].includes(r.status)).length
+  const active    = filteredStats.filter(r => ['booked', 'on_trip', 'waiting_trip', 'submitted', 'pending_coordinator_approval'].includes(r.status)).length
+
+  const completedRows = filteredStats.filter(r => r.status === 'completed' && r.completed_at)
   const avgMin = completedRows.length > 0
     ? Math.round(completedRows.reduce((s, r) => s + differenceInMinutes(new Date(r.completed_at!), new Date(r.scheduled_at)), 0) / completedRows.length)
     : null

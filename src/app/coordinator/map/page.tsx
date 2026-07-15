@@ -162,8 +162,10 @@ export default function CoordinatorMapPage() {
       if (data) setBookingExtra(data as BookingExtra)
     }
 
-    // Fetch full trip route for mini-map: driver position → pickup → destination
-    const bk = d.active_booking
+    // Fetch full trip route for mini-map: driver position → pickup → destination.
+    // Only once the trip has actually started (on_trip/waiting_trip) — a 'booked'
+    // (assigned, not yet started) trip has no route to show yet.
+    const bk = d.active_booking?.status !== 'booked' ? d.active_booking : null
     if (d.latitude && d.longitude && bk && bk.pickup_lat != null && bk.pickup_lng != null
         && bk.destination_lat != null && bk.destination_lng != null) {
       const [leg1, leg2] = await Promise.all([
@@ -318,6 +320,11 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
     ? { text: m.statusBooked,   bg: '#EDE9FE', color: '#7C3AED' }
     : { text: m.statusAvailable, bg: '#D1FAE5', color: '#059669' }
 
+  // Route/pickup/destination info only once the trip has actually started —
+  // 'booked' (assigned, not yet started) keeps the "Booked" status label above,
+  // but shows the same "no active trip" panel as a free driver until it starts.
+  const startedBk = bk && bk.status !== 'booked' ? bk : null
+
   return (
     <>
       {/* Backdrop */}
@@ -361,8 +368,8 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
             </div>
           </div>
 
-          {/* Trip info — only when on a trip */}
-          {bk ? (
+          {/* Trip info — only once the trip has actually started */}
+          {startedBk ? (
             <>
               <div style={{ background: `${d.color}0D`, border: `1px solid ${d.color}30`, borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}>
                 {/* Booking code */}
@@ -395,12 +402,12 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                       <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>🟢</span>
-                      <p style={{ fontSize: 12, fontWeight: 600, margin: 0 }}>{bk.pickup}</p>
+                      <p style={{ fontSize: 12, fontWeight: 600, margin: 0 }}>{startedBk.pickup}</p>
                     </div>
                     <div style={{ marginLeft: 10, width: 2, height: 10, background: `${d.color}40` }} />
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                       <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>📍</span>
-                      <p style={{ fontSize: 12, fontWeight: 700, margin: 0, color: d.color }}>{bk.destination}</p>
+                      <p style={{ fontSize: 12, fontWeight: 700, margin: 0, color: d.color }}>{startedBk.destination}</p>
                     </div>
                   </div>
                 </div>
@@ -412,13 +419,13 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
                   <DriverTripMiniMap
                     driverLat={d.latitude!}
                     driverLng={d.longitude!}
-                    pickupLat={bk.pickup_lat}
-                    pickupLng={bk.pickup_lng}
-                    destLat={bk.destination_lat}
-                    destLng={bk.destination_lng}
+                    pickupLat={startedBk.pickup_lat}
+                    pickupLng={startedBk.pickup_lng}
+                    destLat={startedBk.destination_lat}
+                    destLng={startedBk.destination_lng}
                     color={d.color}
                     route={miniRoute}
-                    status={bk.status}
+                    status={startedBk.status}
                   />
                 </div>
               )}

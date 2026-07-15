@@ -54,6 +54,28 @@ const MSG = {
     cancelled:    'Cancelled',
     rejected:     'Rejected',
     active:       'Active / Pending',
+    topUsers:     'Most Frequent Users',
+    topCancellers:'Most Frequent Cancellers',
+    peakHours:    'Busiest Hours',
+    hourLabel:    (h: number) => `${h.toString().padStart(2, '0')}:00`,
+    sectionDemand:      'Demand',
+    sectionReliability: 'Reliability',
+    sectionCapacity:    'Fleet Capacity',
+    sectionPeople:      'Users & Drivers',
+    vsPrevPeriod:  (pct: number) => `${pct >= 0 ? '+' : ''}${pct}% vs previous period`,
+    topDestinations: 'Top Destinations',
+    leadTime:      'Booking Lead Time',
+    leadNow:       'Right now (<10 min)',
+    lead1h:        '10 min – 1 hour ahead',
+    lead4h:        '1 – 4 hours ahead',
+    leadLong:      'More than 4 hours ahead',
+    tripTypeBreakdown: 'Trip Type',
+    dropType:      (n: number) => `Drop (one-way) — ${n}`,
+    waitType:      (n: number, avg: number) => `Waiting — ${n} (avg ${avg} min wait)`,
+    autoCancelled: 'Auto-cancelled (driver late)',
+    manualCancelled: 'Cancelled (by user/coordinator)',
+    capacityUsed:  'Capacity Used by Special/Full-Day Duty',
+    capacityDesc:  (pct: number) => `${pct}% of taxi-days in this range are blocked by driver duty assignments, unavailable for auto-assign.`,
   },
   id: {
     title:        'Analitik',
@@ -79,15 +101,40 @@ const MSG = {
     cancelled:    'Dibatalkan',
     rejected:     'Ditolak',
     active:       'Aktif / Menunggu',
+    topUsers:     'Pengguna Paling Sering',
+    topCancellers:'Paling Sering Membatalkan',
+    peakHours:    'Jam Tersibuk',
+    hourLabel:    (h: number) => `${h.toString().padStart(2, '0')}:00`,
+    sectionDemand:      'Permintaan',
+    sectionReliability: 'Keandalan',
+    sectionCapacity:    'Kapasitas Armada',
+    sectionPeople:      'Pengguna & Driver',
+    vsPrevPeriod:  (pct: number) => `${pct >= 0 ? '+' : ''}${pct}% vs periode sebelumnya`,
+    topDestinations: 'Tujuan Terpopuler',
+    leadTime:      'Jarak Waktu Booking',
+    leadNow:       'Sekarang (<10 menit)',
+    lead1h:        '10 menit – 1 jam sebelumnya',
+    lead4h:        '1 – 4 jam sebelumnya',
+    leadLong:      'Lebih dari 4 jam sebelumnya',
+    tripTypeBreakdown: 'Jenis Trip',
+    dropType:      (n: number) => `Antar (satu arah) — ${n}`,
+    waitType:      (n: number, avg: number) => `Menunggu — ${n} (rata-rata ${avg} menit)`,
+    autoCancelled: 'Otomatis dibatalkan (driver telat)',
+    manualCancelled: 'Dibatalkan (oleh user/koordinator)',
+    capacityUsed:  'Kapasitas Terpakai Tugas Khusus/Seharian',
+    capacityDesc:  (pct: number) => `${pct}% taksi-hari di rentang ini terpakai oleh tugas khusus driver, tidak tersedia untuk auto-assign.`,
   },
 }
 
 type RangeKey = '7' | '30' | '90'
 
 interface Row {
-  id: string; status: string; scheduled_at: string; completed_at: string | null
-  pickup: string; destination: string; driver_name: string | null
+  id: string; status: string; scheduled_at: string; completed_at: string | null; created_at: string
+  pickup: string; destination: string; driver_name: string | null; passenger_name: string | null
+  trip_type: string; wait_minutes: number | null; rejection_reason: string | null
 }
+
+const AUTO_CANCEL_REASON = 'Driver did not start trip within 15 minutes of the scheduled time'
 
 export default function CoordinatorAnalyticsPage() {
   const router   = useRouter()
@@ -98,6 +145,9 @@ export default function CoordinatorAnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [range,   setRange]   = useState<RangeKey>('30')
   const [rows,    setRows]    = useState<Row[]>([])
+  const [prevTotal, setPrevTotal] = useState<number | null>(null)
+  const [dutyTaxiDays, setDutyTaxiDays] = useState(0)
+  const [activeTaxiCount, setActiveTaxiCount] = useState(0)
   const [showTable, setShowTable] = useState(false)
   const [hoverIdx,  setHoverIdx]  = useState<number | null>(null)
 
@@ -118,12 +168,45 @@ export default function CoordinatorAnalyticsPage() {
       const days  = parseInt(range, 10)
       const start = subDays(new Date(), days - 1)
       start.setHours(0, 0, 0, 0)
-      const { data } = await supabase
-        .from('booking_details')
-        .select('id, status, scheduled_at, completed_at, pickup, destination, driver_name')
-        .gte('scheduled_at', start.toISOString())
-        .order('scheduled_at', { ascending: true })
+      const prevStart = subDays(start, days)
+
+      const [{ data }, { count: prevCount }, { data: duties }, { count: taxiCount }] = await Promise.all([
+        supabase
+          .from('booking_details')
+          .select('id, status, scheduled_at, completed_at, created_at, pickup, destination, driver_name, passenger_name, trip_type, wait_minutes, rejection_reason')
+          .gte('scheduled_at', start.toISOString())
+          .order('scheduled_at', { ascending: true }),
+        // Same-length window immediately before the current range, for growth comparison
+        supabase
+          .from('booking_details')
+          .select('id', { count: 'exact', head: true })
+          .gte('scheduled_at', prevStart.toISOString())
+          .lt('scheduled_at', start.toISOString()),
+        // Driver-day-assignments (full-day/special duty) inside the current range —
+        // used to show how much fleet capacity is consumed outside auto-assign
+        supabase
+          .from('driver_day_assignments')
+          .select('assign_date, start_time, end_time')
+          .gte('assign_date', format(start, 'yyyy-MM-dd'))
+          .lte('assign_date', format(new Date(), 'yyyy-MM-dd')),
+        supabase
+          .from('taxis')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_active', true),
+      ])
+
       setRows((data as any) || [])
+      setPrevTotal(prevCount ?? null)
+      setActiveTaxiCount(taxiCount || 0)
+
+      const taxiDays = (duties || []).reduce((sum: number, d: any) => {
+        if (!d.start_time || !d.end_time) return sum + 1 // full day
+        const [sh, sm] = d.start_time.split(':').map(Number)
+        const [eh, em] = d.end_time.split(':').map(Number)
+        const hours = (eh * 60 + em - (sh * 60 + sm)) / 60
+        return sum + Math.max(hours, 0) / 24
+      }, 0)
+      setDutyTaxiDays(taxiDays)
     }
     load()
   }, [range]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -177,19 +260,100 @@ export default function CoordinatorAnalyticsPage() {
     return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6)
   }, [rows])
 
+  const topUsers = useMemo(() => {
+    const map: Record<string, number> = {}
+    rows.filter(r => r.passenger_name).forEach(r => {
+      map[r.passenger_name!] = (map[r.passenger_name!] || 0) + 1
+    })
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6)
+  }, [rows])
+
+  const topCancellers = useMemo(() => {
+    const map: Record<string, number> = {}
+    rows.filter(r => r.status === 'cancelled' && r.passenger_name).forEach(r => {
+      map[r.passenger_name!] = (map[r.passenger_name!] || 0) + 1
+    })
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6)
+  }, [rows])
+
+  const peakHours = useMemo(() => {
+    const map: Record<number, number> = {}
+    rows.forEach(r => {
+      const h = new Date(r.scheduled_at).getHours()
+      map[h] = (map[h] || 0) + 1
+    })
+    return Object.entries(map)
+      .map(([h, c]) => [`${h.toString().padStart(2, '0')}:00`, c] as [string, number])
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+  }, [rows])
+
+  const topDestinations = useMemo(() => {
+    const map: Record<string, number> = {}
+    rows.forEach(r => { map[r.destination] = (map[r.destination] || 0) + 1 })
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6)
+  }, [rows])
+
+  const leadTime = useMemo(() => {
+    const buckets = { now: 0, h1: 0, h4: 0, long: 0 }
+    rows.forEach(r => {
+      const mins = differenceInMinutes(new Date(r.scheduled_at), new Date(r.created_at))
+      if (mins < 10) buckets.now++
+      else if (mins < 60) buckets.h1++
+      else if (mins < 240) buckets.h4++
+      else buckets.long++
+    })
+    return buckets
+  }, [rows])
+
+  const tripTypeStats = useMemo(() => {
+    const drop = rows.filter(r => r.trip_type === 'DROP').length
+    const waiting = rows.filter(r => r.trip_type === 'WAITING')
+    const avgWait = waiting.length
+      ? Math.round(waiting.reduce((s, r) => s + (r.wait_minutes || 0), 0) / waiting.length)
+      : 0
+    return { drop, waitingCount: waiting.length, avgWait }
+  }, [rows])
+
+  const cancelBreakdown = useMemo(() => {
+    const cancelledRows = rows.filter(r => r.status === 'cancelled')
+    const auto   = cancelledRows.filter(r => r.rejection_reason === AUTO_CANCEL_REASON).length
+    const manual = cancelledRows.length - auto
+    return { auto, manual }
+  }, [rows])
+
+  const growthPct = useMemo(() => {
+    if (prevTotal === null || prevTotal === 0) return null
+    return Math.round(((rows.length - prevTotal) / prevTotal) * 100)
+  }, [rows, prevTotal])
+
+  const capacityPct = useMemo(() => {
+    const days = parseInt(range, 10)
+    const totalTaxiDays = activeTaxiCount * days
+    if (totalTaxiDays === 0) return 0
+    return Math.round((dutyTaxiDays / totalTaxiDays) * 100)
+  }, [range, activeTaxiCount, dutyTaxiDays])
+
   if (loading) return <PageLoader />
 
   const maxTrend = Math.max(1, ...trend.map(d => d.count))
   const maxRoute = Math.max(1, ...topRoutes.map(([, c]) => c))
   const maxDriver = Math.max(1, ...topDrivers.map(([, c]) => c))
+  const maxUser = Math.max(1, ...topUsers.map(([, c]) => c))
+  const maxCanceller = Math.max(1, ...topCancellers.map(([, c]) => c))
+  const maxPeakHour = Math.max(1, ...peakHours.map(([, c]) => c))
 
   const statusRows = [
-    { label: t.completed, count: stats.completed, color: STATUS.good },
-    { label: t.active,    count: stats.active,    color: STATUS.warning },
-    { label: t.cancelled, count: stats.cancelled, color: STATUS.serious },
-    { label: t.rejected,  count: stats.rejected,  color: STATUS.critical },
+    { label: t.completed,      count: stats.completed,       color: STATUS.good },
+    { label: t.active,         count: stats.active,          color: STATUS.warning },
+    { label: t.autoCancelled,  count: cancelBreakdown.auto,   color: STATUS.critical },
+    { label: t.manualCancelled,count: cancelBreakdown.manual, color: STATUS.serious },
+    { label: t.rejected,       count: stats.rejected,         color: STATUS.critical },
   ]
   const maxStatus = Math.max(1, ...statusRows.map(s => s.count))
+
+  const maxDestination = Math.max(1, ...topDestinations.map(([, c]) => c))
+  const maxLeadTime = Math.max(1, leadTime.now, leadTime.h1, leadTime.h4, leadTime.long)
 
   return (
     <div style={{ fontFamily: "var(--font-inter), 'Inter', sans-serif", minHeight: '100vh', background: BG, WebkitFontSmoothing: 'antialiased' }}>
@@ -234,11 +398,13 @@ export default function CoordinatorAnalyticsPage() {
 
         {/* Stat tiles */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, marginBottom: 20 }}>
-          <StatTile label={t.totalTrips} value={stats.total.toLocaleString()} />
+          <StatTile label={t.totalTrips} value={stats.total.toLocaleString()} delta={growthPct !== null ? t.vsPrevPeriod(growthPct) : null} />
           <StatTile label={t.completionRate} value={`${stats.completionRate}%`} />
           <StatTile label={t.avgDuration} value={t.min(stats.avgDuration)} />
           <StatTile label={t.activePending} value={stats.active.toLocaleString()} />
         </div>
+
+        <SectionHeader title={t.sectionDemand} />
 
         {/* Trend line chart */}
         <ChartCard title={t.trend}>
@@ -277,17 +443,6 @@ export default function CoordinatorAnalyticsPage() {
           )}
         </ChartCard>
 
-        {/* Status breakdown — fixed status palette, icon+label never color alone */}
-        <ChartCard title={t.statusBreakdown}>
-          {stats.total === 0 ? <EmptyState text={t.noData} /> : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {statusRows.map(s => (
-                <HBarRow key={s.label} label={s.label} value={s.count} max={maxStatus} color={s.color} />
-              ))}
-            </div>
-          )}
-        </ChartCard>
-
         {/* Top routes */}
         <ChartCard title={t.topRoutes}>
           {topRoutes.length === 0 ? <EmptyState text={t.noData} /> : (
@@ -299,6 +454,95 @@ export default function CoordinatorAnalyticsPage() {
           )}
         </ChartCard>
 
+        {/* Top destinations (destination alone, not full route pairs) */}
+        <ChartCard title={t.topDestinations}>
+          {topDestinations.length === 0 ? <EmptyState text={t.noData} /> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {topDestinations.map(([dest, count]) => (
+                <HBarRow key={dest} label={dest} value={count} max={maxDestination} color={SEQ_400} />
+              ))}
+            </div>
+          )}
+        </ChartCard>
+
+        {/* Busiest hours */}
+        <ChartCard title={t.peakHours}>
+          {peakHours.length === 0 ? <EmptyState text={t.noData} /> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {peakHours.map(([hour, count]) => (
+                <HBarRow key={hour} label={hour} value={count} max={maxPeakHour} color={SEQ_400} />
+              ))}
+            </div>
+          )}
+        </ChartCard>
+
+        {/* Booking lead time — how far ahead people book */}
+        <ChartCard title={t.leadTime}>
+          {stats.total === 0 ? <EmptyState text={t.noData} /> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <HBarRow label={t.leadNow}  value={leadTime.now}  max={maxLeadTime} color={SEQ_400} total={stats.total} />
+              <HBarRow label={t.lead1h}   value={leadTime.h1}   max={maxLeadTime} color={SEQ_400} total={stats.total} />
+              <HBarRow label={t.lead4h}   value={leadTime.h4}   max={maxLeadTime} color={SEQ_400} total={stats.total} />
+              <HBarRow label={t.leadLong} value={leadTime.long} max={maxLeadTime} color={SEQ_400} total={stats.total} />
+            </div>
+          )}
+        </ChartCard>
+
+        {/* Trip type mix */}
+        <ChartCard title={t.tripTypeBreakdown}>
+          {stats.total === 0 ? <EmptyState text={t.noData} /> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <HBarRow
+                label={t.dropType(tripTypeStats.drop)}
+                value={tripTypeStats.drop}
+                max={Math.max(1, tripTypeStats.drop, tripTypeStats.waitingCount)}
+                color={SEQ_400}
+                total={stats.total}
+              />
+              <HBarRow
+                label={t.waitType(tripTypeStats.waitingCount, tripTypeStats.avgWait)}
+                value={tripTypeStats.waitingCount}
+                max={Math.max(1, tripTypeStats.drop, tripTypeStats.waitingCount)}
+                color={SEQ_400}
+                total={stats.total}
+              />
+            </div>
+          )}
+        </ChartCard>
+
+        <SectionHeader title={t.sectionReliability} />
+
+        {/* Status breakdown — fixed status palette, icon+label never color alone.
+            Cancelled is split into auto (driver failed to start) vs manual, since
+            those point to very different problems. */}
+        <ChartCard title={t.statusBreakdown}>
+          {stats.total === 0 ? <EmptyState text={t.noData} /> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {statusRows.map(s => (
+                <HBarRow key={s.label} label={s.label} value={s.count} max={maxStatus} color={s.color} total={stats.total} />
+              ))}
+            </div>
+          )}
+        </ChartCard>
+
+        <SectionHeader title={t.sectionCapacity} />
+
+        {/* Fleet capacity consumed by full-day/special duty assignments — these
+            taxis are unavailable for auto-assign for that window. */}
+        <ChartCard title={t.capacityUsed}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
+            <p style={{ fontSize: 28, fontWeight: 800, margin: 0, color: capacityPct > 30 ? STATUS.serious : INK, letterSpacing: '-0.5px' }}>
+              {capacityPct}%
+            </p>
+          </div>
+          <div style={{ height: 10, background: '#f0efec', borderRadius: 5, overflow: 'hidden', marginBottom: 10 }}>
+            <div style={{ height: '100%', width: `${Math.max(capacityPct, 2)}%`, background: capacityPct > 30 ? STATUS.serious : SEQ_400, borderRadius: 5 }} />
+          </div>
+          <p style={{ fontSize: 12, color: INK_MUT, margin: 0, lineHeight: 1.4 }}>{t.capacityDesc(capacityPct)}</p>
+        </ChartCard>
+
+        <SectionHeader title={t.sectionPeople} />
+
         {/* Top drivers */}
         <ChartCard title={t.topDrivers}>
           {topDrivers.length === 0 ? <EmptyState text={t.noData} /> : (
@@ -309,17 +553,51 @@ export default function CoordinatorAnalyticsPage() {
             </div>
           )}
         </ChartCard>
+
+        {/* Most frequent users */}
+        <ChartCard title={t.topUsers}>
+          {topUsers.length === 0 ? <EmptyState text={t.noData} /> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {topUsers.map(([name, count]) => (
+                <HBarRow key={name} label={name} value={count} max={maxUser} color={SEQ_400} />
+              ))}
+            </div>
+          )}
+        </ChartCard>
+
+        {/* Most frequent cancellers */}
+        <ChartCard title={t.topCancellers}>
+          {topCancellers.length === 0 ? <EmptyState text={t.noData} /> : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {topCancellers.map(([name, count]) => (
+                <HBarRow key={name} label={name} value={count} max={maxCanceller} color={STATUS.serious} />
+              ))}
+            </div>
+          )}
+        </ChartCard>
       </div>
     </div>
   )
 }
 
-function StatTile({ label, value }: { label: string; value: string }) {
+function StatTile({ label, value, delta }: { label: string; value: string; delta?: string | null }) {
+  const deltaUp = delta?.startsWith('+')
   return (
     <div style={{ background: SURF, border: `1px solid ${BORDER}`, borderRadius: 14, padding: '14px 14px' }}>
       <p style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: INK_MUT, margin: '0 0 6px' }}>{label}</p>
       <p style={{ fontSize: 22, fontWeight: 700, margin: 0, color: INK, letterSpacing: '-0.5px' }}>{value}</p>
+      {delta && (
+        <p style={{ fontSize: 10.5, fontWeight: 700, margin: '4px 0 0', color: deltaUp ? STATUS.good : STATUS.serious }}>{delta}</p>
+      )}
     </div>
+  )
+}
+
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <p style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: PRIMARY, margin: '4px 0 10px' }}>
+      {title}
+    </p>
   )
 }
 
@@ -338,13 +616,21 @@ function EmptyState({ text }: { text: string }) {
 
 // Ranked-magnitude horizontal bar: single sequential hue, 4px rounded tip,
 // value at the bar end (outside if it wouldn't fit inside).
-function HBarRow({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+// `total` is optional — pass it for part-of-whole composition data (status
+// breakdown, trip type, lead time) so the value shows "N (X%)" instead of a
+// bare count the reader would otherwise have to sum themselves. Omit it for
+// ranked "Top N" lists (routes, drivers, users, hours) where a bare count is
+// what you actually want to compare.
+function HBarRow({ label, value, max, color, total }: { label: string; value: number; max: number; color: string; total?: number }) {
   const pct = Math.max((value / max) * 100, 2)
+  const pctOfTotal = total && total > 0 ? Math.round((value / total) * 100) : null
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
         <span style={{ fontSize: 12.5, color: INK, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '75%' }}>{label}</span>
-        <span style={{ fontSize: 12.5, color: INK, fontWeight: 700, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{value}</span>
+        <span style={{ fontSize: 12.5, color: INK, fontWeight: 700, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+          {value}{pctOfTotal !== null ? ` (${pctOfTotal}%)` : ''}
+        </span>
       </div>
       <div style={{ height: 8, background: '#f0efec', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4 }} />

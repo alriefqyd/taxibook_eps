@@ -1,16 +1,24 @@
 import type { Coords } from './geocode'
 
-// Free OSRM-based duration (no API key needed) — for server-side auto_complete_at calculation
-export async function getRouteDurationSeconds(
+export interface RouteDurationInfo {
+  durationSec: number
+  distanceMeters: number
+}
+
+// Free OSRM-based duration + distance (no API key needed) — for server-side
+// auto_complete_at calculation and distance-based buffer time.
+export async function getRouteInfo(
   pickupLat: number, pickupLng: number,
   destLat: number, destLng: number
-): Promise<number | null> {
+): Promise<RouteDurationInfo | null> {
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/${pickupLng},${pickupLat};${destLng},${destLat}?overview=false`
     const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
     if (!res.ok) return null
     const data = await res.json()
-    return data.routes?.[0]?.duration ?? null
+    const route = data.routes?.[0]
+    if (!route) return null
+    return { durationSec: route.duration, distanceMeters: route.distance }
   } catch {
     return null
   }

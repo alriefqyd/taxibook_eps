@@ -158,7 +158,10 @@ export default function DriverFleetMap({ style }: Props) {
   // don't stack and hide each other — e.g. several taxis heading to the same office.
   const pinItems = positioned.flatMap(d => {
     const bk = d.active_booking
-    if (!bk) return []
+    // Only pin a pickup/destination once the driver has actually started the trip
+    // (on_trip / waiting_trip) — a merely 'booked' (assigned, not started) trip
+    // shouldn't show pins yet, nothing is actually happening on the ground.
+    if (!bk || bk.status === 'booked') return []
     const items: { id: string; lat: number; lng: number }[] = []
     if (bk.pickup_lat != null && bk.pickup_lng != null) {
       items.push({ id: `${d.id}-pickup`, lat: bk.pickup_lat, lng: bk.pickup_lng })
@@ -186,7 +189,9 @@ export default function DriverFleetMap({ style }: Props) {
 
         {positioned.map(d => {
           const stale    = !isGpsActive(d.location_updated_at)
-          const bk       = d.active_booking
+          // Pins and the trip info box below only apply once the trip is actually
+          // started — a 'booked' (assigned, not yet started) trip shows neither.
+          const bk       = d.active_booking?.status !== 'booked' ? d.active_booking : null
           const hasActiveBooking = bk != null
           const hasPickup = bk?.pickup_lat != null && bk?.pickup_lng != null
           const hasDest   = bk?.destination_lat != null && bk?.destination_lng != null
@@ -245,7 +250,7 @@ export default function DriverFleetMap({ style }: Props) {
                     {bk && (
                       <div style={{ background: `${d.color}12`, border: `1px solid ${d.color}30`, borderRadius: 6, padding: '5px 8px' }}>
                         <p style={{ margin: '0 0 3px', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: d.color }}>
-                          {bk.status === 'waiting_trip' ? '⏱ Waiting' : bk.status === 'booked' ? '🚕 Heading to pickup' : '→ On Trip'}
+                          {bk.status === 'waiting_trip' ? '⏱ Waiting' : '→ On Trip'}
                         </p>
                         <p style={{ margin: '0 0 2px', fontSize: 10, color: '#374151' }}>
                           <span style={{ color: '#6f7979' }}>From </span>{bk.pickup}

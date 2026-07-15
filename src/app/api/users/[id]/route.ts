@@ -15,6 +15,40 @@ async function verifyCoordinator(request: NextRequest) {
   return { error: null, status: 200, admin }
 }
 
+const ACTIVE_STATUSES = ['booked', 'on_trip', 'waiting_trip', 'submitted', 'pending_coordinator_approval']
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { error, status, admin } = await verifyCoordinator(request)
+    if (error || !admin) return NextResponse.json({ error }, { status })
+
+    const { data: rows, error: dbError } = await admin
+      .from('booking_details')
+      .select('id, booking_code, status, scheduled_at, completed_at, pickup, destination, driver_name, trip_type, rejection_reason')
+      .eq('passenger_id', params.id)
+      .order('scheduled_at', { ascending: false })
+      .limit(1000)
+
+    if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 })
+
+    const all = rows || []
+    const stats = {
+      total:     all.length,
+      completed: all.filter(r => r.status === 'completed').length,
+      cancelled: all.filter(r => r.status === 'cancelled').length,
+      rejected:  all.filter(r => r.status === 'rejected').length,
+      active:    all.filter(r => ACTIVE_STATUSES.includes(r.status)).length,
+    }
+
+    return NextResponse.json({ stats, trips: all.slice(0, 20) })
+  } catch {
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }

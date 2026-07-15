@@ -72,6 +72,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Recurring range cannot exceed ${MAX_RECURRING_DAYS} days` }, { status: 400 })
   }
 
+  // ── Block if this taxi already has an active booking overlapping the assignment window ──
+  // A full-day duty blocks the whole WITA day; a partial/special duty only blocks its own
+  // start_time–end_time range on that date.
+  for (const d of dates) {
+    const windowStart = start_time
+      ? new Date(`${d}T${start_time.slice(0, 5)}:00+08:00`)
+      : new Date(`${d}T00:00:00+08:00`)
+    const windowEnd = end_time
+      ? new Date(`${d}T${end_time.slice(0, 5)}:00+08:00`)
+      : new Date(new Date(`${d}T00:00:00+08:00`).getTime() + 24 * 3600000)
+
+    const { data: bookingConflict } = await admin
+      .from('bookings')
+      .select('id, booking_code, scheduled_at')
+      .eq('taxi_id', taxi_id)
+      .in('status', ['booked', 'on_trip', 'waiting_trip'])
+      .lt('scheduled_at', windowEnd.toISOString())
+      .gt('auto_complete_at', windowStart.toISOString())
+      .limit(1)
+      .maybeSingle()
+
+    if (bookingConflict) {
+      const time = new Date(bookingConflict.scheduled_at).toLocaleString('id-ID', {
+        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar',
+      })
+      return NextResponse.json(
+        { error: `This taxi already has a booking (${bookingConflict.booking_code}) at ${time} that overlaps this assignment window.` },
+        { status: 409 }
+      )
+    }
+  }
+
   const { data: taxi } = await admin
     .from('taxis')
     .select('driver_id, name')

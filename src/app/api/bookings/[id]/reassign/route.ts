@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notify } from '@/lib/notify'
+import { getDayAssignmentBlocks, isTaxiDayBlocked } from '@/lib/auto-assign'
 
 export async function POST(
   request: NextRequest,
@@ -43,6 +44,16 @@ export async function POST(
       .single()
 
     if (!newTaxi) return NextResponse.json({ error: 'Taxi not found' }, { status: 404 })
+
+    // Check for a driver_day_assignment (full-day or special/partial duty) blocking this taxi
+    const witaDate = new Date(new Date(booking.scheduled_at).getTime() + 8 * 3600000).toISOString().slice(0, 10)
+    const { fullDay, ranges } = await getDayAssignmentBlocks(admin, witaDate)
+    if (isTaxiDayBlocked(new_taxi_id, fullDay, ranges, new Date(booking.scheduled_at), new Date(booking.auto_complete_at))) {
+      return NextResponse.json(
+        { error: 'This taxi has a driver duty assignment that blocks this time — release the duty assignment first or choose another taxi.' },
+        { status: 409 }
+      )
+    }
 
     // Check for driver schedule overlap
     const { data: driverConflict } = await admin

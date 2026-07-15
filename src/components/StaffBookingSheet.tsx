@@ -247,7 +247,9 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
           </div>
         </div>
 
-        {['booked', 'on_trip', 'waiting_trip'].includes(booking.status) && booking.taxi_id && (
+        {/* Only once the driver has actually started the trip — a 'booked' (assigned,
+            not yet started) trip has no live position/route to show yet. */}
+        {['on_trip', 'waiting_trip'].includes(booking.status) && booking.taxi_id && (
           <TrackingMap
             taxiId={booking.taxi_id}
             taxiColor={booking.taxi_color || '#006064'}
@@ -348,8 +350,8 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
               </button>
               <button
                 onClick={handleCancel}
-                disabled={cancelling || !cancelReason.trim()}
-                style={{ padding: '12px', background: cancelling || !cancelReason.trim() ? '#c9a0a0' : '#991B1B', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: cancelling || !cancelReason.trim() ? 'not-allowed' : 'pointer' }}
+                disabled={cancelling}
+                style={{ padding: '12px', background: cancelling ? '#c9a0a0' : '#991B1B', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: cancelling ? 'not-allowed' : 'pointer' }}
               >
                 {cancelling ? t.cancelling : t.confirmCancel}
               </button>

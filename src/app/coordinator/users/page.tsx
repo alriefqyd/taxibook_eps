@@ -20,6 +20,17 @@ const MSG = {
     deactivate:     'Deactivate',
     activate:       'Activate',
     inactive:       'Inactive',
+    detail:         'Detail',
+    detailTitle:    'Trip Details',
+    totalTrips:     'Total Trips',
+    completed:      'Completed',
+    cancelled:      'Cancelled',
+    rejected:       'Rejected',
+    active:         'Active / Pending',
+    cancelRate:     'Cancellation Rate',
+    recentTrips:    'Recent Trips',
+    noTrips:        'No trips yet',
+    loadingDetail:  'Loading...',
     editTitle:      'Edit User',
     addTitle:       'Add New User',
     fieldName:      'Full Name',
@@ -48,6 +59,17 @@ const MSG = {
     deactivate:     'Nonaktifkan',
     activate:       'Aktifkan',
     inactive:       'Tidak Aktif',
+    detail:         'Detail',
+    detailTitle:    'Detail Perjalanan',
+    totalTrips:     'Total Trip',
+    completed:      'Selesai',
+    cancelled:      'Dibatalkan',
+    rejected:       'Ditolak',
+    active:         'Aktif / Menunggu',
+    cancelRate:     'Tingkat Pembatalan',
+    recentTrips:    'Trip Terbaru',
+    noTrips:        'Belum ada trip',
+    loadingDetail:  'Memuat...',
     editTitle:      'Edit Pengguna',
     addTitle:       'Tambah Pengguna Baru',
     fieldName:      'Nama Lengkap',
@@ -83,6 +105,36 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { name: '', email: '', password: '', role: 'staff', phone: '' }
 
+interface TripStats {
+  total: number
+  completed: number
+  cancelled: number
+  rejected: number
+  active: number
+}
+
+interface TripRow {
+  id: string
+  booking_code: string
+  status: string
+  scheduled_at: string
+  completed_at: string | null
+  pickup: string
+  destination: string
+  driver_name: string | null
+}
+
+const TRIP_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  completed:                    { bg: '#D1FAE5', text: '#065F46' },
+  cancelled:                    { bg: '#FEE2E2', text: '#991B1B' },
+  rejected:                     { bg: '#FEE2E2', text: '#991B1B' },
+  booked:                       { bg: '#DBEAFE', text: '#1E40AF' },
+  on_trip:                      { bg: '#DBEAFE', text: '#1E40AF' },
+  waiting_trip:                 { bg: '#FEF3C7', text: '#92400E' },
+  submitted:                    { bg: '#F1F5F9', text: '#64748b' },
+  pending_coordinator_approval: { bg: '#F1F5F9', text: '#64748b' },
+}
+
 export default function CoordinatorUsersPage() {
   const router   = useRouter()
   const supabase = createClient()
@@ -100,6 +152,11 @@ export default function CoordinatorUsersPage() {
   const [submitting,  setSubmitting]  = useState(false)
   const [error,       setError]       = useState('')
   const [success,     setSuccess]     = useState('')
+
+  const [detailUser,    setDetailUser]    = useState<User | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailStats,   setDetailStats]   = useState<TripStats | null>(null)
+  const [detailTrips,   setDetailTrips]   = useState<TripRow[]>([])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -184,6 +241,20 @@ export default function CoordinatorUsersPage() {
     setSubmitting(false)
   }
 
+  async function openDetail(u: User) {
+    setDetailUser(u)
+    setDetailLoading(true)
+    setDetailStats(null)
+    setDetailTrips([])
+    const res = await fetch(`/api/users/${u.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const json = await res.json()
+    setDetailStats(json.stats || null)
+    setDetailTrips(json.trips || [])
+    setDetailLoading(false)
+  }
+
   async function toggleActive(u: User) {
     await fetch(`/api/users/${u.id}`, {
       method: 'PATCH',
@@ -210,6 +281,7 @@ export default function CoordinatorUsersPage() {
 
   return (
     <div style={{ minHeight: '100dvh', background: '#F5F5F2', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
       {/* Header */}
       <div style={{
@@ -292,7 +364,6 @@ export default function CoordinatorUsersPage() {
       <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
-            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
             <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid rgba(0,96,100,0.15)', borderTop: '3px solid #006064', animation: 'spin 0.8s linear infinite' }} />
           </div>
         ) : filtered.length === 0 ? (
@@ -334,6 +405,16 @@ export default function CoordinatorUsersPage() {
               </div>
 
               <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginLeft: '8px' }}>
+                <button
+                  onClick={() => openDetail(u)}
+                  style={{
+                    padding: '6px 10px', fontSize: '12px', fontWeight: '600',
+                    border: '1.5px solid rgba(0,0,0,0.08)', borderRadius: '8px',
+                    background: 'white', color: '#374151', cursor: 'pointer',
+                  }}
+                >
+                  {t.detail}
+                </button>
                 <button
                   onClick={() => openEditModal(u)}
                   style={{
@@ -471,6 +552,114 @@ export default function CoordinatorUsersPage() {
           </div>
         </div>
       )}
+
+      {/* Detail popup — trip stats + recent trips for this user (as passenger) */}
+      {detailUser && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, zIndex: 1100,
+          background: 'rgba(0,0,0,0.4)', display: 'flex',
+          alignItems: 'flex-end', justifyContent: 'center',
+        }} onClick={e => { if (e.target === e.currentTarget) setDetailUser(null) }}>
+          <div style={{
+            background: 'white', borderRadius: '20px 20px 0 0',
+            width: '100%', maxWidth: '480px', maxHeight: '90dvh',
+            overflowY: 'auto', padding: '24px 20px 32px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1a1a1a' }}>{detailUser.name}</h2>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#9ca3af' }}>{t.detailTitle}</p>
+              </div>
+              <button onClick={() => setDetailUser(null)} style={{
+                background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px',
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            {detailLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', border: '3px solid rgba(0,96,100,0.15)', borderTop: '3px solid #006064', animation: 'spin 0.8s linear infinite' }} />
+              </div>
+            ) : detailStats && (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '8px', margin: '16px 0' }}>
+                  <StatTile label={t.totalTrips} value={detailStats.total} />
+                  <StatTile label={t.completed}  value={detailStats.completed} color="#065F46" />
+                  <StatTile label={t.cancelled}  value={detailStats.cancelled + detailStats.rejected} color="#991B1B" />
+                  <StatTile label={t.active}     value={detailStats.active} color="#1E40AF" />
+                </div>
+
+                {detailStats.total > 0 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: '#f9fafb', border: '1px solid rgba(0,0,0,0.06)',
+                    borderRadius: '10px', padding: '10px 14px', marginBottom: '16px',
+                  }}>
+                    <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>{t.cancelRate}</span>
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a1a' }}>
+                      {Math.round(((detailStats.cancelled + detailStats.rejected) / detailStats.total) * 100)}%
+                    </span>
+                  </div>
+                )}
+
+                <p style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#9ca3af', margin: '0 0 8px' }}>
+                  {t.recentTrips}
+                </p>
+
+                {detailTrips.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '24px', color: '#9ca3af', fontSize: '13px' }}>
+                    {t.noTrips}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {detailTrips.map(trip => {
+                      const sc = TRIP_STATUS_COLORS[trip.status] || { bg: '#F1F5F9', text: '#64748b' }
+                      return (
+                        <div key={trip.id} style={{
+                          border: '1px solid rgba(0,0,0,0.06)', borderRadius: '10px',
+                          padding: '10px 12px',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '11px', color: '#9ca3af', fontFamily: 'monospace' }}>{trip.booking_code}</span>
+                            <span style={{
+                              fontSize: '10px', fontWeight: '700', padding: '2px 7px',
+                              borderRadius: '20px', background: sc.bg, color: sc.text,
+                              textTransform: 'uppercase', letterSpacing: '0.04em',
+                            }}>
+                              {trip.status}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '12.5px', color: '#1a1a1a', fontWeight: '600', marginBottom: '2px' }}>
+                            {trip.pickup} → {trip.destination}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#9ca3af' }}>
+                            {new Date(trip.scheduled_at).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US', {
+                              day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                            })}
+                            {trip.driver_name && ` · ${trip.driver_name}`}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StatTile({ label, value, color }: { label: string; value: number; color?: string }) {
+  return (
+    <div style={{ background: '#f9fafb', border: '1px solid rgba(0,0,0,0.06)', borderRadius: '10px', padding: '10px 12px' }}>
+      <p style={{ margin: '0 0 4px', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9ca3af' }}>{label}</p>
+      <p style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: color || '#1a1a1a' }}>{value}</p>
     </div>
   )
 }

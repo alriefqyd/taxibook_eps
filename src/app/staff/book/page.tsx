@@ -54,6 +54,7 @@ const MSG = {
     errDest:        'Please pick a destination on the map',
     errDateTime:    'Please select date and time',
     errFuture:      'Booking time must be in the future.',
+    errRestTime:    'Booking is not available between 12:00–13:00 (lunch/prayer break). Please choose another time.',
     noTaxiAll:      'No taxis available. All drivers are off duty.',
     checkFailed:    'Failed to check availability.',
     backToSchedule: 'Back to schedule',
@@ -110,6 +111,7 @@ const MSG = {
     errDest:        'Pilih tujuan di peta',
     errDateTime:    'Pilih tanggal dan waktu',
     errFuture:      'Waktu booking harus di masa mendatang.',
+    errRestTime:    'Booking tidak tersedia antara jam 12:00–13:00 (istirahat/sholat). Silakan pilih waktu lain.',
     noTaxiAll:      'Tidak ada taksi tersedia. Semua driver sedang tidak bertugas.',
     checkFailed:    'Gagal memeriksa ketersediaan.',
     backToSchedule: 'Kembali ke jadwal',
@@ -277,11 +279,13 @@ export default function BookPage() {
     if (step === 1) {
       if (!pickupCoords) { setError(t.errPickup); return }
       if (!destCoords)   { setError(t.errDest); return }
+      if (form.mode === 'schedule' && !form.scheduled_at) { setError(t.errDateTime); return }
+      const checkDate = form.mode === 'now' ? new Date(Date.now() + 2 * 60000) : new Date(form.scheduled_at)
+      const checkWitaHour = new Date(checkDate.getTime() + 8 * 3600000).getUTCHours()
+      if (checkWitaHour === 12) { setError(t.errRestTime); return }
       if (form.mode === 'now') {
         const ok = await checkNowAvailability()
         if (!ok) return
-      } else {
-        if (!form.scheduled_at) { setError(t.errDateTime); return }
       }
     }
     setStep(prev => (prev + 1) as Step)

@@ -27,6 +27,11 @@ export interface DriverLocation {
   active_booking: ActiveBooking | null
 }
 
+// Includes 'booked' (assigned but not yet started) so status badges/labels can
+// still distinguish "booked" from "available" — but consumers must check
+// `active_booking.status` themselves before rendering pickup/destination pins,
+// since those should only appear once the driver has actually started the trip
+// (on_trip / waiting_trip), not while it's merely scheduled.
 const ACTIVE_STATUSES = ['on_trip', 'booked', 'waiting_trip']
 
 async function fetchActiveBookings(
