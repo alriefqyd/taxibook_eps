@@ -612,8 +612,10 @@ export default function CoordinatorHomePage() {
           </div>
         )}
 
-        {/* ── Issues — separate section from Approval; only surfaced inline when small (1–2), else use the tile/teaser above/below ── */}
-        {issueItems.length > 0 && issueItems.length <= 2 && (
+        {/* ── Issues — separate section from Approval. Always shown when there's at
+             least one problem; capped to the top 2 cards so the dashboard stays
+             compact, with a link to see the rest on /coordinator/issues. ── */}
+        {issueItems.length > 0 && (
           <div style={{ marginBottom: 16, paddingTop: pendingApproval.length > 0 ? 0 : 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#DC2626', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
@@ -623,7 +625,7 @@ export default function CoordinatorHomePage() {
                 {t.issues}
               </p>
             </div>
-            {issueItems.map(item => (
+            {issueItems.slice(0, 2).map(item => (
               <div
                 key={`${item.kind}-${item.id}`}
                 className="dashboard-issue-card"
@@ -665,6 +667,14 @@ export default function CoordinatorHomePage() {
                 )}
               </div>
             ))}
+            {issueItems.length > 2 && (
+              <button
+                onClick={() => router.push('/coordinator/issues')}
+                style={{ width: '100%', padding: '10px', background: 'transparent', border: '1px dashed rgba(220,38,38,0.35)', borderRadius: 12, fontSize: 12, fontWeight: 700, color: '#991B1B', cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                {lang === 'id' ? `Lihat ${issueItems.length - 2} masalah lainnya ›` : `View ${issueItems.length - 2} more issue${issueItems.length - 2 > 1 ? 's' : ''} ›`}
+              </button>
+            )}
           </div>
         )}
 

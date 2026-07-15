@@ -76,6 +76,8 @@ const MSG = {
     passengerLabel:           'Passenger',
     reasonLabel:               'Reason',
     closeLabel:               'Close',
+    callBtn:                  'Call',
+    whatsappBtn:              'WhatsApp',
     monthDayLetters:          ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
   },
   id: {
@@ -110,6 +112,8 @@ const MSG = {
     passengerLabel:           'Penumpang',
     reasonLabel:               'Keterangan',
     closeLabel:               'Tutup',
+    callBtn:                  'Telepon',
+    whatsappBtn:              'WhatsApp',
     monthDayLetters:          ['S', 'S', 'R', 'K', 'J', 'S', 'M'],
   },
 }
