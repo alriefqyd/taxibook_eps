@@ -732,6 +732,7 @@ export default function CoordinatorHomePage() {
             mapActive={view === 'map'}
             currentUserId={user?.id}
             onRefresh={loadData}
+            isCoordinator
           />
           {view === 'map' && (
             <div style={{ height: 'calc(100dvh - 260px - 72px)', minHeight: 300 }}>
