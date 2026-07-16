@@ -90,6 +90,10 @@ const MSG = {
     reasonOpt:       'Reason (optional)',
     reasonPlaceholder: 'e.g. Driver unavailable...',
     conflictWarning: 'Schedule conflict — driver will be notified',
+    conflictWithTrip: (name: string, time: string) => `Conflicts with ${name}'s trip at ${time}`,
+    swapHint:        'Swap trips instead — both drivers trade their assigned passenger, no one is double-booked.',
+    swapTrips:       'Swap Trips',
+    swapping:        'Swapping...',
     confirm:         'Confirm',
     saving:          'Saving...',
     release:         'Release',
@@ -172,6 +176,10 @@ const MSG = {
     reasonOpt:       'Alasan (opsional)',
     reasonPlaceholder: 'mis. Driver tidak tersedia...',
     conflictWarning: 'Konflik jadwal — driver akan diberitahu',
+    conflictWithTrip: (name: string, time: string) => `Bentrok dengan trip ${name} pukul ${time}`,
+    swapHint:        'Tukar trip saja — kedua driver saling bertukar penumpang, tidak ada yang bentrok.',
+    swapTrips:       'Tukar Trip',
+    swapping:        'Menukar...',
     confirm:         'Konfirmasi',
     saving:          'Menyimpan...',
     release:         'Lepas',
@@ -288,9 +296,10 @@ export default function DriversPage() {
   const [loading,      setLoading]      = useState(true)
   const [section,      setSection]      = useState<Section>('fleet')
   const [toggling,     setToggling]     = useState<string | null>(null)
-  const [expanded,     setExpanded]     = useState<string | null>(null)
+  const [detailTaxiId, setDetailTaxiId] = useState<string | null>(null)
   const [reassigning,  setReassigning]  = useState<Booking | null>(null)
   const [availability, setAvailability] = useState<Record<string, boolean>>({})
+  const [conflictBookings, setConflictBookings] = useState<Record<string, { id: string; booking_code: string; passenger_name: string; scheduled_at: string } | null>>({})
   const [newTaxiId,    setNewTaxiId]    = useState('')
   const [reason,       setReason]       = useState('')
   const [saving,       setSaving]       = useState(false)
@@ -404,17 +413,20 @@ export default function DriversPage() {
     setReason('')
     const scheduledTime = new Date(booking.scheduled_at)
     const avail: Record<string, boolean> = {}
+    const conflicts: Record<string, { id: string; booking_code: string; passenger_name: string; scheduled_at: string } | null> = {}
     for (const taxi of taxis) {
-      if (!taxi.driver_id || !taxi.is_available) { avail[taxi.id] = false; continue }
-      const { data: conflict } = await supabase.from('bookings').select('id')
+      if (!taxi.driver_id || !taxi.is_available) { avail[taxi.id] = false; conflicts[taxi.id] = null; continue }
+      const { data: conflict } = await supabase.from('booking_details').select('id, booking_code, passenger_name, scheduled_at')
         .eq('taxi_id', taxi.id).neq('id', booking.id)
         .in('status', ['booked','on_trip','waiting_trip','pending_driver_approval'])
         .gt('auto_complete_at', scheduledTime.toISOString())
         .lte('scheduled_at', new Date(scheduledTime.getTime() + 2 * 3600000).toISOString())
         .limit(1).maybeSingle()
       avail[taxi.id] = !conflict
+      conflicts[taxi.id] = conflict || null
     }
     setAvailability(avail)
+    setConflictBookings(conflicts)
   }
 
   async function confirmReassign() {
@@ -422,11 +434,21 @@ export default function DriversPage() {
     setSaving(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setSaving(false); return }
-    const res = await fetch(`/api/bookings/${reassigning.id}/reassign`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ new_taxi_id: newTaxiId, reason }),
-    })
+
+    // Picking a taxi that already has a conflicting trip switches this into a
+    // swap — trade the two trips between drivers instead of a plain reassign,
+    // which would otherwise just fail on the same conflict.
+    const conflictBooking = availability[newTaxiId] === false ? conflictBookings[newTaxiId] : null
+    const useSwap = !!conflictBooking
+
+    const res = await fetch(
+      useSwap ? `/api/bookings/${reassigning.id}/swap` : `/api/bookings/${reassigning.id}/reassign`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify(useSwap ? { swap_with_booking_id: conflictBooking!.id } : { new_taxi_id: newTaxiId, reason }),
+      }
+    )
     if (!res.ok) {
       const d = await res.json().catch(() => ({}))
       alert('Error: ' + (d.error || 'Failed to reassign'))
@@ -500,13 +522,16 @@ export default function DriversPage() {
   async function openAddDriver(taxi: TaxiRow) {
     setAddDriverTaxi(taxi)
     setSelectedDriver('')
-    const assignedDriverIds = taxis.filter(t => t.driver_id).map(t => t.driver_id)
+    // Filter out already-assigned drivers client-side rather than building a
+    // `.not('id', 'in', ...)` string — when no taxi has a driver yet that list
+    // is empty, producing a malformed `not.in.()` filter that Supabase rejects
+    // and silently returns zero drivers every time.
+    const assignedDriverIds = new Set(taxis.filter(t => t.driver_id).map(t => t.driver_id))
     const { data } = await supabase
       .from('users').select('id, name')
       .eq('role', 'driver').eq('is_active', true)
-      .not('id', 'in', `(${assignedDriverIds.join(',')})`)
       .order('name')
-    setDriverList(data || [])
+    setDriverList((data || []).filter((d: any) => !assignedDriverIds.has(d.id)))
   }
 
   async function confirmAddDriver() {
@@ -610,7 +635,6 @@ export default function DriversPage() {
           {taxis.map((taxi) => {
             const isOn       = taxi.is_available && !!taxi.driver_id
             const isActive   = !!taxi.active_booking
-            const isExpanded = expanded === taxi.id
             const isToggling = toggling === taxi.id
             const taxiBks    = bookings.filter(b => b.taxi_id === taxi.id)
             const taxiAssignments = dayAssignments[taxi.id] || []
@@ -626,8 +650,8 @@ export default function DriversPage() {
                 border: `1px solid ${hasAssignmentToday ? AMBER : isActive ? `${PRIMARY}40` : BORDER}`,
                 borderLeft: isActive ? `3px solid ${PRIMARY}` : hasAssignmentToday ? `3px solid ${AMBER}` : `1px solid ${BORDER}`,
               }}>
-                {/* Main row */}
-                <div onClick={() => setExpanded(isExpanded ? null : taxi.id)}
+                {/* Main row — tap to open detail card */}
+                <div onClick={() => setDetailTaxiId(taxi.id)}
                   style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
 
                   {/* Color circle */}
@@ -697,152 +721,226 @@ export default function DriversPage() {
                       <div style={{ width: 44, height: 24, borderRadius: 12, background: SURF_LOW, border: `1px dashed ${BORDER}` }} />
                     )}
 
-                    <div style={{ color: TEXT_MUT, transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>
+                    <div style={{ color: TEXT_MUT, transform: 'rotate(-90deg)' }}>
                       <IconChevron />
                     </div>
                   </div>
                 </div>
-
-                {/* Expanded drawer */}
-                {isExpanded && (
-                  <div style={{ borderTop: `1px solid ${BORDER}`, padding: '14px 16px 16px', background: SURF_LOW }}>
-
-                    {/* Stats */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 12 }}>
-                      {[
-                        { label: t.today,     value: taxi.trips_today },
-                        { label: t.scheduled, value: taxiBks.filter(b => b.status === 'booked').length },
-                      ].map(s => (
-                        <div key={s.label} style={{ background: SURF, borderRadius: 12, padding: '10px', textAlign: 'center', border: `1px solid ${BORDER}` }}>
-                          <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: TEXT_MUT, margin: '0 0 4px' }}>{s.label}</p>
-                          <p style={{ fontSize: 22, fontWeight: 700, margin: 0, color: PRIMARY, letterSpacing: '-0.5px' }}>{s.value}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Last location */}
-                    {taxi.driver_id && (
-                      <div style={{ background: SURF, borderRadius: 12, marginBottom: 10, border: `1px solid ${BORDER}`, overflow: 'hidden' }}>
-                        <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: stalenessColor(taxi.location_updated_at), flexShrink: 0 }} />
-                            <div style={{ minWidth: 0 }}>
-                              <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: TEXT_MUT, margin: '0 0 2px' }}>{t.lastLocation}</p>
-                              <p style={{ fontSize: 12, fontWeight: 600, color: TEXT, margin: 0 }}>
-                                {taxi.latitude && taxi.longitude
-                                  ? `${taxi.latitude.toFixed(5)}, ${taxi.longitude.toFixed(5)}`
-                                  : t.noGpsYet}
-                              </p>
-                            </div>
-                          </div>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: stalenessColor(taxi.location_updated_at), flexShrink: 0, whiteSpace: 'nowrap' }}>
-                            {relativeTime(taxi.location_updated_at)}
-                          </span>
-                        </div>
-                        {taxi.latitude && taxi.longitude && (
-                          <div style={{ height: 140, borderTop: `1px solid ${BORDER}` }}>
-                            <DriverLastLocationMap lat={taxi.latitude} lng={taxi.longitude} color={taxi.color} />
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Today's trips */}
-                    {taxiBks.length > 0 && (
-                      <div style={{ marginBottom: 10 }}>
-                        <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: TEXT_MUT, margin: '0 0 7px' }}>{t.todayTrips}</p>
-                        {taxiBks.map(b => {
-                          const sc = STATUS_CONFIG[b.status] || { bg: SURF_LOW, color: TEXT_MUT, label: b.status }
-                          const canReassign = !['completed','cancelled','rejected'].includes(b.status)
-                          return (
-                            <div key={b.id} style={{ background: SURF, borderRadius: 10, marginBottom: 5, border: `1px solid ${BORDER}`, overflow: 'hidden' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px' }}>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 2px', color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.passenger_name}</p>
-                                  <p style={{ fontSize: 11, color: TEXT_MUT, margin: 0 }}>{format(new Date(b.scheduled_at), 'HH:mm')} → {b.destination}</p>
-                                </div>
-                                <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 9999, background: sc.bg, color: sc.color, flexShrink: 0 }}>{sc.label}</span>
-                              </div>
-                              {canReassign && (
-                                <button
-                                  onClick={e => { e.stopPropagation(); openReassign(b) }}
-                                  style={{ width: '100%', padding: '7px 12px', background: `${PRIMARY}08`, borderTop: `1px solid ${BORDER}`, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, color: PRIMARY, fontFamily: FONT, fontSize: 12, fontWeight: 700 }}>
-                                  <IconShuffle /> {t.reassignTitle}
-                                </button>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-
-                    {/* Full Day Assignments */}
-                    <div style={{ borderTop: taxiBks.length > 0 ? `1px solid ${BORDER}` : 'none', paddingTop: taxiBks.length > 0 ? 12 : 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: TEXT_MUT, margin: 0 }}>{t.fullDayDuty}</p>
-                        {taxi.driver_id && (
-                          <button onClick={e => { e.stopPropagation(); openAssignFullDay(taxi) }}
-                            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, padding: '5px 11px', borderRadius: 8, background: AMBER, color: AMBER_T, border: 'none', cursor: 'pointer', fontFamily: FONT }}>
-                            <IconCalendarPlus /> {t.assignDay}
-                          </button>
-                        )}
-                      </div>
-                      {taxiAssignments.length > 0 ? (
-                        taxiAssignments.map(a => (
-                          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 11px', background: a.assign_date === witaTodayStr ? AMBER_BG : SURF, borderRadius: 10, marginBottom: 5, border: `1px solid ${a.assign_date === witaTodayStr ? AMBER : BORDER}` }}>
-                            <span style={{ fontSize: 13, color: AMBER_T }}>★</span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ fontSize: 12, fontWeight: 700, color: AMBER_T, margin: 0 }}>
-                                {format(new Date(a.assign_date + 'T12:00:00'), 'EEE, d MMM yyyy', { locale: idLocale })}
-                                {a.start_time && a.end_time && ` · ${a.start_time.slice(0, 5)}–${a.end_time.slice(0, 5)}`}
-                                {a.assign_date === witaTodayStr && (
-                                  <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: AMBER_T, background: AMBER, padding: '1px 6px', borderRadius: 4 }}>{t.today.toUpperCase()}</span>
-                                )}
-                              </p>
-                              {(a.passenger_id || a.passenger_name_other) && (
-                                <p style={{ fontSize: 11, color: AMBER_T, margin: '2px 0 0', fontWeight: 600 }}>
-                                  👤 {a.passenger_name_other || passengerList.find(p => p.id === a.passenger_id)?.name || '—'}
-                                </p>
-                              )}
-                              {a.reason && <p style={{ fontSize: 11, color: AMBER_T, margin: '2px 0 0', opacity: 0.8 }}>{a.reason}</p>}
-                            </div>
-                            <button onClick={e => { e.stopPropagation(); setPendingRelease(a) }}
-                              disabled={releasingId === a.id}
-                              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 7, background: `${OFFLINE}15`, color: OFFLINE, border: `1px solid ${OFFLINE}40`, cursor: releasingId === a.id ? 'not-allowed' : 'pointer', flexShrink: 0, fontFamily: FONT }}>
-                              <IconX /> {releasingId === a.id ? t.releasing : t.release}
-                            </button>
-                          </div>
-                        ))
-                      ) : (
-                        <p style={{ fontSize: 12, color: TEXT_MUT, margin: 0, padding: '4px 0' }}>{t.noUpcomingDuty}</p>
-                      )}
-                    </div>
-
-                    {/* Driver management */}
-                    <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 12, marginTop: 12 }}>
-                      {taxi.driver_id ? (
-                        <button
-                          onClick={e => { e.stopPropagation(); handleRemoveDriver(taxi) }}
-                          disabled={removingDriver === taxi.id}
-                          style={{ width: '100%', padding: '10px', fontSize: 12, fontWeight: 700, border: `1px solid ${OFFLINE}40`, borderRadius: 10, background: `${OFFLINE}10`, color: OFFLINE, cursor: removingDriver === taxi.id ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
-                          {removingDriver === taxi.id ? t.removing : `✕ ${t.removeDriver}`}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={e => { e.stopPropagation(); openAddDriver(taxi) }}
-                          style={{ width: '100%', padding: '10px', fontSize: 12, fontWeight: 700, border: `1px solid ${PRIMARY}40`, borderRadius: 10, background: `${PRIMARY}10`, color: PRIMARY, cursor: 'pointer', fontFamily: FONT }}>
-                          + {t.addDriver}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             )
           })}
         </div>
       )}
 
+      {/* ── Taxi detail card (popup) ── */}
+      {detailTaxiId && (() => {
+        const taxi = taxis.find(t => t.id === detailTaxiId)
+        if (!taxi) return null
+        const isOn       = taxi.is_available && !!taxi.driver_id
+        const isActive   = !!taxi.active_booking
+        const isToggling = toggling === taxi.id
+        const taxiBks    = bookings.filter(b => b.taxi_id === taxi.id)
+        const taxiAssignments = dayAssignments[taxi.id] || []
+        const hasAssignmentToday = taxiAssignments.some(a => a.assign_date === witaTodayStr)
+
+        return (
+          <div onClick={() => setDetailTaxiId(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1100, display: 'flex', alignItems: 'flex-end' }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: SURF, width: '100%', borderRadius: '20px 20px 0 0', maxHeight: 'calc(100dvh - 20px)', display: 'flex', flexDirection: 'column' }}>
+              {/* Handle */}
+              <div style={{ padding: '10px 20px 0', flexShrink: 0 }}>
+                <div style={{ width: 36, height: 4, borderRadius: 2, background: BORDER, margin: '0 auto 10px' }} />
+              </div>
+
+              {/* Header — identity + status + on/off toggle, all in one row */}
+              <div style={{ padding: '0 20px 12px', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: `${taxi.color}20`, border: `2px solid ${taxi.color}50`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                    <span style={{ width: 14, height: 14, borderRadius: '50%', background: taxi.color, display: 'inline-block' }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <p style={{ fontSize: 16, fontWeight: 700, margin: 0, color: TEXT, letterSpacing: '-0.2px' }}>{taxi.name}</p>
+                      {taxi.plate && (
+                        <span style={{ fontSize: 10, color: TEXT_MUT, background: SURF_LOW, padding: '2px 7px', borderRadius: 6, fontWeight: 600, border: `1px solid ${BORDER}` }}>{taxi.plate}</span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: 12, color: TEXT_MUT, margin: '2px 0 6px' }}>{taxi.driver_name || t.statusNoDriver}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      {hasAssignmentToday && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: AMBER_T, background: AMBER_BG, padding: '2px 8px', borderRadius: 9999, border: `1px solid ${AMBER}` }}>
+                          ★ {t.fullDayToday}
+                        </span>
+                      )}
+                      {isActive ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: ONLINE, background: `${ONLINE}15`, padding: '3px 8px', borderRadius: 9999 }}>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: ONLINE, display: 'inline-block', animation: 'pulse 1.5s infinite' }} />
+                          {taxi.active_booking!.status === 'waiting_trip' ? '⏱ ' : '→ '}{taxi.active_booking!.destination}
+                        </span>
+                      ) : taxi.next_booking ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: PRIMARY, background: `${PRIMARY}12`, padding: '3px 8px', borderRadius: 9999 }}>
+                          <IconClock /> {format(new Date(taxi.next_booking.scheduled_at), 'HH:mm')} → {taxi.next_booking.destination}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: isOn ? ONLINE : !taxi.driver_id ? TEXT_MUT : OFFLINE }}>
+                          {isOn ? `● ${t.free}` : !taxi.driver_id ? `— ${t.noDriver}` : `○ ${t.offline}`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {taxi.driver_id && (
+                    <div onClick={() => !isToggling && setPendingToggle(taxi)}
+                      style={{
+                        width: 44, height: 24, borderRadius: 12, flexShrink: 0, marginTop: 4,
+                        background: isToggling ? BORDER : isOn ? PRIMARY : BORDER,
+                        position: 'relative', cursor: isToggling ? 'not-allowed' : 'pointer',
+                        transition: 'background 0.2s',
+                      }}>
+                      <div style={{
+                        position: 'absolute', top: 2, left: isOn ? 22 : 2,
+                        width: 20, height: 20, borderRadius: '50%', background: SURF,
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.2)', transition: 'left 0.2s cubic-bezier(0.4,0,0.2,1)',
+                      }} />
+                    </div>
+                  )}
+                  <button onClick={() => setDetailTaxiId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: TEXT_MUT, padding: 4, flexShrink: 0 }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable body */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px' }}>
+
+                {/* Compact stat row + location, side by side on wide-enough screens, stacked tightly otherwise */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 10 }}>
+                  <div style={{ background: SURF_LOW, borderRadius: 12, padding: '8px 10px', textAlign: 'center', border: `1px solid ${BORDER}` }}>
+                    <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: TEXT_MUT, margin: '0 0 2px' }}>{t.today}</p>
+                    <p style={{ fontSize: 18, fontWeight: 700, margin: 0, color: PRIMARY, letterSpacing: '-0.5px' }}>{taxi.trips_today}</p>
+                  </div>
+                  <div style={{ background: SURF_LOW, borderRadius: 12, padding: '8px 10px', textAlign: 'center', border: `1px solid ${BORDER}` }}>
+                    <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: TEXT_MUT, margin: '0 0 2px' }}>{t.scheduled}</p>
+                    <p style={{ fontSize: 18, fontWeight: 700, margin: 0, color: PRIMARY, letterSpacing: '-0.5px' }}>{taxiBks.filter(b => b.status === 'booked').length}</p>
+                  </div>
+                </div>
+
+                {/* Last location — compact row + small map */}
+                {taxi.driver_id && (
+                  <div style={{ background: SURF_LOW, borderRadius: 12, marginBottom: 10, border: `1px solid ${BORDER}`, overflow: 'hidden' }}>
+                    <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: stalenessColor(taxi.location_updated_at), flexShrink: 0 }} />
+                        <p style={{ fontSize: 11, fontWeight: 600, color: TEXT, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {taxi.latitude && taxi.longitude
+                            ? `${taxi.latitude.toFixed(5)}, ${taxi.longitude.toFixed(5)}`
+                            : t.noGpsYet}
+                        </p>
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: stalenessColor(taxi.location_updated_at), flexShrink: 0, whiteSpace: 'nowrap' }}>
+                        {relativeTime(taxi.location_updated_at)}
+                      </span>
+                    </div>
+                    {taxi.latitude && taxi.longitude && (
+                      <div style={{ height: 110, borderTop: `1px solid ${BORDER}` }}>
+                        <DriverLastLocationMap lat={taxi.latitude} lng={taxi.longitude} color={taxi.color} />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Today's trips — compact single-line rows with inline reassign icon */}
+                {taxiBks.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: TEXT_MUT, margin: '0 0 6px' }}>{t.todayTrips}</p>
+                    {taxiBks.map(b => {
+                      const sc = STATUS_CONFIG[b.status] || { bg: SURF_LOW, color: TEXT_MUT, label: b.status }
+                      const canReassign = !['completed','cancelled','rejected','on_trip','waiting_trip'].includes(b.status)
+                      return (
+                        <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: SURF_LOW, borderRadius: 10, marginBottom: 5, border: `1px solid ${BORDER}`, padding: '7px 8px 7px 12px' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 12.5, fontWeight: 600, margin: 0, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.passenger_name}</p>
+                            <p style={{ fontSize: 10.5, color: TEXT_MUT, margin: 0 }}>{format(new Date(b.scheduled_at), 'HH:mm')} → {b.destination}</p>
+                          </div>
+                          <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius: 9999, background: sc.bg, color: sc.color, flexShrink: 0 }}>{sc.label}</span>
+                          {canReassign && (
+                            <button
+                              onClick={() => openReassign(b)}
+                              title={t.reassignTitle}
+                              style={{ width: 28, height: 28, borderRadius: 8, background: `${PRIMARY}12`, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: PRIMARY, flexShrink: 0 }}>
+                              <IconShuffle />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Full Day Duty — compact chips */}
+                <div style={{ borderTop: taxiBks.length > 0 ? `1px solid ${BORDER}` : 'none', paddingTop: taxiBks.length > 0 ? 10 : 0, marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: TEXT_MUT, margin: 0 }}>{t.fullDayDuty}</p>
+                    {taxi.driver_id && (
+                      <button onClick={() => openAssignFullDay(taxi)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, padding: '4px 9px', borderRadius: 8, background: AMBER, color: AMBER_T, border: 'none', cursor: 'pointer', fontFamily: FONT }}>
+                        <IconCalendarPlus /> {t.assignDay}
+                      </button>
+                    )}
+                  </div>
+                  {taxiAssignments.length > 0 ? (
+                    taxiAssignments.map(a => (
+                      <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 8px 7px 10px', background: a.assign_date === witaTodayStr ? AMBER_BG : SURF_LOW, borderRadius: 10, marginBottom: 5, border: `1px solid ${a.assign_date === witaTodayStr ? AMBER : BORDER}` }}>
+                        <span style={{ fontSize: 12, color: AMBER_T, flexShrink: 0 }}>★</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 11.5, fontWeight: 700, color: AMBER_T, margin: 0 }}>
+                            {format(new Date(a.assign_date + 'T12:00:00'), 'd MMM', { locale: idLocale })}
+                            {a.start_time && a.end_time && ` · ${a.start_time.slice(0, 5)}–${a.end_time.slice(0, 5)}`}
+                            {a.assign_date === witaTodayStr && (
+                              <span style={{ marginLeft: 5, fontSize: 9, fontWeight: 700, color: AMBER_T, background: AMBER, padding: '1px 5px', borderRadius: 4 }}>{t.today.toUpperCase()}</span>
+                            )}
+                          </p>
+                          {(a.passenger_id || a.passenger_name_other || a.reason) && (
+                            <p style={{ fontSize: 10.5, color: AMBER_T, margin: '1px 0 0', opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {[
+                                (a.passenger_name_other || passengerList.find(p => p.id === a.passenger_id)?.name) && `👤 ${a.passenger_name_other || passengerList.find(p => p.id === a.passenger_id)?.name}`,
+                                a.reason,
+                              ].filter(Boolean).join(' · ')}
+                            </p>
+                          )}
+                        </div>
+                        <button onClick={() => setPendingRelease(a)}
+                          disabled={releasingId === a.id}
+                          style={{ width: 26, height: 26, borderRadius: 7, background: `${OFFLINE}12`, color: OFFLINE, border: `1px solid ${OFFLINE}40`, cursor: releasingId === a.id ? 'not-allowed' : 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <IconX />
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <p style={{ fontSize: 11.5, color: TEXT_MUT, margin: 0, padding: '2px 0' }}>{t.noUpcomingDuty}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Sticky footer — driver management */}
+              <div style={{ padding: '10px 16px 24px', borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
+                {taxi.driver_id ? (
+                  <button
+                    onClick={() => handleRemoveDriver(taxi)}
+                    disabled={removingDriver === taxi.id}
+                    style={{ width: '100%', padding: '10px', fontSize: 12, fontWeight: 700, border: `1px solid ${OFFLINE}40`, borderRadius: 10, background: `${OFFLINE}10`, color: OFFLINE, cursor: removingDriver === taxi.id ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
+                    {removingDriver === taxi.id ? t.removing : `✕ ${t.removeDriver}`}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => openAddDriver(taxi)}
+                    style={{ width: '100%', padding: '10px', fontSize: 12, fontWeight: 700, border: `1px solid ${PRIMARY}40`, borderRadius: 10, background: `${PRIMARY}10`, color: PRIMARY, cursor: 'pointer', fontFamily: FONT }}>
+                    + {t.addDriver}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
       {/* ── SCHEDULE TAB ── */}
       {section === 'schedule' && (
         <div style={{ padding: '16px 16px 100px' }}>
@@ -892,7 +990,7 @@ export default function DriversPage() {
                 </div>
                 {taxiBks.map(b => {
                   const sc = STATUS_CONFIG[b.status] || { bg: SURF_LOW, color: TEXT_MUT, label: b.status }
-                  const canReassign = !['completed','cancelled','rejected'].includes(b.status)
+                  const canReassign = !['completed','cancelled','rejected','on_trip','waiting_trip'].includes(b.status)
                   return (
                     <div key={b.id} style={{ background: SURF, borderRadius: 12, padding: '12px 14px', marginBottom: 6, borderLeft: `3px solid ${taxi.color}`, boxShadow: CARD_SH, border: `1px solid ${BORDER}`, borderLeftColor: taxi.color, borderLeftWidth: 3 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 5 }}>
@@ -955,9 +1053,9 @@ export default function DriversPage() {
 
       {/* ── Assign Full Day sheet ── */}
       {assigningTaxi && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
           onClick={() => setAssigningTaxi(null)}>
-          <div style={{ background: SURF, width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', maxHeight: '80vh', overflowY: 'auto' }}
+          <div style={{ background: SURF, width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', maxHeight: 'calc(100dvh - 20px)', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: BORDER, margin: '0 auto 20px' }} />
 
@@ -1089,9 +1187,9 @@ export default function DriversPage() {
 
       {/* ── Add Driver sheet ── */}
       {addDriverTaxi && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
           onClick={() => setAddDriverTaxi(null)}>
-          <div style={{ background: SURF, width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', maxHeight: '80vh', overflowY: 'auto' }}
+          <div style={{ background: SURF, width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', maxHeight: 'calc(100dvh - 20px)', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: BORDER, margin: '0 auto 20px' }} />
 
@@ -1135,6 +1233,7 @@ export default function DriversPage() {
         const conflictTaxis = withDriver.filter(tx => tx.is_available && !availability[tx.id])
         const offlineTaxis  = withDriver.filter(tx => !tx.is_available)
         const hasConflict   = newTaxiId ? availability[newTaxiId] === false && taxis.find(tx => tx.id === newTaxiId)?.is_available : false
+        const conflictBooking = hasConflict ? conflictBookings[newTaxiId] : null
 
         const TaxiOption = ({ taxi }: { taxi: TaxiRow }) => {
           const isSelected = newTaxiId === taxi.id
@@ -1174,9 +1273,9 @@ export default function DriversPage() {
         }
 
         return (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
             onClick={() => setReassigning(null)}>
-            <div style={{ background: SURF, width: '100%', borderRadius: '20px 20px 0 0', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
+            <div style={{ background: SURF, width: '100%', borderRadius: '20px 20px 0 0', maxHeight: 'calc(100dvh - 20px)', display: 'flex', flexDirection: 'column' }}
               onClick={e => e.stopPropagation()}>
 
               {/* Handle */}
@@ -1228,7 +1327,14 @@ export default function DriversPage() {
 
                 {hasConflict && (
                   <div style={{ background: `${AMBER}18`, border: `1px solid ${AMBER}`, borderRadius: 12, padding: '10px 14px', margin: '8px 0' }}>
-                    <p style={{ fontSize: 12, fontWeight: 600, color: AMBER_T, margin: 0 }}>⚠ {t.conflictWarning}</p>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: AMBER_T, margin: 0 }}>
+                      ⚠ {conflictBooking
+                        ? t.conflictWithTrip(conflictBooking.passenger_name, format(new Date(conflictBooking.scheduled_at), 'HH:mm'))
+                        : t.conflictWarning}
+                    </p>
+                    {conflictBooking && (
+                      <p style={{ fontSize: 11, color: AMBER_T, margin: '4px 0 0', opacity: 0.85 }}>{t.swapHint}</p>
+                    )}
                   </div>
                 )}
 
@@ -1247,7 +1353,7 @@ export default function DriversPage() {
                 </button>
                 <button onClick={confirmReassign} disabled={!newTaxiId || saving || newTaxiId === reassigning.taxi_id}
                   style={{ padding: '13px', background: (!newTaxiId || saving || newTaxiId === reassigning.taxi_id) ? BORDER : PRIMARY, color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: (!newTaxiId || saving || newTaxiId === reassigning.taxi_id) ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
-                  {saving ? t.saving : t.confirm}
+                  {conflictBooking ? (saving ? t.swapping : t.swapTrips) : (saving ? t.saving : t.confirm)}
                 </button>
               </div>
             </div>

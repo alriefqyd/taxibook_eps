@@ -460,7 +460,7 @@ export default function RegisteredLocationsPage() {
       {/* Name dialog — after Add picker */}
       {pendingPin && !addPickerOpen && (
         <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, zIndex: 9998,
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998,
           background: 'rgba(0,0,0,0.5)',
           display: 'flex', alignItems: 'flex-end',
         }}>
@@ -515,7 +515,7 @@ export default function RegisteredLocationsPage() {
       {/* Edit dialog */}
       {editLoc && !editPickerOpen && (
         <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, zIndex: 9998,
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998,
           background: 'rgba(0,0,0,0.5)',
           display: 'flex', alignItems: 'flex-end',
         }}>
@@ -589,7 +589,7 @@ export default function RegisteredLocationsPage() {
       {/* Delete confirmation */}
       {deleteId && (
         <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, zIndex: 9998,
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9998,
           background: 'rgba(0,0,0,0.5)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: '0 24px',

@@ -328,11 +328,11 @@ function TripDetailSheet({ driver: d, bookingExtra, miniRoute, onClose }: {
   return (
     <>
       {/* Backdrop */}
-      <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.4)', zIndex: 1100 }} />
+      <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1100 }} />
 
       {/* Sheet */}
       <div style={{
-        position: 'fixed', bottom: 72, left: 0, right: 0, zIndex: 1101,
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1101,
         background: '#fff', borderRadius: '20px 20px 0 0',
         maxHeight: '80vh', overflowY: 'auto',
         boxShadow: '0 -4px 24px rgba(0,0,0,0.18)',

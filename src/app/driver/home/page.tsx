@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import type { User } from '@/types'
-import GanttCalendar from '@/components/GanttCalendar'
+import GanttCalendar, { type DayAssignment } from '@/components/GanttCalendar'
 import { useGpsReporting } from '@/hooks/useGpsReporting'
 import OnboardingTour from '@/components/OnboardingTour'
 import PageLoader from '@/components/PageLoader'
@@ -74,11 +74,18 @@ const MSG = {
     callPassenger:         'Call passenger',
     whatsappPassenger:     'WhatsApp',
     waMessage:             (code: string, pickup: string) => `Hi, I'm your driver for booking ${code}. I'm heading to pick you up at ${pickup}.`,
+    navigateToPickup:      'Navigate to pickup',
+    navigateToDestination: 'Navigate to destination',
     dutyToday:             'Duty Assignment Today',
     dutyFullDay:           'Full-day duty — unavailable for passenger trips',
     dutyTimeRange:         (start: string, end: string) => `Special duty ${start}–${end}`,
     dutyReasonLabel:       'Reason',
     dutyNote:              'Set by your coordinator — you will not be auto-assigned passenger trips during this window.',
+    dutyDateLabel:         'Date',
+    dutyTimeLabel:         'Time',
+    dutyFullDayValue:      'Full day',
+    dutyTaxiLabel:         'Taxi',
+    dutyPassengerLabel:    'Passenger',
   },
   id: {
     offline:              'Offline',
@@ -135,11 +142,18 @@ const MSG = {
     callPassenger:         'Telepon penumpang',
     whatsappPassenger:     'WhatsApp',
     waMessage:             (code: string, pickup: string) => `Halo, saya driver untuk booking ${code}. Saya sedang menuju ke ${pickup} untuk menjemput Anda.`,
+    navigateToPickup:      'Navigasi ke lokasi jemput',
+    navigateToDestination: 'Navigasi ke tujuan',
     dutyToday:             'Tugas Hari Ini',
     dutyFullDay:           'Tugas seharian — tidak tersedia untuk trip penumpang',
     dutyTimeRange:         (start: string, end: string) => `Tugas khusus ${start}–${end}`,
     dutyReasonLabel:       'Alasan',
     dutyNote:              'Ditetapkan oleh koordinator Anda — Anda tidak akan menerima trip penumpang otomatis selama periode ini.',
+    dutyDateLabel:         'Tanggal',
+    dutyTimeLabel:         'Waktu',
+    dutyFullDayValue:      'Seharian',
+    dutyTaxiLabel:         'Taksi',
+    dutyPassengerLabel:    'Penumpang',
   },
 }
 
@@ -177,7 +191,7 @@ export default function DriverHomePage() {
   const [past,       setPast]       = useState<DriverBooking[]>([])
   const [activeTrip,  setActiveTrip]  = useState<DriverBooking | null>(null)
   const [myTaxi,        setMyTaxi]        = useState<any | null>(null)
-  const [dayAssignments, setDayAssignments] = useState<{ taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null; reason?: string | null }[]>([])
+  const [dayAssignments, setDayAssignments] = useState<DayAssignment[]>([])
   const [loading,    setLoading]    = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
   const [selected,   setSelected]   = useState<DriverBooking | null>(null)
@@ -232,9 +246,28 @@ export default function DriverHomePage() {
   const loadDayAssignments = useCallback(async (taxiId: string) => {
     const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
     const { data } = await supabase.from('driver_day_assignments')
-      .select('taxi_id, assign_date, start_time, end_time, reason')
+      .select('taxi_id, assign_date, start_time, end_time, reason, passenger_id, passenger_name_other, taxis(name, plate, users!driver_id(name))')
       .eq('taxi_id', taxiId).gte('assign_date', witaToday)
-    setDayAssignments(data || [])
+
+    const rows = data || []
+    const passengerIds = Array.from(new Set(rows.filter((a: any) => a.passenger_id).map((a: any) => a.passenger_id as string)))
+    let passengerNames: Record<string, string> = {}
+    if (passengerIds.length > 0) {
+      const { data: pUsers } = await supabase.from('users').select('id, name').in('id', passengerIds)
+      if (pUsers) pUsers.forEach((u: any) => { passengerNames[u.id] = u.name })
+    }
+
+    setDayAssignments(rows.map((a: any) => ({
+      taxi_id:        a.taxi_id,
+      assign_date:    a.assign_date,
+      start_time:     a.start_time ?? null,
+      end_time:       a.end_time ?? null,
+      reason:         a.reason ?? null,
+      taxi_name:      a.taxis?.name ?? null,
+      taxi_plate:     a.taxis?.plate ?? null,
+      driver_name:    a.taxis?.users?.name ?? null,
+      passenger_name: a.passenger_id ? (passengerNames[a.passenger_id] ?? null) : (a.passenger_name_other ?? null),
+    })))
   }, [supabase])
 
   const loadTrips = useCallback(async (userId: string) => {
@@ -308,7 +341,24 @@ export default function DriverHomePage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_day_assignments' },
         () => { if (taxiIdRef.current) loadDayAssignments(taxiIdRef.current) })
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+
+    // Mobile browsers commonly suspend the realtime websocket while the app is
+    // backgrounded and don't reliably resume delivering missed events — force
+    // a refresh whenever the tab/app becomes visible or regains focus again,
+    // so data doesn't go stale until the driver manually reloads.
+    const refreshOnReturn = () => {
+      if (document.visibilityState !== 'visible' || !uidRef.current) return
+      loadTrips(uidRef.current)
+      if (taxiIdRef.current) loadDayAssignments(taxiIdRef.current)
+    }
+    document.addEventListener('visibilitychange', refreshOnReturn)
+    window.addEventListener('focus', refreshOnReturn)
+
+    return () => {
+      supabase.removeChannel(ch)
+      document.removeEventListener('visibilitychange', refreshOnReturn)
+      window.removeEventListener('focus', refreshOnReturn)
+    }
   }, [])
 
   async function getToken() {
@@ -406,10 +456,6 @@ export default function DriverHomePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0, lineHeight: 1 }}>
               <span style={{ fontSize: 16, fontWeight: 800, color: '#006064', letterSpacing: '-0.3px' }}>Ridr</span>
               <span style={{ fontSize: 9, color: '#9ca3af', fontWeight: 500, marginTop: 2 }}>PT Vale Indonesia</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 2 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: myTaxi?.is_available === false ? '#ba1a1a' : '#344500', display: 'inline-block' }} />
-              <span style={{ fontSize: 10, color: '#6f7979', fontWeight: 500 }}>{myTaxi?.is_available === false ? t.offline : t.onDuty}</span>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -681,11 +727,11 @@ export default function DriverHomePage() {
       {/* ── Trip detail sheet ── */}
       {selected && (
         <div
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
           onClick={() => setSelected(null)}
         >
           <div
-            style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px', maxHeight: '85vh', overflowY: 'auto' }}
+            style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px', maxHeight: 'calc(100dvh - 20px)', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.08)', margin: '0 auto 20px' }} />
@@ -698,12 +744,21 @@ export default function DriverHomePage() {
 }
 
 // ── Duty assignment card (coordinator-assigned full-day/special duty) ──
-function DutyAssignmentCard({ duty }: {
-  duty: { assign_date: string; start_time?: string | null; end_time?: string | null; reason?: string | null }
-}) {
+function DutyAssignmentCard({ duty }: { duty: DayAssignment }) {
   const lang = useLang()
   const t    = MSG[lang]
   const isFullDay = !duty.start_time || !duty.end_time
+  const dateLabel = format(new Date(duty.assign_date + 'T00:00:00'), 'EEE, d MMM yyyy', { locale: idLocale })
+  const timeValue = isFullDay ? t.dutyFullDayValue : `${duty.start_time!.slice(0, 5)}–${duty.end_time!.slice(0, 5)}`
+
+  const rows = [
+    { l: t.dutyDateLabel, v: dateLabel },
+    { l: t.dutyTimeLabel, v: timeValue },
+    ...(duty.taxi_name ? [{ l: t.dutyTaxiLabel, v: `${duty.taxi_name}${duty.taxi_plate ? ` · ${duty.taxi_plate}` : ''}` }] : []),
+    ...(duty.passenger_name ? [{ l: t.dutyPassengerLabel, v: duty.passenger_name }] : []),
+    ...(duty.reason ? [{ l: t.dutyReasonLabel, v: duty.reason }] : []),
+  ]
+
   return (
     <div style={{ background: '#ffffff', borderRadius: 18, border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden', marginBottom: 14 }}>
       <div style={{ background: '#FEF3C7', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -711,14 +766,19 @@ function DutyAssignmentCard({ duty }: {
         <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0 }}>{t.dutyToday}</p>
       </div>
       <div style={{ padding: '14px 16px' }}>
-        <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 6px', color: '#1a1c1b' }}>
+        <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px', color: '#1a1c1b' }}>
           {isFullDay ? t.dutyFullDay : t.dutyTimeRange(duty.start_time!.slice(0, 5), duty.end_time!.slice(0, 5))}
         </p>
-        {duty.reason && (
-          <p style={{ fontSize: 12, color: '#6f7979', margin: '0 0 8px' }}>
-            <span style={{ fontWeight: 600 }}>{t.dutyReasonLabel}: </span>{duty.reason}
-          </p>
-        )}
+
+        <div style={{ background: '#F5F5F2', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 16, overflow: 'hidden', marginBottom: 12 }}>
+          {rows.map((r, i) => (
+            <div key={r.l} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: i < rows.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
+              <span style={{ fontSize: 12, color: '#6f7979' }}>{r.l}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, textAlign: 'right', maxWidth: '60%' }}>{r.v}</span>
+            </div>
+          ))}
+        </div>
+
         <p style={{ fontSize: 11, color: '#9ca3af', margin: 0, lineHeight: 1.4 }}>{t.dutyNote}</p>
       </div>
     </div>
@@ -761,6 +821,8 @@ function ActiveTripCard({ trip: b, processing, onComplete }: {
 
         {/* Route */}
         <RouteBlock pickup={b.pickup} destination={b.destination} />
+
+        <NavigateButton lat={b.destination_lat} lng={b.destination_lng} address={b.destination} label={t.navigateToDestination} />
 
         {b.notes && (
           <div style={{ background: '#ffdeac', border: '1px solid #FDE68A', borderRadius: 10, padding: '8px 12px', margin: '12px 0' }}>
@@ -814,6 +876,12 @@ function TripDetailCard({ trip: b, processing, onStart, onComplete }: {
       <ContactPassengerButtons trip={b} />
 
       <RouteBlock pickup={b.pickup} destination={b.destination} />
+
+      {b.status === 'booked' ? (
+        <NavigateButton lat={b.pickup_lat} lng={b.pickup_lng} address={b.pickup} label={t.navigateToPickup} />
+      ) : ['on_trip', 'waiting_trip'].includes(b.status) ? (
+        <NavigateButton lat={b.destination_lat} lng={b.destination_lng} address={b.destination} label={t.navigateToDestination} />
+      ) : null}
 
       <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 16, overflow: 'hidden', margin: '12px 0' }}>
         {[
@@ -980,4 +1048,21 @@ function toWaNumber(phone: string): string {
   let n = phone.replace(/\D/g, '')
   if (n.startsWith('0')) n = '62' + n.slice(1)
   return n
+}
+
+// ── One-tap turn-by-turn navigation (opens Google Maps app or web) ──
+function NavigateButton({ lat, lng, address, label }: {
+  lat: number | null; lng: number | null; address: string; label: string
+}) {
+  const dest = lat != null && lng != null ? `${lat},${lng}` : encodeURIComponent(address)
+  const href = `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`
+  return (
+    <a
+      href={href}
+      target="_blank" rel="noopener noreferrer"
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '12px 8px', background: '#EFF6FF', color: '#0369A1', border: '1px solid #BAE6FD', borderRadius: 16, fontSize: 13, fontWeight: 700, textDecoration: 'none', boxSizing: 'border-box', fontFamily: FONT, marginTop: 10 }}
+    >
+      🧭 {label}
+    </a>
+  )
 }

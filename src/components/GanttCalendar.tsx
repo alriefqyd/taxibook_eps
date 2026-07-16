@@ -318,8 +318,15 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAssi
                 const left   = (startH - HOUR_START) * HOUR_W
                 const width  = Math.max((endH - startH) * HOUR_W, 4)
                 return (
-                  <div onClick={() => onSelectDayAssignment(fullDayAssignment)} style={{ position: 'absolute', left, width, top: 0, bottom: 0, background: 'rgba(254,243,199,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderTop: '2px solid #FCD34D', borderBottom: '2px solid #FCD34D', cursor: 'pointer', overflow: 'hidden' }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, color: '#92400E', letterSpacing: '0.05em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 4px' }}>
+                  <div onClick={() => onSelectDayAssignment(fullDayAssignment)} style={{
+                    position: 'absolute', left, width, top: 4, bottom: 4,
+                    background: 'repeating-linear-gradient(135deg, rgba(254,179,0,0.14) 0px, rgba(254,179,0,0.14) 7px, rgba(254,179,0,0.26) 7px, rgba(254,179,0,0.26) 14px)',
+                    border: '1.5px solid #FCD34D', borderLeft: '4px solid #F59E0B', borderRadius: 8,
+                    display: 'flex', alignItems: 'center', gap: 5, zIndex: 4, cursor: 'pointer', overflow: 'hidden', padding: '0 8px',
+                    boxShadow: '0 1px 3px rgba(146,64,14,0.12)',
+                  }}>
+                    <span style={{ fontSize: 11, flexShrink: 0 }}>📋</span>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: '#92400E', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {hasRange
                         ? t.fullDayRangeTapDetail(fullDayAssignment.start_time!.slice(0, 5), fullDayAssignment.end_time!.slice(0, 5))
                         : t.fullDayDutyTapDetail}
@@ -437,8 +444,13 @@ function WeekGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, dayAss
                       const isAssigned = dayAssignments.some(a => a.taxi_id === taxi.id && a.assign_date === format(d, 'yyyy-MM-dd'))
                       if (!isAssigned) return null
                       return (
-                        <div key={d.toISOString()} style={{ position: 'absolute', left: i * DAY_W + 1, top: 0, width: DAY_W - 2, bottom: 0, background: 'rgba(254,243,199,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, borderLeft: '2px solid #FCD34D', borderRight: '1px solid #FCD34D' }}>
-                          <span style={{ fontSize: 8, fontWeight: 800, color: '#92400E', letterSpacing: '0.04em', writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap' }}>{t.fullDayVertical}</span>
+                        <div key={d.toISOString()} style={{
+                          position: 'absolute', left: i * DAY_W + 2, top: 4, width: DAY_W - 4, bottom: 4,
+                          background: 'repeating-linear-gradient(135deg, rgba(254,179,0,0.14) 0px, rgba(254,179,0,0.14) 7px, rgba(254,179,0,0.26) 7px, rgba(254,179,0,0.26) 14px)',
+                          border: '1.5px solid #FCD34D', borderTop: '4px solid #F59E0B', borderRadius: 8,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4, overflow: 'hidden',
+                        }}>
+                          <span style={{ fontSize: 8, fontWeight: 800, color: '#92400E', letterSpacing: '0.04em', writingMode: 'vertical-rl', transform: 'rotate(180deg)', whiteSpace: 'nowrap' }}>★ {t.fullDayVertical}</span>
                         </div>
                       )
                     })}
@@ -695,7 +707,7 @@ function GanttLegend() {
 }
 
 // ── Day assignment detail bottom sheet ─────────────────────
-function DayAssignmentSheet({ assignment: a, onClose }: { assignment: DayAssignment; onClose: () => void }) {
+export function DayAssignmentSheet({ assignment: a, onClose }: { assignment: DayAssignment; onClose: () => void }) {
   const lang = useLang()
   const t    = MSG[lang]
   const dateLocale = lang === 'id' ? idLocale : undefined
@@ -709,17 +721,20 @@ function DayAssignmentSheet({ assignment: a, onClose }: { assignment: DayAssignm
 
   return createPortal(
     <>
-      <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.45)', zIndex: 1100 }} />
-      <div style={{ position: 'fixed', bottom: 74, left: 0, right: 0, zIndex: 1101, background: '#fff', borderRadius: '20px 20px 0 0', padding: '20px 20px 32px', maxHeight: '80vh', overflowY: 'auto' }}>
+      <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1100 }} />
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1101, background: '#fff', borderRadius: '20px 20px 0 0', padding: '20px 20px 32px', maxHeight: '80vh', overflowY: 'auto' }}>
         {/* Handle */}
         <div style={{ width: 36, height: 4, borderRadius: 9999, background: 'rgba(0,0,0,0.12)', margin: '0 auto 16px' }} />
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0, letterSpacing: '0.04em' }}>★ {a.start_time && a.end_time ? t.partialDayDuty : t.fullDayDutyCaps}</p>
-          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9999, background: '#FEF3C7', color: '#92400E' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 8 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#92400E', margin: 0, letterSpacing: '0.04em', flex: 1, minWidth: 0 }}>★ {a.start_time && a.end_time ? t.partialDayDuty : t.fullDayDutyCaps}</p>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9999, background: '#FEF3C7', color: '#92400E', flexShrink: 0 }}>
             {a.start_time && a.end_time ? `${a.start_time.slice(0, 5)}–${a.end_time.slice(0, 5)}` : t.fullDayBadgeText}
           </span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4, flexShrink: 0, display: 'flex' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
 
         {/* Date */}
@@ -769,9 +784,6 @@ function DayAssignmentSheet({ assignment: a, onClose }: { assignment: DayAssignm
           </div>
         )}
 
-        <button onClick={onClose} style={{ width: '100%', padding: '13px', background: '#92400E', color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 8 }}>
-          {t.closeLabel}
-        </button>
       </div>
     </>,
     document.body

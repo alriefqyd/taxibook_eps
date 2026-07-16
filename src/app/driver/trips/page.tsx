@@ -469,11 +469,11 @@ export default function DriverTripsPage() {
       {selectedTrip && (
         <div
           onClick={() => setSelectedTrip(null)}
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '20px 20px 40px', maxHeight: '90vh', overflowY: 'auto' }}
+            style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '20px 20px 40px', maxHeight: 'calc(100dvh - 20px)', overflowY: 'auto' }}
           >
             {/* Handle */}
             <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.08)', margin: '0 auto 20px' }} />

@@ -784,7 +784,7 @@ export default function CoordinatorHomePage() {
 
       {/* Reject modal */}
       {rejectId && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }}>
           <style>{`@keyframes card-spin { to { transform: rotate(360deg) } }`}</style>
           <div style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 14px' }}>{t.rejectBooking}</h2>
@@ -817,7 +817,7 @@ export default function CoordinatorHomePage() {
 
       {/* Cancel confirmation modal */}
       {cancelConfirmId && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1200 }}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1200 }}
           onClick={() => !cancellingModal && setCancelConfirmId(null)}>
           <div onClick={e => e.stopPropagation()}
             style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', boxSizing: 'border-box' }}>
@@ -904,6 +904,10 @@ function BookingCard({ booking: b, isProcessing, processingAction, onApprove, on
   const sc = STATUS_COLORS[b.status]
   const needsApproval = b.status === 'pending_coordinator_approval'
   const canCancel = !!onCancel && ['submitted', 'pending_coordinator_approval', 'booked'].includes(b.status)
+  // Once a driver has actually picked up (on_trip) or is waiting with the
+  // passenger (waiting_trip), swapping the taxi mid-ride doesn't make sense —
+  // the passenger is physically in that vehicle already.
+  const canReassign = !!onReassign && !['completed', 'cancelled', 'rejected', 'on_trip', 'waiting_trip'].includes(b.status)
   const hasContact = b.driver_phone || b.passenger_phone
 
   return (
@@ -975,15 +979,15 @@ function BookingCard({ booking: b, isProcessing, processingAction, onApprove, on
           </div>
         </>
       )}
-      {!needsApproval && !['completed','cancelled','rejected'].includes(b.status) && (onReassign || canCancel) && (
+      {!needsApproval && (canReassign || canCancel) && (
         <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-          {onReassign && (
+          {canReassign && (
             <button onClick={onReassign} style={{ flex: 1, padding: '7px', background: '#F5F5F2', color: '#6f7979', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
               {t.reassign}
             </button>
           )}
           {canCancel && (
-            <button onClick={onCancel} disabled={isProcessing} style={{ flex: onReassign ? '0 0 auto' : 1, padding: '7px 12px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={onCancel} disabled={isProcessing} style={{ flex: canReassign ? '0 0 auto' : 1, padding: '7px 12px', background: '#ffdad6', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
               {t.cancel}
             </button>
           )}

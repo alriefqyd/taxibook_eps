@@ -36,3 +36,20 @@ CREATE POLICY "Authenticated users can view driver day assignments"
 -- ============================================================
 ALTER TABLE driver_day_assignments ADD COLUMN IF NOT EXISTS start_time time;
 ALTER TABLE driver_day_assignments ADD COLUMN IF NOT EXISTS end_time   time;
+
+-- ============================================================
+-- REALTIME — enable for live updates
+-- Missing this is why driver/home's postgres_changes subscription on this
+-- table never fired: Supabase Realtime only streams tables added to this
+-- publication, so coordinator assign/release actions never pushed live to
+-- the driver — they only saw it after a manual reload.
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'driver_day_assignments'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.driver_day_assignments;
+  END IF;
+END $$;

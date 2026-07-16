@@ -446,13 +446,13 @@ export default function CoordinatorUsersPage() {
       {/* Modal */}
       {showModal && (
         <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, zIndex: 1100,
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1100,
           background: 'rgba(0,0,0,0.4)', display: 'flex',
           alignItems: 'flex-end', justifyContent: 'center',
         }} onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
           <div style={{
             background: 'white', borderRadius: '20px 20px 0 0',
-            width: '100%', maxWidth: '480px', maxHeight: '90dvh',
+            width: '100%', maxWidth: '480px', maxHeight: 'calc(100dvh - 20px)',
             overflowY: 'auto', padding: '24px 20px 32px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
@@ -556,13 +556,13 @@ export default function CoordinatorUsersPage() {
       {/* Detail popup — trip stats + recent trips for this user (as passenger) */}
       {detailUser && (
         <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, zIndex: 1100,
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1100,
           background: 'rgba(0,0,0,0.4)', display: 'flex',
           alignItems: 'flex-end', justifyContent: 'center',
         }} onClick={e => { if (e.target === e.currentTarget) setDetailUser(null) }}>
           <div style={{
             background: 'white', borderRadius: '20px 20px 0 0',
-            width: '100%', maxWidth: '480px', maxHeight: '90dvh',
+            width: '100%', maxWidth: '480px', maxHeight: 'calc(100dvh - 20px)',
             overflowY: 'auto', padding: '24px 20px 32px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>

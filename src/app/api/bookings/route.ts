@@ -227,13 +227,13 @@ export async function POST(request: NextRequest) {
       if (result.taxi) {
         // Notify driver
         const { data: passenger } = await admin
-          .from('users').select('name').eq('id', passengerId).single()
+          .from('users').select('name, role').eq('id', passengerId).single()
 
         const time = new Date(scheduled_at).toLocaleTimeString('id-ID', {
           hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar'
         })
 
-        await notify({
+        const notifs: any[] = [{
           user_id:    result.taxi.driver_id,
           booking_id: booking.id,
           title:      { en: 'Trip assigned to you', id: 'Perjalanan ditugaskan kepada Anda' },
@@ -242,7 +242,28 @@ export async function POST(request: NextRequest) {
             id: `Anda ditugaskan menjemput ${passenger?.name} → ${destination} pukul ${time}. Mohon siap tepat waktu.`,
           },
           type:       'driver_assigned',
-        })
+        }]
+
+        // Someone else (a coordinator) booked this trip on the passenger's behalf —
+        // let the passenger know a trip now exists for them, with the driver already assigned.
+        if (passengerId !== user.id) {
+          const passengerUrl = passenger?.role === 'driver' ? '/driver/home'
+            : passenger?.role === 'coordinator' ? '/coordinator/home'
+            : '/staff/home'
+          notifs.push({
+            user_id:    passengerId,
+            booking_id: booking.id,
+            title:      { en: 'A trip has been booked for you', id: 'Trip telah dibooking untuk Anda' },
+            body: {
+              en: `${result.taxi.name} · ${result.taxi.driver_name} will pick you up → ${destination} at ${time}.`,
+              id: `${result.taxi.name} · ${result.taxi.driver_name} akan menjemput Anda → ${destination} pukul ${time}.`,
+            },
+            type: 'booking_created_for_you',
+            url:  passengerUrl,
+          })
+        }
+
+        await notify(notifs)
 
         return NextResponse.json({
           booking:      { ...booking, taxi_id: result.taxi.id, status: 'booked' },
@@ -272,6 +293,30 @@ export async function POST(request: NextRequest) {
         id: `Trip tunggu — waktu tunggu ${wait_minutes} menit memerlukan persetujuan koordinator.`,
       }
     )
+
+    // Someone else (a coordinator) booked this trip on the passenger's behalf —
+    // let the passenger know, even though it's still awaiting approval.
+    if (passengerId !== user.id) {
+      const { data: passenger } = await admin
+        .from('users').select('role').eq('id', passengerId).single()
+      const passengerUrl = passenger?.role === 'driver' ? '/driver/home'
+        : passenger?.role === 'coordinator' ? '/coordinator/home'
+        : '/staff/home'
+      const time = new Date(scheduled_at).toLocaleTimeString('id-ID', {
+        hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Makassar'
+      })
+      await notify({
+        user_id:    passengerId,
+        booking_id: booking.id,
+        title:      { en: 'A trip has been booked for you', id: 'Trip telah dibooking untuk Anda' },
+        body: {
+          en: `A trip to ${destination} at ${time} has been booked for you — awaiting coordinator approval.`,
+          id: `Trip ke ${destination} pukul ${time} telah dibooking untuk Anda — menunggu persetujuan koordinator.`,
+        },
+        type: 'booking_created_for_you',
+        url:  passengerUrl,
+      })
+    }
 
     return NextResponse.json({ booking, assigned: false }, { status: 201 })
 

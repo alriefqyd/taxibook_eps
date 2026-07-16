@@ -16,6 +16,7 @@ import OnboardingTour from '@/components/OnboardingTour'
 import StaffBookingSheet from '@/components/StaffBookingSheet'
 import PageLoader from '@/components/PageLoader'
 import { useLang } from '@/lib/language'
+import { DayAssignmentSheet, type DayAssignment } from '@/components/GanttCalendar'
 
 const TrackingMap    = dynamic(() => import('@/components/map/TrackingMap'),    { ssr: false })
 const DriverFleetMap = dynamic(() => import('@/components/map/DriverFleetMap'), { ssr: false })
@@ -131,7 +132,8 @@ export default function StaffHomePage() {
   const [unreadCount,  setUnreadCount]  = useState(0)
   const [view,           setView]           = useState<ViewMode>('day')
   const [cursor,         setCursor]         = useState(new Date())
-  const [dayAssignments, setDayAssignments] = useState<{ taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null }[]>([])
+  const [dayAssignments, setDayAssignments] = useState<DayAssignment[]>([])
+  const [selectedDayAssignment, setSelectedDayAssignment] = useState<DayAssignment | null>(null)
   const [selectedBk,   setSelectedBk]   = useState<BookingDetail | null>(null)
   const [refreshing,   setRefreshing]   = useState(false)
   const [pullY,        setPullY]        = useState(0)
@@ -165,8 +167,30 @@ export default function StaffHomePage() {
         .order('name'),
     ])
     const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
-    supabase.from('driver_day_assignments').select('taxi_id, assign_date, start_time, end_time')
-      .gte('assign_date', witaToday).then(({ data }) => setDayAssignments(data || []))
+    supabase.from('driver_day_assignments')
+      .select('taxi_id, assign_date, start_time, end_time, reason, passenger_id, passenger_name_other, taxis(name, plate, users!driver_id(name, phone))')
+      .gte('assign_date', witaToday)
+      .then(async ({ data }) => {
+        const rows = data || []
+        const passengerIds = Array.from(new Set(rows.filter((a: any) => a.passenger_id).map((a: any) => a.passenger_id as string)))
+        let passengerNames: Record<string, string> = {}
+        if (passengerIds.length > 0) {
+          const { data: pUsers } = await supabase.from('users').select('id, name').in('id', passengerIds)
+          if (pUsers) pUsers.forEach((u: any) => { passengerNames[u.id] = u.name })
+        }
+        setDayAssignments(rows.map((a: any) => ({
+          taxi_id:        a.taxi_id,
+          assign_date:    a.assign_date,
+          start_time:     a.start_time ?? null,
+          end_time:       a.end_time ?? null,
+          reason:         a.reason ?? null,
+          taxi_name:      a.taxis?.name ?? null,
+          taxi_plate:     a.taxis?.plate ?? null,
+          driver_name:    a.taxis?.users?.name ?? null,
+          driver_phone:   a.taxis?.users?.phone ?? null,
+          passenger_name: a.passenger_id ? (passengerNames[a.passenger_id] ?? null) : (a.passenger_name_other ?? null),
+        })))
+      })
 
     const bkList = bks || []
     setBookings(bkList)
@@ -468,7 +492,7 @@ export default function StaffHomePage() {
       </div>
 
       {/* ── Views ── */}
-      {view === 'day'   && <DayGantt   bookings={allActiveBookings} taxis={taxis} cursor={cursor} scrollRef={dayScrollRef} onSelectBooking={setSelectedBk} currentUserId={user?.id} dayAssignments={dayAssignments} />}
+      {view === 'day'   && <DayGantt   bookings={allActiveBookings} taxis={taxis} cursor={cursor} scrollRef={dayScrollRef} onSelectBooking={setSelectedBk} currentUserId={user?.id} dayAssignments={dayAssignments} onSelectDayAssignment={setSelectedDayAssignment} />}
       {view === 'week'  && <WeekView   bookings={allActiveBookings} cursor={cursor} onSelectBooking={setSelectedBk} currentUserId={user?.id} dayAssignments={dayAssignments} />}
       {view === 'month' && <MonthView  bookings={allBookings} cursor={cursor} onDayClick={d => { setCursor(d); setView('day') }} dayAssignments={dayAssignments} />}
       {view === 'map'   && (
@@ -554,19 +578,25 @@ export default function StaffHomePage() {
           onCancelled={() => { if (user) loadData(user.id) }}
         />
       )}
+
+      {/* ── Duty assignment detail sheet (tap the yellow duty block) ── */}
+      {selectedDayAssignment && (
+        <DayAssignmentSheet assignment={selectedDayAssignment} onClose={() => setSelectedDayAssignment(null)} />
+      )}
     </div>
   )
 }
 
 // ── DAY GANTT ───────────────────────────────────────────────
-function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, currentUserId, dayAssignments = [] }: {
+function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, currentUserId, dayAssignments = [], onSelectDayAssignment }: {
   bookings: BookingDetail[]
   taxis: any[]
   cursor: Date
   scrollRef: React.RefObject<HTMLDivElement>
   onSelectBooking: (b: BookingDetail) => void
   currentUserId?: string
-  dayAssignments?: { taxi_id: string; assign_date: string; start_time?: string | null; end_time?: string | null }[]
+  dayAssignments?: DayAssignment[]
+  onSelectDayAssignment?: (a: DayAssignment) => void
 }) {
   const lang = useLang()
   const t = MSG[lang]
@@ -616,15 +646,19 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, current
                 const left   = (startH - HOUR_START) * HOUR_W
                 const width  = Math.max((endH - startH) * HOUR_W, 4)
                 return (
-                  <div style={{
-                    position: 'absolute', left, width, top: 0, bottom: 0,
-                    background: 'rgba(254,179,0,0.13)',
-                    borderTop: '2px solid #feb300',
-                    zIndex: 2, display: 'flex', alignItems: 'center', paddingLeft: 10, overflow: 'hidden',
-                    pointerEvents: 'none',
-                  }}>
-                    <span style={{ fontSize: 9, fontWeight: 800, color: '#7e5700', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
-                      {hasRange ? `★ ${fullDayAssignment.start_time!.slice(0, 5)}–${fullDayAssignment.end_time!.slice(0, 5)}` : t.fullDayBadge}
+                  <div
+                    onClick={() => onSelectDayAssignment?.(fullDayAssignment)}
+                    style={{
+                      position: 'absolute', left, width, top: 4, bottom: 4,
+                      background: 'repeating-linear-gradient(135deg, rgba(254,179,0,0.14) 0px, rgba(254,179,0,0.14) 7px, rgba(254,179,0,0.26) 7px, rgba(254,179,0,0.26) 14px)',
+                      border: '1.5px solid #FCD34D', borderLeft: '4px solid #F59E0B', borderRadius: 8,
+                      zIndex: 2, display: 'flex', alignItems: 'center', gap: 5, paddingLeft: 8, overflow: 'hidden',
+                      cursor: onSelectDayAssignment ? 'pointer' : 'default',
+                      boxShadow: '0 1px 3px rgba(146,64,14,0.12)',
+                    }}>
+                    <span style={{ fontSize: 11, flexShrink: 0 }}>📋</span>
+                    <span style={{ fontSize: 9, fontWeight: 800, color: '#7e5700', letterSpacing: '0.05em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {hasRange ? `${fullDayAssignment.start_time!.slice(0, 5)}–${fullDayAssignment.end_time!.slice(0, 5)}` : t.fullDayBadge}
                     </span>
                   </div>
                 )

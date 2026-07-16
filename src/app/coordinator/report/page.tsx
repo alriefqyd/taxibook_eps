@@ -74,6 +74,16 @@ const MSG = {
     reassignCancel:   'Cancel',
     currentTaxi:      'Current',
     noDriver:         'No driver',
+    selectTaxi:       'Select taxi',
+    freeTaxi:         'Free at this time',
+    conflictTaxi:     'Has conflict',
+    offlineTaxi:      'Offline',
+    conflictWithTrip: (name: string, time: string) => `Conflicts with ${name}'s trip at ${time}`,
+    swapHint:         'Swap trips instead — both drivers trade their assigned passenger, no one is double-booked.',
+    swapTrips:        'Swap Trips',
+    swapping:         'Swapping...',
+    reasonOpt:        'Reason (optional)',
+    reasonPlaceholder:'e.g. Driver unavailable...',
     exportExcel:         'Export Excel',
     exporting:           'Exporting…',
     cancelBooking:       'Cancel booking',
@@ -147,6 +157,16 @@ const MSG = {
     reassignCancel:   'Batal',
     currentTaxi:      'Saat ini',
     noDriver:         'Tanpa driver',
+    selectTaxi:       'Pilih taksi',
+    freeTaxi:         'Bebas di waktu ini',
+    conflictTaxi:     'Ada konflik',
+    offlineTaxi:      'Offline',
+    conflictWithTrip: (name: string, time: string) => `Bentrok dengan trip ${name} pukul ${time}`,
+    swapHint:         'Tukar trip saja — kedua driver saling bertukar penumpang, tidak ada yang bentrok.',
+    swapTrips:        'Tukar Trip',
+    swapping:         'Menukar...',
+    reasonOpt:        'Alasan (opsional)',
+    reasonPlaceholder:'mis. Driver tidak tersedia...',
     exportExcel:         'Export Excel',
     exporting:           'Mengekspor…',
     cancelBooking:       'Batalkan booking',
@@ -160,12 +180,19 @@ const MSG = {
   },
 }
 
+// All date-range math here is WITA-based (UTC+8, matching how scheduled_at is
+// interpreted everywhere else in the app) — using the browser/server's local
+// date instead would drop bookings scheduled during WITA's early-morning hours,
+// since their UTC calendar date is still "yesterday".
+function witaNow() {
+  return new Date(Date.now() + 8 * 3600000)
+}
 function monthStart() {
-  const d = new Date()
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
+  const d = witaNow()
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`
 }
 function todayStr() {
-  return new Date().toISOString().slice(0, 10)
+  return witaNow().toISOString().slice(0, 10)
 }
 
 interface ReportRow {
@@ -196,7 +223,9 @@ interface ReportRow {
 interface TaxiOption {
   id: string
   name: string
+  driver_id: string | null
   driver_name: string | null
+  is_available: boolean
 }
 
 export default function CoordinatorReportPage() {
@@ -212,6 +241,9 @@ export default function CoordinatorReportPage() {
   const [reassignRow,    setReassignRow]    = useState<ReportRow | null>(null)
   const [reassignTaxiId, setReassignTaxiId] = useState('')
   const [reassigning,    setReassigning]    = useState(false)
+  const [reassignReason, setReassignReason] = useState('')
+  const [availability, setAvailability] = useState<Record<string, boolean>>({})
+  const [conflictBookings, setConflictBookings] = useState<Record<string, { id: string; booking_code: string; passenger_name: string; scheduled_at: string } | null>>({})
   const [page,           setPage]           = useState(0)
   const [hasMore,        setHasMore]        = useState(false)
   const [loadingMore,    setLoadingMore]    = useState(false)
@@ -246,13 +278,15 @@ export default function CoordinatorReportPage() {
 
       const { data: txs } = await supabase
         .from('taxis')
-        .select('id, name, users!driver_id(name)')
+        .select('id, name, driver_id, is_available, users!driver_id(name)')
         .eq('is_active', true)
         .order('name')
       setTaxis((txs || []).map((taxi: any) => ({
         id: taxi.id,
         name: taxi.name,
+        driver_id: taxi.driver_id,
         driver_name: taxi.users?.name ?? null,
+        is_available: taxi.is_available,
       })))
 
       await Promise.all([
@@ -265,8 +299,8 @@ export default function CoordinatorReportPage() {
   }, [])
 
   async function loadData(from: string, to: string, pageNum = 0, append = false) {
-    const start = new Date(from); start.setHours(0, 0, 0, 0)
-    const end   = new Date(to);   end.setHours(23, 59, 59, 999)
+    const start = new Date(`${from}T00:00:00+08:00`)
+    const end   = new Date(`${to}T23:59:59.999+08:00`)
 
     const { data } = await supabase
       .from('booking_details')
@@ -285,8 +319,8 @@ export default function CoordinatorReportPage() {
   // summary stat tiles so they reflect the whole range, not just the 20 rows
   // currently loaded into the scrollable list.
   async function loadStats(from: string, to: string) {
-    const start = new Date(from); start.setHours(0, 0, 0, 0)
-    const end   = new Date(to);   end.setHours(23, 59, 59, 999)
+    const start = new Date(`${from}T00:00:00+08:00`)
+    const end   = new Date(`${to}T23:59:59.999+08:00`)
 
     const { data } = await supabase
       .from('booking_details')
@@ -298,13 +332,58 @@ export default function CoordinatorReportPage() {
     setStatsRows(data || [])
   }
 
-  async function handleReassign() {
+  async function openReassign(row: ReportRow) {
+    setReassignRow(row)
+    setReassignTaxiId(row.taxi_id ?? '')
+    setReassignReason('')
+    const scheduledTime = new Date(row.scheduled_at)
+    const avail: Record<string, boolean> = {}
+    const conflicts: Record<string, { id: string; booking_code: string; passenger_name: string; scheduled_at: string } | null> = {}
+    for (const taxi of taxis) {
+      if (!taxi.driver_id || !taxi.is_available) { avail[taxi.id] = false; conflicts[taxi.id] = null; continue }
+      const { data: conflict } = await supabase.from('booking_details').select('id, booking_code, passenger_name, scheduled_at')
+        .eq('taxi_id', taxi.id).neq('id', row.id)
+        .in('status', ['booked','on_trip','waiting_trip','pending_driver_approval'])
+        .gt('auto_complete_at', scheduledTime.toISOString())
+        .lte('scheduled_at', new Date(scheduledTime.getTime() + 2 * 3600000).toISOString())
+        .limit(1).maybeSingle()
+      avail[taxi.id] = !conflict
+      conflicts[taxi.id] = conflict || null
+    }
+    setAvailability(avail)
+    setConflictBookings(conflicts)
+  }
+
+  async function confirmReassign() {
     if (!reassignRow || !reassignTaxiId) return
     setReassigning(true)
-    await supabase.from('bookings').update({ taxi_id: reassignTaxiId }).eq('id', reassignRow.id)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setReassigning(false); return }
+
+    // Picking a taxi that already has a conflicting trip switches this into a
+    // swap — trade the two trips between drivers instead of a plain reassign,
+    // which would otherwise just fail on the same conflict.
+    const conflictBooking = availability[reassignTaxiId] === false ? conflictBookings[reassignTaxiId] : null
+    const useSwap = !!conflictBooking
+
+    const res = await fetch(
+      useSwap ? `/api/bookings/${reassignRow.id}/swap` : `/api/bookings/${reassignRow.id}/reassign`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify(useSwap ? { swap_with_booking_id: conflictBooking!.id } : { new_taxi_id: reassignTaxiId, reason: reassignReason }),
+      }
+    )
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      alert('Error: ' + (d.error || 'Failed to reassign'))
+      setReassigning(false)
+      return
+    }
     await Promise.all([loadData(dateFrom, dateTo, page, false), loadStats(dateFrom, dateTo)])
     setReassignRow(null)
     setReassignTaxiId('')
+    setReassignReason('')
     setReassigning(false)
   }
 
@@ -332,8 +411,9 @@ export default function CoordinatorReportPage() {
     loadStats(from, to)
   }
   function thisWeekRange() {
-    const d = new Date()
-    const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+    const d = witaNow()
+    const mon = new Date(d)
+    mon.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7))
     return { from: mon.toISOString().slice(0, 10), to: todayStr() }
   }
 
@@ -510,8 +590,8 @@ export default function CoordinatorReportPage() {
               <ReportCard
                 key={r.id} row={r}
                 onClick={() => setSelectedRow(r)}
-                onReassign={['submitted','booked','on_trip','waiting_trip'].includes(r.status)
-                  ? () => { setReassignRow(r); setReassignTaxiId(r.taxi_id ?? '') }
+                onReassign={['submitted','booked'].includes(r.status)
+                  ? () => openReassign(r)
                   : undefined}
               />
             ))}
@@ -546,7 +626,7 @@ export default function CoordinatorReportPage() {
 
       {/* Cancel confirmation modal */}
       {cancelRow && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.5)', zIndex: 1200, display: 'flex', alignItems: 'flex-end' }}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1200, display: 'flex', alignItems: 'flex-end' }}
           onClick={() => !cancelling && setCancelRow(null)}>
           <div onClick={e => e.stopPropagation()}
             style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', boxSizing: 'border-box' }}>
@@ -576,9 +656,52 @@ export default function CoordinatorReportPage() {
       )}
 
       {/* Reassign modal */}
-      {reassignRow && (
-        <div onClick={() => setReassignRow(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'flex-end' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+      {reassignRow && (() => {
+        const withDriver = taxis.filter(taxi => taxi.driver_id)
+        const freeTaxis     = withDriver.filter(tx => tx.is_available && availability[tx.id])
+        const conflictTaxis = withDriver.filter(tx => tx.is_available && !availability[tx.id])
+        const offlineTaxis  = withDriver.filter(tx => !tx.is_available)
+        const hasConflict   = reassignTaxiId ? availability[reassignTaxiId] === false && taxis.find(tx => tx.id === reassignTaxiId)?.is_available : false
+        const conflictBooking = hasConflict ? conflictBookings[reassignTaxiId] : null
+
+        const TaxiRow = ({ taxi }: { taxi: TaxiOption }) => {
+          const isSelected = reassignTaxiId === taxi.id
+          const isCurrent  = reassignRow.taxi_id === taxi.id
+          const isFree     = availability[taxi.id]
+          const isOffline  = !taxi.is_available
+          return (
+            <div
+              onClick={() => !isOffline && setReassignTaxiId(taxi.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, marginBottom: 6, cursor: isOffline ? 'default' : 'pointer', border: `1.5px solid ${isSelected ? PRIMARY : isCurrent ? '#FEAA0080' : 'rgba(0,0,0,0.08)'}`, background: isSelected ? 'rgba(0,96,100,0.06)' : isCurrent ? '#FFF8E6' : '#fff', opacity: isOffline ? 0.5 : 1 }}
+            >
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: isSelected ? PRIMARY : '#F5F5F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isSelected ? '#fff' : '#6f7979'} strokeWidth="2"><path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><circle cx="7.5" cy="17" r="2.5"/><circle cx="16.5" cy="17" r="2.5"/></svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: isSelected ? PRIMARY : '#1a1c1b' }}>{taxi.name}</p>
+                  {isCurrent && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 9999, background: '#FEAA0030', color: '#684300' }}>{t.currentTaxi}</span>}
+                </div>
+                <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>{taxi.driver_name ?? t.noDriver}</p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 9999,
+                  background: isOffline ? '#FEE2E2' : isFree ? '#D1FAE5' : '#FEF3C7',
+                  color: isOffline ? '#991B1B' : isFree ? '#059669' : '#92400E',
+                }}>
+                  {isOffline ? t.offlineTaxi : isFree ? t.freeTaxi : t.conflictTaxi}
+                </span>
+                {isSelected && (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+                )}
+              </div>
+            </div>
+          )
+        }
+
+        return (
+        <div onClick={() => setReassignRow(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', maxHeight: 'calc(100dvh - 20px)', display: 'flex', flexDirection: 'column' }}>
             {/* Handle */}
             <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px', flexShrink: 0 }}>
               <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.12)' }} />
@@ -589,32 +712,46 @@ export default function CoordinatorReportPage() {
               <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>{reassignRow.booking_code} · {reassignRow.passenger_name}</p>
             </div>
             {/* Taxi list */}
-            <div style={{ overflowY: 'auto', flex: 1, padding: '10px 16px' }}>
-              {taxis.map(taxi => {
-                const isCurrent  = taxi.id === reassignRow.taxi_id
-                const isSelected = taxi.id === reassignTaxiId
-                return (
-                  <div
-                    key={taxi.id}
-                    onClick={() => setReassignTaxiId(taxi.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, marginBottom: 6, cursor: 'pointer', border: `1.5px solid ${isSelected ? PRIMARY : 'rgba(0,0,0,0.08)'}`, background: isSelected ? 'rgba(0,96,100,0.06)' : '#fff' }}
-                  >
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: isSelected ? PRIMARY : '#F5F5F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isSelected ? '#fff' : '#6f7979'} strokeWidth="2"><path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><circle cx="7.5" cy="17" r="2.5"/><circle cx="16.5" cy="17" r="2.5"/></svg>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 2px', color: isSelected ? PRIMARY : '#1a1c1b' }}>{taxi.name}</p>
-                      <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{taxi.driver_name ?? t.noDriver}</p>
-                    </div>
-                    {isCurrent && (
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: '#FEF3C7', color: '#92400E', flexShrink: 0 }}>{t.currentTaxi}</span>
-                    )}
-                    {isSelected && !isCurrent && (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
-                    )}
-                  </div>
-                )
-              })}
+            <div style={{ overflowY: 'auto', flex: 1, padding: '10px 16px 0' }}>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 8px' }}>{t.selectTaxi}</p>
+
+              {freeTaxis.length > 0 && (
+                <>
+                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: '#059669', margin: '0 0 6px', textTransform: 'uppercase' }}>✓ {t.freeTaxi}</p>
+                  {freeTaxis.map(tx => <TaxiRow key={tx.id} taxi={tx} />)}
+                </>
+              )}
+              {conflictTaxis.length > 0 && (
+                <>
+                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: '#92400E', margin: '10px 0 6px', textTransform: 'uppercase' }}>⚠ {t.conflictTaxi}</p>
+                  {conflictTaxis.map(tx => <TaxiRow key={tx.id} taxi={tx} />)}
+                </>
+              )}
+              {offlineTaxis.length > 0 && (
+                <>
+                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: '#991B1B', margin: '10px 0 6px', textTransform: 'uppercase' }}>○ {t.offlineTaxi}</p>
+                  {offlineTaxis.map(tx => <TaxiRow key={tx.id} taxi={tx} />)}
+                </>
+              )}
+
+              {hasConflict && (
+                <div style={{ background: '#FEF3C7', border: '1px solid #FEAA00', borderRadius: 12, padding: '10px 14px', margin: '8px 0' }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: '#92400E', margin: 0 }}>
+                    ⚠ {conflictBooking
+                      ? t.conflictWithTrip(conflictBooking.passenger_name, format(new Date(conflictBooking.scheduled_at), 'HH:mm'))
+                      : t.conflictTaxi}
+                  </p>
+                  {conflictBooking && (
+                    <p style={{ fontSize: 11, color: '#92400E', margin: '4px 0 0', opacity: 0.85 }}>{t.swapHint}</p>
+                  )}
+                </div>
+              )}
+
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '12px 0 6px' }}>{t.reasonOpt}</p>
+              <input type="text" value={reassignReason} onChange={e => setReassignReason(e.target.value)}
+                placeholder={t.reasonPlaceholder}
+                style={{ width: '100%', padding: '11px 14px', fontSize: 13, border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 12, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', background: '#fff' }} />
+              <div style={{ height: 16 }} />
             </div>
             {/* Actions */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '12px 16px 28px', borderTop: '1px solid rgba(0,0,0,0.07)', flexShrink: 0 }}>
@@ -622,16 +759,17 @@ export default function CoordinatorReportPage() {
                 {t.reassignCancel}
               </button>
               <button
-                disabled={!reassignTaxiId || reassigning}
-                onClick={handleReassign}
-                style={{ padding: '13px', background: reassignTaxiId && !reassigning ? PRIMARY : '#d1d5db', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#fff', cursor: reassignTaxiId && !reassigning ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
+                disabled={!reassignTaxiId || reassigning || reassignTaxiId === reassignRow.taxi_id}
+                onClick={confirmReassign}
+                style={{ padding: '13px', background: (!reassignTaxiId || reassigning || reassignTaxiId === reassignRow.taxi_id) ? '#d1d5db' : PRIMARY, border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#fff', cursor: (!reassignTaxiId || reassigning || reassignTaxiId === reassignRow.taxi_id) ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
               >
-                {reassigning ? '...' : t.reassignConfirm}
+                {conflictBooking ? (reassigning ? t.swapping : t.swapTrips) : (reassigning ? '...' : t.reassignConfirm)}
               </button>
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
@@ -731,11 +869,11 @@ function DetailModal({ row: r, onClose, canCancel, onCancel }: {
   return (
     <div
       onClick={onClose}
-      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'flex-end' }}
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'flex-end' }}
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box', padding: '0 0 32px' }}
+        style={{ background: '#fff', width: '100%', borderRadius: '20px 20px 0 0', maxHeight: 'calc(100dvh - 20px)', overflowY: 'auto', boxSizing: 'border-box', padding: '0 0 32px' }}
       >
         {/* Handle */}
         <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>

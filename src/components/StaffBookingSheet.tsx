@@ -223,9 +223,9 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
   const statusColor = STATUS_COLORS[booking.status]
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 74, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }} onClick={onClose}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 1100 }} onClick={onClose}>
       <div
-        style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px', maxHeight: '85vh', overflowY: 'auto', boxSizing: 'border-box' }}
+        style={{ background: '#ffffff', width: '100%', borderRadius: '20px 20px 0 0', padding: '24px 20px', maxHeight: 'calc(100dvh - 20px)', overflowY: 'auto', boxSizing: 'border-box' }}
         onClick={e => e.stopPropagation()}
       >
         <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.08)', margin: '0 auto 20px' }} />
