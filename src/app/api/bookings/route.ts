@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notify, LocalizedText } from '@/lib/notify'
-import { getRouteInfo } from '@/lib/routing'
+import { getRouteInfo, getBufferSeconds } from '@/lib/routing'
 import { getDayAssignmentBlocks, isTaxiDayBlocked } from '@/lib/auto-assign'
 
 export async function POST(request: NextRequest) {
@@ -49,10 +49,6 @@ export async function POST(request: NextRequest) {
 
     // ── Compute auto_complete_at: pickup→destination + destination→pickup + wait + buffer ──
     // Window covers the full round trip so the driver isn't double-booked until back at base.
-    const MARGIN_SHORT_S    = 15 * 60   // 15 min buffer for trips ≤ 20km one-way
-    const MARGIN_LONG_S     = 60 * 60   // 60 min buffer for trips > 20km one-way — longer trips
-                                         // need more slack for traffic/parking variance
-    const LONG_TRIP_KM      = 20
     const FALLBACK_S        = 2 * 3600  // 2h fallback when route unavailable (driver/taxi side)
     const ONEWAY_FALLBACK_S = 25 * 60   // 25 min fallback for a single leg (passenger side)
     const waitSec           = trip_type === 'WAITING' ? (wait_minutes || 0) * 60 : 0
@@ -70,9 +66,7 @@ export async function POST(request: NextRequest) {
       forwardDistanceKm = forwardInfo ? forwardInfo.distanceMeters / 1000 : null
     }
 
-    const MARGIN_S = forwardDistanceKm !== null && forwardDistanceKm > LONG_TRIP_KM
-      ? MARGIN_LONG_S
-      : MARGIN_SHORT_S
+    const MARGIN_S = getBufferSeconds(forwardDistanceKm)
 
     let routeSec = FALLBACK_S
     if (forward != null && back != null) routeSec = forward + back

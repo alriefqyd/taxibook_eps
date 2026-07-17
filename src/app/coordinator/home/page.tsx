@@ -178,8 +178,8 @@ export default function CoordinatorHomePage() {
   const [tripsToday,       setTripsToday]       = useState(0)
   const [issueCount,       setIssueCount]       = useState(0)
   const [issueItems,       setIssueItems]       = useState<IssueItem[]>([])
-  const [weekStats,        setWeekStats]        = useState({ total: 0, completionRate: 0, avgDuration: 0 })
-  const [topDriver,        setTopDriver]        = useState<{ name: string; count: number } | null>(null)
+  const [monthStats,       setMonthStats]       = useState({ total: 0, completionRate: 0, avgDuration: 0 })
+  const [topDriver,        setTopDriver]        = useState<{ name: string; count: number; rate: number } | null>(null)
   const [taxis,            setTaxis]            = useState<TaxiRow[]>([])
   const [dayAssignments,   setDayAssignments]   = useState<import('@/components/GanttCalendar').DayAssignment[]>([])
   const [loading,          setLoading]          = useState(true)
@@ -203,10 +203,11 @@ export default function CoordinatorHomePage() {
     const todayWitaStart = new Date(`${witaDate}T00:00:00+08:00`).toISOString()
     const todayWitaEnd   = new Date(`${witaDate}T23:59:59+08:00`).toISOString()
 
-    const weekAgo = new Date(Date.now() - 7 * 24 * 3600000)
+    const monthStart = new Date(`${witaDate.slice(0, 7)}-01T00:00:00+08:00`)
 
-    const [{ data: allBks }, { data: txs }, { data: pendingBks }, { data: weekBks }, { count: todayCount }] = await Promise.all([
-      // Wide window for Calendar tab
+    const [{ data: allBks }, { data: calBks }, { data: txs }, { data: pendingBks }, { data: monthBks }, { count: todayCount }] = await Promise.all([
+      // Recent window — feeds issue detection (overdue/offline), which only cares about
+      // what's happening now/soon, not the whole history.
       supabase
         .from('booking_details')
         .select('*')
@@ -215,6 +216,15 @@ export default function CoordinatorHomePage() {
         .not('status', 'in', '("cancelled","rejected")')
         .order('scheduled_at', { ascending: true })
         .limit(1000),
+      // Full history (no lower bound) up through the same forward window — feeds the
+      // Calendar tab, which should show everything, not just the last 7 days.
+      supabase
+        .from('booking_details')
+        .select('*')
+        .lt('scheduled_at', calEnd.toISOString())
+        .not('status', 'in', '("cancelled","rejected")')
+        .order('scheduled_at', { ascending: true })
+        .limit(2000),
       supabase
         .from('taxis')
         .select('*, users!driver_id(name, phone)')
@@ -224,11 +234,11 @@ export default function CoordinatorHomePage() {
         .select('*')
         .eq('status', 'pending_coordinator_approval')
         .order('scheduled_at', { ascending: true }),
-      // Lightweight — all statuses, last 7 days, just for the Analytics teaser stats
+      // Lightweight — all statuses, this month, just for the Analytics teaser stats
       supabase
         .from('booking_details')
         .select('status, scheduled_at, completed_at, driver_name')
-        .gte('scheduled_at', weekAgo.toISOString()),
+        .gte('scheduled_at', monthStart.toISOString()),
       supabase
         .from('booking_details')
         .select('id', { count: 'exact', head: true })
@@ -260,21 +270,39 @@ export default function CoordinatorHomePage() {
     setIssueItems(otherIssues)
     setIssueCount(otherIssues.length + (pendingBks || []).length)
 
-    // ── Analytics teaser stats (last 7 days) ──
-    const weekTotal = (weekBks || []).length
-    const weekCompleted = (weekBks || []).filter((b: any) => b.status === 'completed')
-    const weekCompletionRate = weekTotal > 0 ? Math.round((weekCompleted.length / weekTotal) * 100) : 0
-    const weekDurations = weekCompleted
+    // ── Analytics teaser stats (this month) ──
+    const monthTotal = (monthBks || []).length
+    const monthCompleted = (monthBks || []).filter((b: any) => b.status === 'completed')
+    const monthCompletionRate = monthTotal > 0 ? Math.round((monthCompleted.length / monthTotal) * 100) : 0
+    const monthDurations = monthCompleted
       .filter((b: any) => b.completed_at)
       .map((b: any) => Math.round((new Date(b.completed_at).getTime() - new Date(b.scheduled_at).getTime()) / 60000))
       .filter((m: number) => m >= 0)
-    const weekAvgDuration = weekDurations.length ? Math.round(weekDurations.reduce((s: number, m: number) => s + m, 0) / weekDurations.length) : 0
-    setWeekStats({ total: weekTotal, completionRate: weekCompletionRate, avgDuration: weekAvgDuration })
+    const monthAvgDuration = monthDurations.length ? Math.round(monthDurations.reduce((s: number, m: number) => s + m, 0) / monthDurations.length) : 0
+    setMonthStats({ total: monthTotal, completionRate: monthCompletionRate, avgDuration: monthAvgDuration })
 
-    const driverTripCounts: Record<string, number> = {}
-    ;(weekBks || []).forEach((b: any) => { if (b.driver_name) driverTripCounts[b.driver_name] = (driverTripCounts[b.driver_name] || 0) + 1 })
-    const topDriverEntry = Object.entries(driverTripCounts).sort((a, b) => b[1] - a[1])[0]
-    setTopDriver(topDriverEntry ? { name: topDriverEntry[0], count: topDriverEntry[1] } : null)
+    // Same criterion as /coordinator/analytics — ranking on raw completed-trip count
+    // rewards whoever worked the most shifts, not who's actually reliable. Completion rate
+    // (completed ÷ everything ever assigned to them) already bakes reliability in: an
+    // auto-cancelled trip stays in the denominator, so it doesn't need a separate factor.
+    const driverAgg: Record<string, { totalAssigned: number; completed: number }> = {}
+    ;(monthBks || []).forEach((b: any) => {
+      if (!b.driver_name) return
+      const e = driverAgg[b.driver_name] ?? (driverAgg[b.driver_name] = { totalAssigned: 0, completed: 0 })
+      e.totalAssigned++
+      if (b.status === 'completed') e.completed++
+    })
+
+    const topDriverEntry = Object.entries(driverAgg)
+      .map(([name, v]) => ({
+        name,
+        completed:      v.completed,
+        completionRate: v.totalAssigned > 0 ? v.completed / v.totalAssigned : 0,
+      }))
+      .sort((a, b) => b.completionRate - a.completionRate)[0]
+    setTopDriver(topDriverEntry
+      ? { name: topDriverEntry.name, count: topDriverEntry.completed, rate: Math.round(topDriverEntry.completionRate * 100) }
+      : null)
 
     const enriched = await Promise.all(
       (txs || []).map(async (taxi: any) => {
@@ -312,7 +340,7 @@ export default function CoordinatorHomePage() {
     }
 
     setPendingAll(pendingBks || [])
-    setCalendarBookings(allBks || [])
+    setCalendarBookings(calBks || [])
     setTripsToday(todayCount || 0)
     setTaxis(enriched)
     setDayAssignments((dayAssign || []).map((a: any) => ({
@@ -447,7 +475,7 @@ export default function CoordinatorHomePage() {
   const initials = user?.name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') || 'C'
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif", position: 'fixed', inset: 0, background: '#F5F5F2', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ fontFamily: "'Inter', sans-serif", position: 'fixed', inset: 0, zIndex: 1050, background: '#F5F5F2', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       {/* ── TopAppBar — in normal flow; flex layout keeps it above the scroll area ── */}
       <header style={{
@@ -532,7 +560,7 @@ export default function CoordinatorHomePage() {
       </header>
 
       {/* ── Scrollable content below header ── */}
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingBottom: 72 }}>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingBottom: 20 }}>
       <OnboardingTour role="coordinator" />
       <style jsx>{`
         .dashboard-summary-item,
@@ -552,6 +580,30 @@ export default function CoordinatorHomePage() {
         .dashboard-issue-card:hover {
           box-shadow: 0 14px 32px rgba(0, 96, 100, 0.12);
         }
+        @keyframes issueGlow {
+          0%, 100% { box-shadow: 0 2px 8px rgba(220,38,38,0.06), 0 0 0 0 rgba(220,38,38,0.35); }
+          50%      { box-shadow: 0 2px 8px rgba(220,38,38,0.06), 0 0 0 7px rgba(220,38,38,0); }
+        }
+        .dashboard-issue-card,
+        .dashboard-issue-tile {
+          animation: issueGlow 2.2s ease-in-out infinite;
+        }
+        @keyframes badgePulse {
+          0%, 100% { transform: scale(1); }
+          50%      { transform: scale(1.2); }
+        }
+        .dashboard-issue-badge,
+        .dashboard-approval-badge {
+          animation: badgePulse 1.4s ease-in-out infinite;
+        }
+        @keyframes approvalGlow {
+          0%, 100% { box-shadow: 0 2px 8px rgba(217,119,6,0.06), 0 0 0 0 rgba(217,119,6,0.35); }
+          50%      { box-shadow: 0 2px 8px rgba(217,119,6,0.06), 0 0 0 7px rgba(217,119,6,0); }
+        }
+        .dashboard-approval-tile,
+        .dashboard-approval-card {
+          animation: approvalGlow 2.2s ease-in-out infinite;
+        }
       `}</style>
 
       {/* ── Greeting hero ── */}
@@ -567,7 +619,7 @@ export default function CoordinatorHomePage() {
             <p style={{ fontSize: 13, color: '#6f7979', margin: 0, fontWeight: 500 }}>{t.role}</p>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
-            <div className="dashboard-summary-item" style={{ textAlign: 'center', background: pendingApproval.length > 0 ? '#FEF3C7' : '#F5F5F2', borderRadius: 12, padding: '8px 10px' }}>
+            <div className={`dashboard-summary-item${pendingApproval.length > 0 ? ' dashboard-approval-tile' : ''}`} style={{ textAlign: 'center', background: pendingApproval.length > 0 ? '#FEF3C7' : '#F5F5F2', borderRadius: 12, padding: '8px 10px' }}>
               <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: pendingApproval.length > 0 ? '#92400E' : '#9ca3af', margin: '0 0 2px', opacity: 0.8 }}>
                 {lang === 'id' ? 'Approval' : 'Approval'}
               </p>
@@ -575,7 +627,7 @@ export default function CoordinatorHomePage() {
               <p style={{ fontSize: 10, color: pendingApproval.length > 0 ? '#92400E' : '#9ca3af', margin: '2px 0 0', opacity: 0.7 }}>{lang === 'id' ? 'menunggu' : 'pending'}</p>
             </div>
             <div
-              className="dashboard-summary-item"
+              className={`dashboard-summary-item${issueCount > 0 ? ' dashboard-issue-tile' : ''}`}
               onClick={() => router.push('/coordinator/issues')}
               style={{ textAlign: 'center', background: issueCount > 0 ? '#FEE2E2' : '#F5F5F2', borderRadius: 12, padding: '8px 10px', cursor: 'pointer' }}
             >
@@ -601,7 +653,7 @@ export default function CoordinatorHomePage() {
         {pendingApproval.length > 0 && (
           <div style={{ marginBottom: 16, paddingTop: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#D97706', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
+              <div className="dashboard-approval-badge" style={{ width: 20, height: 20, borderRadius: '50%', background: '#D97706', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
                 {pendingApproval.length}
               </div>
               <p style={{ fontSize: 12, fontWeight: 700, color: '#7e5700', margin: 0, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
@@ -620,7 +672,7 @@ export default function CoordinatorHomePage() {
         {issueItems.length > 0 && (
           <div style={{ marginBottom: 16, paddingTop: pendingApproval.length > 0 ? 0 : 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#DC2626', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
+              <div className="dashboard-issue-badge" style={{ width: 20, height: 20, borderRadius: '50%', background: '#DC2626', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
                 {issueItems.length}
               </div>
               <p style={{ fontSize: 12, fontWeight: 700, color: '#991B1B', margin: 0, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
@@ -725,7 +777,7 @@ export default function CoordinatorHomePage() {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: '#6f7979', margin: 0, textTransform: 'uppercase', letterSpacing: '0.15em' }}>
-                {lang === 'id' ? 'Analitik · 7 hari terakhir' : 'Analytics · Last 7 days'}
+                {lang === 'id' ? 'Analitik · Bulan ini' : 'Analytics · This month'}
               </p>
               <span style={{ fontSize: 11, fontWeight: 700, color: PRIMARY }}>
                 {lang === 'id' ? 'Lihat semua ›' : 'View all ›'}
@@ -734,17 +786,17 @@ export default function CoordinatorHomePage() {
             <div style={{ display: 'grid', gap: 12 }}>
               <div style={{ display: 'flex', background: '#F5F5F2', borderRadius: 24, border: '1px solid rgba(0,0,0,0.08)', minHeight: 100, overflow: 'hidden' }}>
                 <div style={{ flex: 1, padding: '18px 12px', textAlign: 'center' }}>
-                  <p style={{ fontSize: 26, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.7px' }}>{weekStats.total}</p>
+                  <p style={{ fontSize: 26, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.7px' }}>{monthStats.total}</p>
                   <p style={{ fontSize: 10, color: '#334f52', margin: '6px 0 0', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.15em' }}>{lang === 'id' ? 'trip' : 'trips'}</p>
                 </div>
                 <div style={{ width: 1, background: 'rgba(0,0,0,0.08)', margin: '14px 0' }} />
                 <div style={{ flex: 1, padding: '18px 12px', textAlign: 'center' }}>
-                  <p style={{ fontSize: 26, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.7px' }}>{weekStats.completionRate}%</p>
+                  <p style={{ fontSize: 26, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.7px' }}>{monthStats.completionRate}%</p>
                   <p style={{ fontSize: 10, color: '#334f52', margin: '6px 0 0', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.15em' }}>{lang === 'id' ? 'selesai' : 'completion'}</p>
                 </div>
                 <div style={{ width: 1, background: 'rgba(0,0,0,0.08)', margin: '14px 0' }} />
                 <div style={{ flex: 1, padding: '18px 12px', textAlign: 'center' }}>
-                  <p style={{ fontSize: 26, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.7px' }}>{weekStats.avgDuration}</p>
+                  <p style={{ fontSize: 26, fontWeight: 800, margin: 0, color: PRIMARY, letterSpacing: '-0.7px' }}>{monthStats.avgDuration}</p>
                   <p style={{ fontSize: 10, color: '#334f52', margin: '6px 0 0', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.15em' }}>{lang === 'id' ? 'menit rata²' : 'avg min'}</p>
                 </div>
               </div>
@@ -754,7 +806,9 @@ export default function CoordinatorHomePage() {
                     🏆
                   </div>
                   <p style={{ fontSize: 13, color: '#0f3d45', margin: 0, lineHeight: 1.35, fontWeight: 600 }}>
-                    <span style={{ fontWeight: 700 }}>{topDriver.name}</span> {lang === 'id' ? 'adalah driver teratas dengan' : 'is top driver with'} {topDriver.count} {lang === 'id' ? 'trip' : 'trips'}
+                    <span style={{ fontWeight: 700 }}>{topDriver.name}</span> {lang === 'id'
+                      ? `adalah driver teratas dengan tingkat penyelesaian ${topDriver.rate}% (${topDriver.count} trip selesai)`
+                      : `is top driver with a ${topDriver.rate}% completion rate (${topDriver.count} trips completed)`}
                   </p>
                 </div>
               )}
@@ -820,6 +874,12 @@ export default function CoordinatorHomePage() {
         )}
       </div>
       </div>{/* end scrollable content */}
+
+      {/* Reserves the bottom-nav's own height so the scrollable area above
+          never extends behind it — the nav is a fixed sibling rendered by
+          the layout, outside this page's flex column, so it can't shrink
+          this page's own flex:1 area on its own. */}
+      <div style={{ flexShrink: 0, height: 64 }} />
 
       {/* Reject modal */}
       {rejectId && (
@@ -950,7 +1010,16 @@ function BookingCard({ booking: b, isProcessing, processingAction, onApprove, on
   const hasContact = b.driver_phone || b.passenger_phone
 
   return (
-    <div style={{ background: '#ffffff', borderRadius: 16, padding: '14px 16px', marginBottom: 10, boxShadow: '0 2px 8px rgba(0,96,100,0.06)', border: `1px solid ${needsApproval ? 'rgba(217,119,6,0.2)' : 'rgba(0,0,0,0.06)'}`, borderLeft: `3px solid ${needsApproval ? '#d97706' : '#006064'}` }}>
+    <div style={{
+      background: '#ffffff', borderRadius: 16, padding: '14px 16px', marginBottom: 10,
+      boxShadow: '0 2px 8px rgba(0,96,100,0.06)',
+      border: `1px solid ${needsApproval ? 'rgba(217,119,6,0.2)' : 'rgba(0,0,0,0.06)'}`,
+      borderLeft: `3px solid ${needsApproval ? '#d97706' : '#006064'}`,
+      // References the `approvalGlow` keyframes declared globally via the <style jsx>
+      // block in CoordinatorHomePage — styled-jsx hoists @keyframes globally even
+      // though its class-selector scoping wouldn't reach into this sibling component.
+      animation: needsApproval ? 'approvalGlow 2.2s ease-in-out infinite' : 'none',
+    }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
         <div style={{ flex: 1, minWidth: 0, marginRight: '8px' }}>
           <p style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

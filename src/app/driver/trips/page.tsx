@@ -7,6 +7,8 @@ import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { useLang } from '@/lib/language'
 import PageLoader from '@/components/PageLoader'
+import { useTravelTimes } from '@/hooks/useTravelTimes'
+import { formatDurationMin } from '@/lib/routing'
 
 interface DriverBooking {
   id:               string
@@ -15,7 +17,11 @@ interface DriverBooking {
   passenger_email:  string
   passenger_phone:  string | null
   pickup:           string
+  pickup_lat:       number | null
+  pickup_lng:       number | null
   destination:      string
+  destination_lat:  number | null
+  destination_lng:  number | null
   trip_type:        string
   wait_minutes:     number
   scheduled_at:     string
@@ -76,6 +82,12 @@ const MSG = {
     tripType:           'Trip type',
     dropOneWay:         'Drop — one way',
     waitingMin:         (n: number) => `Waiting — ${n} min`,
+    travelTime:         'Travel time',
+    travelToDest:       'Pickup → destination',
+    travelToOffice:     (office: string) => `Destination → ${office}`,
+    bufferTime:         'Buffer time',
+    officeNotSet:       'Office location not registered',
+    calculating:        'Calculating...',
     notes:              'Notes',
     rejectionReason:    'Rejection reason',
     vehicle:            'Vehicle',
@@ -124,6 +136,12 @@ const MSG = {
     tripType:           'Jenis perjalanan',
     dropOneWay:         'Antar — sekali jalan',
     waitingMin:         (n: number) => `Menunggu — ${n} menit`,
+    travelTime:         'Waktu perjalanan',
+    travelToDest:       'Penjemputan → tujuan',
+    travelToOffice:     (office: string) => `Tujuan → ${office}`,
+    bufferTime:         'Buffer time',
+    officeNotSet:       'Lokasi kantor belum terdaftar',
+    calculating:        'Menghitung...',
     notes:              'Catatan',
     rejectionReason:    'Alasan penolakan',
     vehicle:            'Kendaraan',
@@ -200,16 +218,29 @@ export default function DriverTripsPage() {
   const [hasMore,      setHasMore]      = useState(false)
   const [loadingMore,  setLoadingMore]  = useState(false)
   const [selectedTrip, setSelectedTrip] = useState<DriverBooking | null>(null)
+  const officeName = 'Central Engineering'
+  const travel = useTravelTimes(
+    selectedTrip?.pickup_lat, selectedTrip?.pickup_lng,
+    selectedTrip?.destination_lat, selectedTrip?.destination_lng,
+    officeName,
+  )
 
   const PAGE_SIZE = 20
 
-  async function loadData(tid: string, reset = true) {
+  // Date range is applied server-side (WITA-aware, same convention as coordinator/report) —
+  // filtering only the already-fetched page client-side would hide older trips beyond the
+  // current page instead of actually finding them.
+  async function loadData(tid: string, reset = true, from = dateFrom, to = dateTo) {
     const currentPage = reset ? 0 : page + 1
-    const { data } = await supabase
+    let query = supabase
       .from('booking_details')
       .select('*')
       .eq('taxi_id', tid)
       .not('status', 'in', '("cancelled","rejected")')
+    if (from) query = query.gte('scheduled_at', new Date(`${from}T00:00:00+08:00`).toISOString())
+    if (to)   query = query.lte('scheduled_at', new Date(`${to}T23:59:59.999+08:00`).toISOString())
+
+    const { data } = await query
       .order('scheduled_at', { ascending: false })
       .range(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE - 1)
 
@@ -247,16 +278,7 @@ export default function DriverTripsPage() {
     init()
   }, [])
 
-  const filtered = bookings.filter(b => {
-    if (!matchesGroup(b.status, statusGroup)) return false
-    if (dateFrom) {
-      if (new Date(b.scheduled_at) < new Date(dateFrom + 'T00:00:00')) return false
-    }
-    if (dateTo) {
-      if (new Date(b.scheduled_at) > new Date(dateTo + 'T23:59:59')) return false
-    }
-    return true
-  })
+  const filtered = bookings.filter(b => matchesGroup(b.status, statusGroup))
 
   const hasDateFilter = !!(dateFrom || dateTo)
 
@@ -339,7 +361,8 @@ export default function DriverTripsPage() {
           <div style={{ flex: 1, background: '#F5F5F2', borderRadius: 12, padding: '10px 12px' }}>
             <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 4px' }}>{t.from}</p>
             <input
-              type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              type="date" value={dateFrom}
+              onChange={e => { setDateFrom(e.target.value); if (taxiId) loadData(taxiId, true, e.target.value, dateTo) }}
               style={{ width: '100%', border: 'none', outline: 'none', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', background: 'transparent', color: PRIMARY }}
             />
           </div>
@@ -349,13 +372,14 @@ export default function DriverTripsPage() {
           <div style={{ flex: 1, background: '#F5F5F2', borderRadius: 12, padding: '10px 12px' }}>
             <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9ca3af', margin: '0 0 4px' }}>{t.to}</p>
             <input
-              type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              type="date" value={dateTo}
+              onChange={e => { setDateTo(e.target.value); if (taxiId) loadData(taxiId, true, dateFrom, e.target.value) }}
               style={{ width: '100%', border: 'none', outline: 'none', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', background: 'transparent', color: PRIMARY }}
             />
           </div>
           {hasDateFilter && (
             <button
-              onClick={() => { setDateFrom(''); setDateTo('') }}
+              onClick={() => { setDateFrom(''); setDateTo(''); if (taxiId) loadData(taxiId, true, '', '') }}
               style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.06)', color: '#6f7979', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -375,7 +399,7 @@ export default function DriverTripsPage() {
             {hasDateFilter && <> · {t.dateRangeLabel}</>}
           </p>
           <button
-            onClick={() => { setStatusGroup('all'); setDateFrom(''); setDateTo('') }}
+            onClick={() => { setStatusGroup('all'); setDateFrom(''); setDateTo(''); if (taxiId) loadData(taxiId, true, '', '') }}
             style={{ fontSize: 11, fontWeight: 700, color: PRIMARY, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
           >
             {t.clearAll}
@@ -540,6 +564,22 @@ export default function DriverTripsPage() {
                 </div>
               </div>
             </div>
+
+            {selectedTrip.pickup_lat && selectedTrip.pickup_lng && selectedTrip.destination_lat && selectedTrip.destination_lng && (
+              <>
+                <SectionLabel>{t.travelTime}</SectionLabel>
+                <DetailTable rows={[
+                  { label: t.travelToDest, value: travel.loading ? t.calculating : travel.forwardSec != null ? formatDurationMin(travel.forwardSec, lang) : '—' },
+                  {
+                    label: t.travelToOffice(officeName),
+                    value: travel.loading ? t.calculating
+                      : !travel.officeFound ? t.officeNotSet
+                      : travel.returnSec != null ? formatDurationMin(travel.returnSec, lang) : '—',
+                  },
+                  { label: t.bufferTime, value: formatDurationMin(travel.bufferSec, lang) },
+                ]} />
+              </>
+            )}
 
             {/* ── Time ── */}
             <SectionLabel>{t.time}</SectionLabel>

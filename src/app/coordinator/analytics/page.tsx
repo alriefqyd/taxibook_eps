@@ -6,6 +6,7 @@ import { format, subDays, differenceInMinutes, eachDayOfInterval } from 'date-fn
 import { id as idLocale } from 'date-fns/locale'
 import { useLang } from '@/lib/language'
 import PageLoader from '@/components/PageLoader'
+import { AUTO_CANCEL_REASON } from '@/lib/autoCancel'
 
 const FONT = "'Plus Jakarta Sans', sans-serif"
 const BG      = '#F5F5F2'
@@ -47,7 +48,6 @@ const MSG = {
     date:         'Date',
     trips:        'Trips',
     topRoutes:    'Top Routes',
-    topDrivers:   'Top Drivers',
     noData:       'No data in this range',
     statusBreakdown: 'Status Breakdown',
     completed:    'Completed',
@@ -76,6 +76,11 @@ const MSG = {
     manualCancelled: 'Cancelled (by user/coordinator)',
     capacityUsed:  'Capacity Used by Special/Full-Day Duty',
     capacityDesc:  (pct: number) => `${pct}% of taxi-days in this range are blocked by driver duty assignments, unavailable for auto-assign.`,
+    driverRanking: 'Driver Ranking',
+    colDriver:        'Driver',
+    colCompleted:     'Completed',
+    colCompletionRate:'Completion',
+    colAutoCancel:    'Auto-cancelled',
   },
   id: {
     title:        'Analitik',
@@ -94,7 +99,6 @@ const MSG = {
     date:         'Tanggal',
     trips:        'Trip',
     topRoutes:    'Rute Teratas',
-    topDrivers:   'Driver Teratas',
     noData:       'Tidak ada data di rentang ini',
     statusBreakdown: 'Rincian Status',
     completed:    'Selesai',
@@ -123,6 +127,11 @@ const MSG = {
     manualCancelled: 'Dibatalkan (oleh user/koordinator)',
     capacityUsed:  'Kapasitas Terpakai Tugas Khusus/Seharian',
     capacityDesc:  (pct: number) => `${pct}% taksi-hari di rentang ini terpakai oleh tugas khusus driver, tidak tersedia untuk auto-assign.`,
+    driverRanking: 'Peringkat Driver',
+    colDriver:        'Driver',
+    colCompleted:     'Selesai',
+    colCompletionRate:'Tingkat Selesai',
+    colAutoCancel:    'Otomatis Dibatalkan',
   },
 }
 
@@ -130,11 +139,10 @@ type RangeKey = '7' | '30' | '90'
 
 interface Row {
   id: string; status: string; scheduled_at: string; completed_at: string | null; created_at: string
+  auto_complete_at: string | null; completed_by: string | null
   pickup: string; destination: string; driver_name: string | null; passenger_name: string | null
   trip_type: string; wait_minutes: number | null; rejection_reason: string | null
 }
-
-const AUTO_CANCEL_REASON = 'Driver did not start trip within 15 minutes of the scheduled time'
 
 export default function CoordinatorAnalyticsPage() {
   const router   = useRouter()
@@ -173,7 +181,7 @@ export default function CoordinatorAnalyticsPage() {
       const [{ data }, { count: prevCount }, { data: duties }, { count: taxiCount }] = await Promise.all([
         supabase
           .from('booking_details')
-          .select('id, status, scheduled_at, completed_at, created_at, pickup, destination, driver_name, passenger_name, trip_type, wait_minutes, rejection_reason')
+          .select('id, status, scheduled_at, completed_at, created_at, auto_complete_at, pickup, destination, driver_name, passenger_name, trip_type, wait_minutes, rejection_reason')
           .gte('scheduled_at', start.toISOString())
           .order('scheduled_at', { ascending: true }),
         // Same-length window immediately before the current range, for growth comparison
@@ -252,12 +260,28 @@ export default function CoordinatorAnalyticsPage() {
     return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6)
   }, [rows])
 
-  const topDrivers = useMemo(() => {
-    const map: Record<string, number> = {}
-    rows.filter(r => r.driver_name).forEach(r => {
-      map[r.driver_name!] = (map[r.driver_name!] || 0) + 1
+  // Ranking on raw completed-trip count rewards whoever worked the most shifts, not who's
+  // actually reliable — a driver who did 3/3 trips perfectly would always rank below one who
+  // did 15/20 with several auto-cancels. Completion rate (completed ÷ everything ever assigned
+  // to them) already accounts for that: auto-cancelled trips stay in the denominator, so
+  // reliability is baked into the rate itself rather than needing a separate weighted factor.
+  const driverScores = useMemo(() => {
+    const map: Record<string, { totalAssigned: number; completed: number; autoCancelled: number }> = {}
+
+    rows.forEach(r => {
+      if (!r.driver_name) return
+      const e = map[r.driver_name] ?? (map[r.driver_name] = { totalAssigned: 0, completed: 0, autoCancelled: 0 })
+      e.totalAssigned++
+      if (r.status === 'completed') e.completed++
+      if (r.status === 'cancelled' && r.rejection_reason === AUTO_CANCEL_REASON) e.autoCancelled++
     })
-    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6)
+
+    return Object.entries(map).map(([name, v]) => ({
+      name,
+      completed:      v.completed,
+      completionRate: v.totalAssigned > 0 ? v.completed / v.totalAssigned : 0,
+      autoCancelled:  v.autoCancelled,
+    })).sort((a, b) => b.completionRate - a.completionRate)
   }, [rows])
 
   const topUsers = useMemo(() => {
@@ -338,7 +362,6 @@ export default function CoordinatorAnalyticsPage() {
 
   const maxTrend = Math.max(1, ...trend.map(d => d.count))
   const maxRoute = Math.max(1, ...topRoutes.map(([, c]) => c))
-  const maxDriver = Math.max(1, ...topDrivers.map(([, c]) => c))
   const maxUser = Math.max(1, ...topUsers.map(([, c]) => c))
   const maxCanceller = Math.max(1, ...topCancellers.map(([, c]) => c))
   const maxPeakHour = Math.max(1, ...peakHours.map(([, c]) => c))
@@ -543,13 +566,38 @@ export default function CoordinatorAnalyticsPage() {
 
         <SectionHeader title={t.sectionPeople} />
 
-        {/* Top drivers */}
-        <ChartCard title={t.topDrivers}>
-          {topDrivers.length === 0 ? <EmptyState text={t.noData} /> : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {topDrivers.map(([name, count]) => (
-                <HBarRow key={name} label={name} value={count} max={maxDriver} color={SEQ_400} />
-              ))}
+        {/* Driver ranking — by completion rate (completed ÷ everything ever assigned to
+            them), not raw completed-trip count, so a driver who worked fewer shifts but
+            finished everything reliably doesn't get buried under one who just works more. */}
+        <ChartCard title={t.driverRanking}>
+          {driverScores.length === 0 ? <EmptyState text={t.noData} /> : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{ background: '#f9f9f7' }}>
+                    <th style={{ textAlign: 'left', padding: '8px 12px', color: INK_MUT, fontWeight: 700 }}>{t.colDriver}</th>
+                    <th style={{ textAlign: 'right', padding: '8px 12px', color: INK_MUT, fontWeight: 700 }}>{t.colCompleted}</th>
+                    <th style={{ textAlign: 'right', padding: '8px 12px', color: INK_MUT, fontWeight: 700 }}>{t.colCompletionRate}</th>
+                    <th style={{ textAlign: 'right', padding: '8px 12px', color: INK_MUT, fontWeight: 700 }}>{t.colAutoCancel}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {driverScores.slice(0, 8).map(d => (
+                    <tr key={d.name} style={{ borderTop: `1px solid ${BORDER}` }}>
+                      <td style={{ padding: '8px 12px', color: INK, fontWeight: 600, whiteSpace: 'nowrap' }}>{d.name}</td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: INK, fontVariantNumeric: 'tabular-nums' }}>
+                        {d.completed}
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: PRIMARY, fontVariantNumeric: 'tabular-nums' }}>
+                        {Math.round(d.completionRate * 100)}%
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: d.autoCancelled > 0 ? STATUS.critical : INK_MUT, fontVariantNumeric: 'tabular-nums' }}>
+                        {d.autoCancelled}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </ChartCard>

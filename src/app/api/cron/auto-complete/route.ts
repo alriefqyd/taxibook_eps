@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notify } from '@/lib/notify'
+import { AUTO_CANCEL_REASON } from '@/lib/autoCancel'
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R    = 6371
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
       const ids = notStarted.map((b: any) => b.id)
       await admin.from('bookings').update({
         status:           'cancelled',
-        rejection_reason: 'Driver did not start trip within 15 minutes of the scheduled time',
+        rejection_reason: AUTO_CANCEL_REASON,
       }).in('id', ids)
 
       const { data: coordinators } = await admin

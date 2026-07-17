@@ -199,7 +199,7 @@ export default function CoordinatorMapPage() {
   })
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif", position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', touchAction: 'manipulation' }}>
+    <div style={{ fontFamily: "'Inter', sans-serif", position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', flexDirection: 'column', overflow: 'hidden', touchAction: 'manipulation' }}>
 
       {/* Header */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid rgba(0,0,0,0.08)', padding: '12px 20px', flexShrink: 0 }}>

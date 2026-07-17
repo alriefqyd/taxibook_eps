@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { BookingDetail } from '@/types'
 import { STATUS_COLORS, STATUS_LABELS } from '@/types'
 import { useLang } from '@/lib/language'
+import { useTravelTimes } from '@/hooks/useTravelTimes'
+import { formatDurationMin } from '@/lib/routing'
 
 const TrackingMap = dynamic(() => import('@/components/map/TrackingMap'), { ssr: false })
 
@@ -35,6 +37,11 @@ const MSG = {
     from:             'From',
     to:               'To',
     tripType:         'Trip type',
+    travelToDest:     'Travel: pickup → destination',
+    travelToOffice:   (office: string) => `Travel: destination → ${office}`,
+    bufferTime:       'Buffer time',
+    officeNotSet:     'Office location not registered',
+    calculating:      'Calculating...',
     drop:             'Drop',
     waitMin:          (n: number) => `Wait ${n} min`,
     rejectionReason:  'Rejection reason',
@@ -75,6 +82,11 @@ const MSG = {
     from:             'Dari',
     to:               'Tujuan',
     tripType:         'Jenis perjalanan',
+    travelToDest:     'Perjalanan: penjemputan → tujuan',
+    travelToOffice:   (office: string) => `Perjalanan: tujuan → ${office}`,
+    bufferTime:       'Buffer time',
+    officeNotSet:     'Lokasi kantor belum terdaftar',
+    calculating:      'Menghitung...',
     drop:             'Drop',
     waitMin:          (n: number) => `Tunggu ${n} menit`,
     rejectionReason:  'Alasan penolakan',
@@ -180,6 +192,8 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
   const [showCancel, setShowCancel] = React.useState(false)
   const [cancelReason, setCancelReason] = React.useState('')
   const [error, setError] = React.useState('')
+  const officeName = 'Central Engineering'
+  const travel = useTravelTimes(booking.pickup_lat, booking.pickup_lng, booking.destination_lat, booking.destination_lng, officeName)
 
   async function handleCancel() {
     if (!cancelReason.trim()) { setError(t.errReasonRequired); return }
@@ -289,6 +303,23 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
             <DetailRow label={t.from} value={booking.pickup} highlight />
             <DetailRow label={t.to} value={booking.destination} highlight />
             <DetailRow label={t.tripType} value={booking.trip_type === 'DROP' ? t.drop : t.waitMin(booking.wait_minutes)} />
+            {booking.pickup_lat && booking.pickup_lng && booking.destination_lat && booking.destination_lng && (
+              <>
+                <DetailRow
+                  label={t.travelToDest}
+                  value={travel.loading ? t.calculating : travel.forwardSec != null ? formatDurationMin(travel.forwardSec, lang) : '—'}
+                />
+                <DetailRow
+                  label={t.travelToOffice(officeName)}
+                  value={
+                    travel.loading ? t.calculating
+                      : !travel.officeFound ? t.officeNotSet
+                      : travel.returnSec != null ? formatDurationMin(travel.returnSec, lang) : '—'
+                  }
+                />
+                <DetailRow label={t.bufferTime} value={formatDurationMin(travel.bufferSec, lang)} />
+              </>
+            )}
           </Section>
 
           {(booking.notes || booking.rejection_reason) && (

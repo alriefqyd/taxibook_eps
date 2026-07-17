@@ -162,21 +162,30 @@ export async function POST(
                 },
                 type:       'driver_assigned',
               })
-
-              await notify({
-                user_id:    booking.passenger_id,
-                booking_id: bookingId,
-                title:      { en: '✅ Trip approved!', id: '✅ Perjalanan disetujui!' },
-                body: {
-                  en: `Your trip to ${booking.destination} is approved and a driver has been assigned.`,
-                  id: `Perjalanan Anda ke ${booking.destination} disetujui dan driver telah ditugaskan.`,
-                },
-                type:       'booking_confirmed',
-              })
             }
           }
         }
       }
+
+      // Passenger always gets told their trip was approved, whether or not a driver
+      // could be auto-assigned right away — previously this only fired inside the
+      // taxi-assigned branch above, so anyone approved with no taxi currently free
+      // got no notification at all.
+      await notify({
+        user_id:    booking.passenger_id,
+        booking_id: bookingId,
+        title:      { en: '✅ Trip approved!', id: '✅ Perjalanan disetujui!' },
+        body: assignedTaxi
+          ? {
+              en: `Your trip to ${booking.destination} is approved and a driver has been assigned.`,
+              id: `Perjalanan Anda ke ${booking.destination} disetujui dan driver telah ditugaskan.`,
+            }
+          : {
+              en: `Your trip to ${booking.destination} is approved. A driver will be assigned soon.`,
+              id: `Perjalanan Anda ke ${booking.destination} disetujui. Driver akan segera ditugaskan.`,
+            },
+        type: 'booking_confirmed',
+      })
 
       return NextResponse.json({ success: true, assigned: !!assignedTaxi })
     }

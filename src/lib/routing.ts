@@ -30,6 +30,24 @@ export interface RouteResult {
   durationSeconds: number
 }
 
+// Distance-based buffer added on top of drive time, shared by the auto_complete_at
+// calculation (api/bookings/route.ts) and any UI that surfaces the same figure.
+export const LONG_TRIP_KM     = 20
+export const BUFFER_SHORT_SEC = 15 * 60
+export const BUFFER_LONG_SEC  = 40 * 60
+
+export function getBufferSeconds(oneWayDistanceKm: number | null): number {
+  return oneWayDistanceKm !== null && oneWayDistanceKm > LONG_TRIP_KM ? BUFFER_LONG_SEC : BUFFER_SHORT_SEC
+}
+
+export function formatDurationMin(sec: number, lang: 'en' | 'id'): string {
+  const mins = Math.round(sec / 60)
+  if (mins < 60) return lang === 'id' ? `${mins} menit` : `${mins} min`
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return lang === 'id' ? `${h}j ${m}m` : `${h}h ${m}m`
+}
+
 export async function getRoute(from: Coords, to: Coords): Promise<RouteResult | null> {
   try {
     const key = process.env.NEXT_PUBLIC_ORS_KEY
