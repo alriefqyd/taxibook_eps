@@ -15,6 +15,8 @@ import GanttCalendar from '@/components/GanttCalendar'
 import OnboardingTour from '@/components/OnboardingTour'
 import { useLang } from '@/lib/language'
 import PageLoader from '@/components/PageLoader'
+import WaButton from '@/components/WaButton'
+import { gpsStaleWaMsg, overdueWaMsg, offlineUpcomingWaMsg } from '@/lib/waMessages'
 
 const DriverFleetMap = dynamic(() => import('@/components/map/DriverFleetMap'), { ssr: false })
 
@@ -160,9 +162,9 @@ interface TaxiRow {
 }
 
 type IssueItem =
-  | { kind: 'gps'; id: string; taxiName: string; plate: string | null; driverName: string | null }
-  | { kind: 'overdue'; id: string; passengerName: string; destination: string; scheduledAt: string }
-  | { kind: 'offline'; id: string; taxiName: string | null; passengerName: string; destination: string; scheduledAt: string }
+  | { kind: 'gps'; id: string; taxiName: string; plate: string | null; driverName: string | null; driverPhone: string | null }
+  | { kind: 'overdue'; id: string; passengerName: string; destination: string; scheduledAt: string; bookingCode: string; driverName: string | null; driverPhone: string | null }
+  | { kind: 'offline'; id: string; taxiName: string | null; passengerName: string; destination: string; scheduledAt: string; bookingCode: string; driverName: string | null; driverPhone: string | null }
 
 export default function CoordinatorHomePage() {
   const router   = useRouter()
@@ -215,7 +217,7 @@ export default function CoordinatorHomePage() {
         .limit(1000),
       supabase
         .from('taxis')
-        .select('*, users!driver_id(name)')
+        .select('*, users!driver_id(name, phone)')
         .eq('is_active', true),
       supabase
         .from('booking_details')
@@ -242,16 +244,16 @@ export default function CoordinatorHomePage() {
     const upcomingWindow = new Date(nowMs + 2 * 60 * 60 * 1000)
     const gpsStaleItems: IssueItem[] = (txs || [])
       .filter((tx: any) => tx.is_available && tx.driver_id && (!tx.location_updated_at || new Date(tx.location_updated_at) < staleCutoff))
-      .map((tx: any) => ({ kind: 'gps', id: tx.id, taxiName: tx.name, plate: tx.plate, driverName: tx.users?.name || null }))
+      .map((tx: any) => ({ kind: 'gps', id: tx.id, taxiName: tx.name, plate: tx.plate, driverName: tx.users?.name || null, driverPhone: tx.users?.phone || null }))
     const overdueItems: IssueItem[] = (allBks || [])
       .filter((b: any) => b.status === 'booked' && new Date(b.scheduled_at) < new Date(nowMs))
-      .map((b: any) => ({ kind: 'overdue', id: b.id, passengerName: b.passenger_name, destination: b.destination, scheduledAt: b.scheduled_at }))
+      .map((b: any) => ({ kind: 'overdue', id: b.id, passengerName: b.passenger_name, destination: b.destination, scheduledAt: b.scheduled_at, bookingCode: b.booking_code, driverName: b.driver_name || null, driverPhone: b.driver_phone || null }))
     const offlineTaxiIds = new Set((txs || []).filter((tx: any) => tx.is_available === false).map((tx: any) => tx.id))
     const offlineItems: IssueItem[] = (allBks || [])
       .filter((b: any) =>
         b.status === 'booked' && b.taxi_id && offlineTaxiIds.has(b.taxi_id)
         && new Date(b.scheduled_at) >= new Date(nowMs) && new Date(b.scheduled_at) <= upcomingWindow)
-      .map((b: any) => ({ kind: 'offline', id: b.id, taxiName: b.taxi_name, passengerName: b.passenger_name, destination: b.destination, scheduledAt: b.scheduled_at }))
+      .map((b: any) => ({ kind: 'offline', id: b.id, taxiName: b.taxi_name, passengerName: b.passenger_name, destination: b.destination, scheduledAt: b.scheduled_at, bookingCode: b.booking_code, driverName: b.driver_name || null, driverPhone: b.driver_phone || null }))
     // Pending approvals get their own dedicated section further down, so they're
     // counted in the tile total but not duplicated in the inline issue list.
     const otherIssues = [...gpsStaleItems, ...overdueItems, ...offlineItems]
@@ -630,40 +632,76 @@ export default function CoordinatorHomePage() {
                 key={`${item.kind}-${item.id}`}
                 className="dashboard-issue-card"
                 onClick={() => router.push('/coordinator/issues')}
-                style={{ background: '#ffffff', borderRadius: 16, padding: '12px 16px', marginBottom: 10, boxShadow: '0 2px 8px rgba(0,96,100,0.06)', border: '1px solid rgba(220,38,38,0.18)', borderLeft: '3px solid #DC2626', cursor: 'pointer' }}
+                style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#ffffff', borderRadius: 16, padding: '12px 16px', marginBottom: 10, boxShadow: '0 2px 8px rgba(0,96,100,0.06)', border: '1px solid rgba(220,38,38,0.18)', borderLeft: '3px solid #DC2626', cursor: 'pointer' }}
               >
-                {item.kind === 'gps' && (
-                  <>
-                    <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{item.taxiName}{item.plate ? ` · ${item.plate}` : ''}</p>
-                    <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>
-                      {lang === 'id' ? 'GPS tidak update' : 'GPS stale'} · {item.driverName || (lang === 'id' ? 'Tidak ada driver' : 'No driver')}
-                    </p>
-                    <p style={{ fontSize: 11, color: '#b0b6b6', margin: '4px 0 0', lineHeight: 1.4 }}>
-                      {lang === 'id' ? 'Driver aktif yang lokasinya tidak update lebih dari 1 jam' : 'On-duty driver whose location has not updated in over an hour'}
-                    </p>
-                  </>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {item.kind === 'gps' && (
+                    <>
+                      <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{item.taxiName}{item.plate ? ` · ${item.plate}` : ''}</p>
+                      <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>
+                        {lang === 'id' ? 'GPS tidak update' : 'GPS stale'} · {item.driverName || (lang === 'id' ? 'Tidak ada driver' : 'No driver')}
+                      </p>
+                      <p style={{ fontSize: 11, color: '#b0b6b6', margin: '4px 0 0', lineHeight: 1.4 }}>
+                        {lang === 'id' ? 'Driver aktif yang lokasinya tidak update lebih dari 1 jam' : 'On-duty driver whose location has not updated in over an hour'}
+                      </p>
+                    </>
+                  )}
+                  {item.kind === 'overdue' && (
+                    <>
+                      <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{item.passengerName} → {item.destination}</p>
+                      <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>
+                        {lang === 'id' ? 'Trip terlambat' : 'Overdue trip'} · {format(new Date(item.scheduledAt), 'HH:mm')}
+                      </p>
+                      <p style={{ fontSize: 11, color: '#b0b6b6', margin: '4px 0 0', lineHeight: 1.4 }}>
+                        {lang === 'id' ? 'Booking sudah lewat jadwal tapi belum di-start driver' : 'Booked trip past its scheduled time that the driver has not started'}
+                      </p>
+                    </>
+                  )}
+                  {item.kind === 'offline' && (
+                    <>
+                      <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{item.passengerName} → {item.destination}</p>
+                      <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>
+                        {lang === 'id' ? 'Driver offline, trip segera' : 'Driver offline, trip soon'}{item.taxiName ? ` · ${item.taxiName}` : ''} · {format(new Date(item.scheduledAt), 'HH:mm')}
+                      </p>
+                      <p style={{ fontSize: 11, color: '#b0b6b6', margin: '4px 0 0', lineHeight: 1.4 }}>
+                        {lang === 'id' ? 'Driver ditugaskan tapi offline padahal ada trip segera' : 'Assigned driver is offline but has an upcoming trip'}
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                {item.kind === 'gps' && item.driverPhone && (
+                  <div onClick={e => e.stopPropagation()}>
+                    <WaButton
+                      phone={item.driverPhone} title="WhatsApp driver"
+                      message={gpsStaleWaMsg({
+                        driverName: item.driverName, taxiName: item.taxiName, plate: item.plate,
+                        sinceText: lang === 'id' ? 'lebih dari 1 jam yang lalu' : 'more than 1 hour ago',
+                      })}
+                    />
+                  </div>
                 )}
-                {item.kind === 'overdue' && (
-                  <>
-                    <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{item.passengerName} → {item.destination}</p>
-                    <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>
-                      {lang === 'id' ? 'Trip terlambat' : 'Overdue trip'} · {format(new Date(item.scheduledAt), 'HH:mm')}
-                    </p>
-                    <p style={{ fontSize: 11, color: '#b0b6b6', margin: '4px 0 0', lineHeight: 1.4 }}>
-                      {lang === 'id' ? 'Booking sudah lewat jadwal tapi belum di-start driver' : 'Booked trip past its scheduled time that the driver has not started'}
-                    </p>
-                  </>
+                {item.kind === 'overdue' && item.driverPhone && (
+                  <div onClick={e => e.stopPropagation()}>
+                    <WaButton
+                      phone={item.driverPhone} title="WhatsApp driver"
+                      message={overdueWaMsg({
+                        driverName: item.driverName, passengerName: item.passengerName, destination: item.destination,
+                        bookingCode: item.bookingCode, lateMin: Math.floor((Date.now() - new Date(item.scheduledAt).getTime()) / 60000),
+                      })}
+                    />
+                  </div>
                 )}
-                {item.kind === 'offline' && (
-                  <>
-                    <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{item.passengerName} → {item.destination}</p>
-                    <p style={{ fontSize: 11, color: '#9ca3af', margin: '2px 0 0' }}>
-                      {lang === 'id' ? 'Driver offline, trip segera' : 'Driver offline, trip soon'}{item.taxiName ? ` · ${item.taxiName}` : ''} · {format(new Date(item.scheduledAt), 'HH:mm')}
-                    </p>
-                    <p style={{ fontSize: 11, color: '#b0b6b6', margin: '4px 0 0', lineHeight: 1.4 }}>
-                      {lang === 'id' ? 'Driver ditugaskan tapi offline padahal ada trip segera' : 'Assigned driver is offline but has an upcoming trip'}
-                    </p>
-                  </>
+                {item.kind === 'offline' && item.driverPhone && (
+                  <div onClick={e => e.stopPropagation()}>
+                    <WaButton
+                      phone={item.driverPhone} title="WhatsApp driver"
+                      message={offlineUpcomingWaMsg({
+                        driverName: item.driverName, passengerName: item.passengerName, destination: item.destination,
+                        bookingCode: item.bookingCode, timeText: format(new Date(item.scheduledAt), 'HH:mm'),
+                      })}
+                    />
+                  </div>
                 )}
               </div>
             ))}

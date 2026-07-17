@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import type { Coords } from '@/lib/geocode'
 import { useLang } from '@/lib/language'
+import DateTimePicker from '@/components/DateTimePicker'
 
 const MSG = {
   en: {
@@ -487,7 +488,9 @@ export default function BookPage() {
         </div>
       </div>
 
-      <div style={{ padding: '24px 20px 32px' }}>
+      <div style={{ padding: '16px 16px 12px' }}>
+
+        <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 24, padding: '18px 16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: 12 }}>
 
         {/* ── STEP 1 ── */}
         {step === 1 && (
@@ -533,12 +536,15 @@ export default function BookPage() {
             {/* DateTime — only for schedule */}
             {form.mode === 'schedule' && (
               <FG label={t.dateTime}>
-                <input
-                  type="datetime-local"
+                <DateTimePicker
                   value={form.scheduled_at}
-                  onChange={e => update('scheduled_at', e.target.value)}
+                  onChange={v => update('scheduled_at', v)}
                   min={defaultDateTime()}
-                  style={inputSt}
+                  lang={lang}
+                  color={C.black}
+                  border={C.border}
+                  textPrimary={C.textPrimary}
+                  textTert={C.textTert}
                 />
               </FG>
             )}
@@ -669,9 +675,9 @@ export default function BookPage() {
             <p style={{ fontSize: 12, color: C.textTert, margin: '0 0 16px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.reviewConfirm}</p>
 
             {/* Summary card */}
-            <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{ background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 16, overflow: 'hidden', marginBottom: 16 }}>
               {/* When row — highlighted */}
-              <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}`, background: C.surface }}>
+              <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border2}`, background: C.surface2 }}>
                 <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.textTert, margin: '0 0 4px' }}>{t.when}</p>
                 <p style={{ fontSize: 15, fontWeight: 700, color: C.textPrimary, margin: '0 0 3px', letterSpacing: '-0.2px' }}>
                   {form.mode === 'now' ? t.rightNow : formatDateTime(form.scheduled_at)}
@@ -730,6 +736,8 @@ export default function BookPage() {
           </div>
         )}
 
+        </div>
+
         {/* Error */}
         {error && (
           <div style={{ padding: '10px 14px', background: C.redBg, border: `1px solid #FECACA`, borderRadius: 12, marginTop: 12 }}>
@@ -763,7 +771,7 @@ export default function BookPage() {
         )}
 
         {/* CTA */}
-        <div style={{ marginTop: 20 }}>
+        <div style={{ marginTop: 12 }}>
           {step < 3 ? (
             <button
               onClick={handleNext}

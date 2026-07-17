@@ -14,7 +14,7 @@ export default function DriverLayout({ children }: { children: React.ReactNode }
     })
   }, [])
   return (
-    <div style={{ minHeight: '100dvh', background: '#F5F5F2', paddingBottom: '72px' }}>
+    <div style={{ minHeight: '100dvh', background: '#F5F5F2' }}>
       {children}
       <BottomNav role="driver" />
       {userId && <DriverTripAlert userId={userId} />}

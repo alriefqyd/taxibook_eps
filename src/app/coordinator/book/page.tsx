@@ -9,6 +9,8 @@ import type { Coords } from '@/lib/geocode'
 import { useLang } from '@/lib/language'
 import PageLoader from '@/components/PageLoader'
 import SwitchRow from '@/components/SwitchRow'
+import DateTimePicker from '@/components/DateTimePicker'
+import CalendarDatePicker from '@/components/CalendarDatePicker'
 
 const MSG = {
   en: {
@@ -536,7 +538,9 @@ export default function CoordinatorBookPage() {
         </div>
       </div>
 
-      <div style={{ padding: '24px 20px 32px' }}>
+      <div style={{ padding: '16px 16px 12px' }}>
+
+        <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 24, padding: '18px 16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: 12 }}>
 
         {/* STEP 1 */}
         {step === 1 && (
@@ -638,9 +642,16 @@ export default function CoordinatorBookPage() {
                 </FG>
 
                 <FG label={t.dutyDate}>
-                  <input type="date" value={dutyDate}
-                    onChange={e => { setDutyDate(e.target.value); if (dutyEndDate < e.target.value) setDutyEndDate(e.target.value) }}
-                    min={defaultDateOnly()} style={inputSt} />
+                  <CalendarDatePicker
+                    value={dutyDate}
+                    onChange={v => { setDutyDate(v); if (dutyEndDate < v) setDutyEndDate(v) }}
+                    min={defaultDateOnly()}
+                    lang={lang}
+                    color={C.black}
+                    border={C.border}
+                    textPrimary={C.textPrimary}
+                    textTert={C.textTert}
+                  />
                 </FG>
 
                 <SwitchRow
@@ -651,7 +662,16 @@ export default function CoordinatorBookPage() {
                 {dutyRepeat && (
                   <div style={{ marginTop: -6, marginBottom: 14, paddingLeft: 4 }}>
                     <FG label={t.untilDate}>
-                      <input type="date" value={dutyEndDate} onChange={e => setDutyEndDate(e.target.value)} min={dutyDate} style={inputSt} />
+                      <CalendarDatePicker
+                        value={dutyEndDate}
+                        onChange={setDutyEndDate}
+                        min={dutyDate}
+                        lang={lang}
+                        color={C.black}
+                        border={C.border}
+                        textPrimary={C.textPrimary}
+                        textTert={C.textTert}
+                      />
                     </FG>
                     {dutyDate && dutyEndDate && (
                       <p style={{ fontSize: 12, color: C.textTert, margin: '-10px 0 0' }}>
@@ -720,7 +740,16 @@ export default function CoordinatorBookPage() {
 
                 {form.mode === 'schedule' && (
                   <FG label={t.dateTime}>
-                    <input type="datetime-local" value={form.scheduled_at} onChange={e => update('scheduled_at', e.target.value)} min={defaultDateTime()} style={inputSt} />
+                    <DateTimePicker
+                      value={form.scheduled_at}
+                      onChange={v => update('scheduled_at', v)}
+                      min={defaultDateTime()}
+                      lang={lang}
+                      color={C.black}
+                      border={C.border}
+                      textPrimary={C.textPrimary}
+                      textTert={C.textTert}
+                    />
                   </FG>
                 )}
 
@@ -832,8 +861,8 @@ export default function CoordinatorBookPage() {
         {step === 3 && bookingKind === 'duty' && (
           <div>
             <p style={{ fontSize: 12, color: C.textTert, margin: '0 0 16px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.reviewConfirm}</p>
-            <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', marginBottom: 16 }}>
-              <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}`, background: C.surface }}>
+            <div style={{ background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 16, overflow: 'hidden', marginBottom: 16 }}>
+              <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border2}`, background: C.surface2 }}>
                 <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.textTert, margin: '0 0 4px' }}>{t.selectTaxi}</p>
                 <p style={{ fontSize: 15, fontWeight: 700, color: C.textPrimary, margin: 0 }}>{selectedDutyTaxi?.name || '—'}</p>
                 <p style={{ fontSize: 12, color: C.textSecond, margin: '2px 0 0' }}>{selectedDutyTaxi?.driver_name}</p>
@@ -869,8 +898,8 @@ export default function CoordinatorBookPage() {
         {step === 3 && bookingKind === 'trip' && (
           <div>
             <p style={{ fontSize: 12, color: C.textTert, margin: '0 0 16px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.reviewConfirm}</p>
-            <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: 'hidden', marginBottom: 16 }}>
-              <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}`, background: C.surface }}>
+            <div style={{ background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 16, overflow: 'hidden', marginBottom: 16 }}>
+              <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border2}`, background: C.surface2 }}>
                 <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.textTert, margin: '0 0 4px' }}>{t.passengerLabel}</p>
                 <p style={{ fontSize: 15, fontWeight: 700, color: C.textPrimary, margin: 0 }}>{selectedPassenger?.name || '—'}</p>
               </div>
@@ -925,13 +954,15 @@ export default function CoordinatorBookPage() {
           </div>
         )}
 
+        </div>
+
         {error && (
           <div style={{ padding: '10px 14px', background: C.redBg, border: `1px solid #FECACA`, borderRadius: 12, marginTop: 12 }}>
             <p style={{ fontSize: 12, color: C.red, margin: 0, fontWeight: 500 }}>{error}</p>
           </div>
         )}
 
-        <div style={{ marginTop: 20 }}>
+        <div style={{ marginTop: 12 }}>
           {step < 3 ? (
             <button
               onClick={handleNext}

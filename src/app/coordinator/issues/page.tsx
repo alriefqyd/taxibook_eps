@@ -6,6 +6,8 @@ import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { useLang } from '@/lib/language'
 import PageLoader from '@/components/PageLoader'
+import WaButton from '@/components/WaButton'
+import { gpsStaleWaMsg, overdueWaMsg, pendingWaMsg, offlineUpcomingWaMsg } from '@/lib/waMessages'
 
 const FONT    = "'Plus Jakarta Sans', sans-serif"
 const PRIMARY = '#006064'
@@ -74,16 +76,16 @@ function minsAgo(ts: string | null, now: number): number | null {
 
 interface GpsStaleTaxi {
   id: string; name: string; plate: string | null; color: string
-  driver_name: string | null; location_updated_at: string | null
+  driver_name: string | null; driver_phone: string | null; location_updated_at: string | null
 }
 interface TripRow {
-  id: string; booking_code: string; passenger_name: string; destination: string
-  scheduled_at: string; created_at: string; taxi_name: string | null; driver_name: string | null
+  id: string; booking_code: string; passenger_name: string; passenger_phone: string | null; destination: string
+  scheduled_at: string; created_at: string; taxi_name: string | null; driver_name: string | null; driver_phone: string | null
   wait_minutes: number; trip_type: string
 }
 interface OfflineUpcoming {
   id: string; booking_code: string; passenger_name: string; destination: string
-  scheduled_at: string; taxi_name: string | null; driver_name: string | null
+  scheduled_at: string; taxi_name: string | null; driver_name: string | null; driver_phone: string | null
 }
 
 export default function CoordinatorIssuesPage() {
@@ -107,7 +109,7 @@ export default function CoordinatorIssuesPage() {
 
     const [{ data: taxis }, { data: overdueBks }, { data: pendingBks }, { data: upcomingBks }] = await Promise.all([
       supabase.from('taxis')
-        .select('id, name, plate, color, is_available, driver_id, location_updated_at, users!driver_id(name)')
+        .select('id, name, plate, color, is_available, driver_id, location_updated_at, users!driver_id(name, phone)')
         .eq('is_active', true)
         .not('driver_id', 'is', null),
       supabase.from('booking_details').select('*')
@@ -131,7 +133,8 @@ export default function CoordinatorIssuesPage() {
         .filter((tx: any) => tx.is_available && (!tx.location_updated_at || new Date(tx.location_updated_at) < staleCutoff))
         .map((tx: any) => ({
           id: tx.id, name: tx.name, plate: tx.plate, color: tx.color,
-          driver_name: tx.users?.name || null, location_updated_at: tx.location_updated_at,
+          driver_name: tx.users?.name || null, driver_phone: tx.users?.phone || null,
+          location_updated_at: tx.location_updated_at,
         }))
     )
 
@@ -235,6 +238,9 @@ export default function CoordinatorIssuesPage() {
                     <p style={{ fontSize: 11, color: '#9ca3af', margin: '1px 0 0' }}>{tx.driver_name || t.noDriver}</p>
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 700, color: GRAY, flexShrink: 0 }}>{relTime(tx.location_updated_at)}</span>
+                  {tx.driver_phone && (
+                    <WaButton phone={tx.driver_phone} message={gpsStaleWaMsg({ driverName: tx.driver_name, taxiName: tx.name, plate: tx.plate, sinceText: relTime(tx.location_updated_at) })} title="WhatsApp driver" />
+                  )}
                 </div>
               ))}
             </IssueSection>
@@ -249,6 +255,9 @@ export default function CoordinatorIssuesPage() {
                       <p style={{ fontSize: 11, color: '#9ca3af', margin: '1px 0 0' }}>{b.taxi_name || t.noDriver}{b.driver_name ? ` · ${b.driver_name}` : ''} · {b.booking_code}</p>
                     </div>
                     <span style={{ fontSize: 11, fontWeight: 700, color: RED, flexShrink: 0 }}>{t.minLate(lateMin)}</span>
+                    {b.driver_phone && (
+                      <WaButton phone={b.driver_phone} message={overdueWaMsg({ driverName: b.driver_name, passengerName: b.passenger_name, destination: b.destination, bookingCode: b.booking_code, lateMin })} title="WhatsApp driver" />
+                    )}
                   </div>
                 )
               })}
@@ -264,6 +273,17 @@ export default function CoordinatorIssuesPage() {
                     </p>
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 700, color: AMBER, flexShrink: 0 }}>{t.waitingSince(format(new Date(b.created_at), 'HH:mm'))}</span>
+                  {b.passenger_phone && (
+                    <WaButton
+                      phone={b.passenger_phone}
+                      message={pendingWaMsg({
+                        passengerName: b.passenger_name, destination: b.destination,
+                        scheduledAtText: format(new Date(b.scheduled_at), 'EEEE, d MMMM yyyy · HH:mm', { locale: idLocale }),
+                        waitMinutes: b.wait_minutes,
+                      })}
+                      title="WhatsApp passenger"
+                    />
+                  )}
                 </div>
               ))}
             </IssueSection>
@@ -276,6 +296,16 @@ export default function CoordinatorIssuesPage() {
                     <p style={{ fontSize: 11, color: '#9ca3af', margin: '1px 0 0' }}>{b.passenger_name} → {b.destination}</p>
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 700, color: RED, flexShrink: 0 }}>{format(new Date(b.scheduled_at), 'HH:mm')}</span>
+                  {b.driver_phone && (
+                    <WaButton
+                      phone={b.driver_phone}
+                      message={offlineUpcomingWaMsg({
+                        driverName: b.driver_name, passengerName: b.passenger_name, destination: b.destination,
+                        bookingCode: b.booking_code, timeText: format(new Date(b.scheduled_at), 'HH:mm'),
+                      })}
+                      title="WhatsApp driver"
+                    />
+                  )}
                 </div>
               ))}
             </IssueSection>
