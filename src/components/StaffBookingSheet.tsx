@@ -20,8 +20,6 @@ const MSG = {
     sectionDriver:    'Driver & Vehicle',
     sectionRoute:     'Trip Route',
     sectionNotes:     'Notes',
-    bookingId:        'Booking ID',
-    created:          'Created',
     scheduled:        'Scheduled',
     completed:        'Completed',
     windowEnd:        'Window end',
@@ -37,11 +35,7 @@ const MSG = {
     from:             'From',
     to:               'To',
     tripType:         'Trip type',
-    travelToDest:     'Travel: pickup → destination',
-    travelToOffice:   (office: string) => `Travel: destination → ${office}`,
     bufferTime:       'Buffer time',
-    officeNotSet:     'Office location not registered',
-    calculating:      'Calculating...',
     drop:             'Drop',
     waitMin:          (n: number) => `Wait ${n} min`,
     rejectionReason:  'Rejection reason',
@@ -65,8 +59,6 @@ const MSG = {
     sectionDriver:    'Driver & Kendaraan',
     sectionRoute:     'Rute Perjalanan',
     sectionNotes:     'Catatan',
-    bookingId:        'ID Booking',
-    created:          'Dibuat',
     scheduled:        'Dijadwalkan',
     completed:        'Selesai',
     windowEnd:        'Akhir jendela',
@@ -82,11 +74,7 @@ const MSG = {
     from:             'Dari',
     to:               'Tujuan',
     tripType:         'Jenis perjalanan',
-    travelToDest:     'Perjalanan: penjemputan → tujuan',
-    travelToOffice:   (office: string) => `Perjalanan: tujuan → ${office}`,
     bufferTime:       'Buffer time',
-    officeNotSet:     'Lokasi kantor belum terdaftar',
-    calculating:      'Menghitung...',
     drop:             'Drop',
     waitMin:          (n: number) => `Tunggu ${n} menit`,
     rejectionReason:  'Alasan penolakan',
@@ -226,7 +214,6 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
     onClose()
   }
 
-  const createdAt = booking.created_at ? fmtDate(booking.created_at) : '-'
   const scheduledAt = booking.scheduled_at ? fmtDate(booking.scheduled_at) : '-'
   const completedAt = booking.completed_at ? fmtDate(booking.completed_at) : null
   const windowMin = booking.auto_complete_at ? Math.round((new Date(booking.auto_complete_at).getTime() - new Date(booking.scheduled_at).getTime()) / 60000) : null
@@ -245,8 +232,7 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
         <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.08)', margin: '0 auto 20px' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 10 }}>
           <div style={{ minWidth: 0 }}>
-            <p style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.3px' }}>{booking.destination}</p>
-            <p style={{ fontSize: 13, color: '#6f7979', margin: 0 }}>{scheduledAt}</p>
+            <p style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.3px' }}>{booking.pickup} → {booking.destination}</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <span style={{ fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 9999, background: statusColor.bg, color: statusColor.text, whiteSpace: 'nowrap' }}>
@@ -279,8 +265,6 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: booking.taxi_id ? 16 : 0 }}>
           <Section title={t.sectionTime}>
-            <DetailRow label={t.bookingId} value={booking.booking_code} highlight />
-            <DetailRow label={t.created} value={createdAt} />
             <DetailRow label={t.scheduled} value={scheduledAt} highlight />
             {completedAt && <DetailRow label={t.completed} value={completedAt} valueColor="#059669" />}
             {booking.auto_complete_at && <DetailRow label={t.windowEnd} value={new Date(booking.auto_complete_at).toLocaleString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} valueColor="#6f7979" />}
@@ -304,21 +288,7 @@ export default function StaffBookingSheet({ booking, currentUserId, onClose, onC
             <DetailRow label={t.to} value={booking.destination} highlight />
             <DetailRow label={t.tripType} value={booking.trip_type === 'DROP' ? t.drop : t.waitMin(booking.wait_minutes)} />
             {booking.pickup_lat && booking.pickup_lng && booking.destination_lat && booking.destination_lng && (
-              <>
-                <DetailRow
-                  label={t.travelToDest}
-                  value={travel.loading ? t.calculating : travel.forwardSec != null ? formatDurationMin(travel.forwardSec, lang) : '—'}
-                />
-                <DetailRow
-                  label={t.travelToOffice(officeName)}
-                  value={
-                    travel.loading ? t.calculating
-                      : !travel.officeFound ? t.officeNotSet
-                      : travel.returnSec != null ? formatDurationMin(travel.returnSec, lang) : '—'
-                  }
-                />
-                <DetailRow label={t.bufferTime} value={formatDurationMin(travel.bufferSec, lang)} />
-              </>
+              <DetailRow label={t.bufferTime} value={formatDurationMin(travel.bufferSec, lang)} />
             )}
           </Section>
 

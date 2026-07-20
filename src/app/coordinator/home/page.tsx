@@ -475,14 +475,15 @@ export default function CoordinatorHomePage() {
   const initials = user?.name?.split(' ').map((n: string) => n[0]).slice(0,2).join('') || 'C'
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif", position: 'fixed', inset: 0, zIndex: 1050, background: '#F5F5F2', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ fontFamily: "'Inter', sans-serif", minHeight: '100dvh', background: '#F5F5F2' }}>
 
-      {/* ── TopAppBar — in normal flow; flex layout keeps it above the scroll area ── */}
+      {/* ── TopAppBar — sticky, well below the bottom nav's z-index (1000) so it
+           never fights the nav for stacking priority ── */}
       <header style={{
         background: '#F5F5F2',
         borderBottom: '1px solid rgba(0,0,0,0.08)',
         boxShadow: '0 1px 4px rgba(0,96,100,0.06)',
-        flexShrink: 0, position: 'relative', zIndex: 1000,
+        position: 'sticky', top: 0, zIndex: 40,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', height: 64 }}>
           {/* Logo */}
@@ -509,8 +510,8 @@ export default function CoordinatorHomePage() {
               </div>
               {menuOpen && (
                 <>
-                  <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 999 }} />
-                  <div style={{ position: 'absolute', top: 44, right: 0, background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 1099, minWidth: 220, overflow: 'hidden' }}>
+                  <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 98 }} />
+                  <div style={{ position: 'absolute', top: 44, right: 0, background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 99, minWidth: 220, overflow: 'hidden' }}>
                     <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', background: '#F5F5F2' }}>
                       <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 2px', color: '#1a1c1b' }}>{user?.name}</p>
                       <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{t.role}</p>
@@ -559,8 +560,9 @@ export default function CoordinatorHomePage() {
         </div>
       </header>
 
-      {/* ── Scrollable content below header ── */}
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingBottom: 20 }}>
+      {/* ── Content below header — normal document flow, so the layout's
+           fixed BottomNav (and its own spacer) reserve room for it correctly ── */}
+      <div style={{ paddingBottom: 20 }}>
       <OnboardingTour role="coordinator" />
       <style jsx>{`
         .dashboard-summary-item,
@@ -816,8 +818,12 @@ export default function CoordinatorHomePage() {
           </div>
         </div>
 
-        {/* ── CALENDAR / MAP ── */}
-        <div style={{ margin: '0 -16px', background: '#fff', borderTop: '1px solid rgba(0,0,0,0.08)', borderBottom: '1px solid rgba(0,0,0,0.08)', position: 'relative', zIndex: 0 }}>
+        {/* ── CALENDAR / MAP — no zIndex here: an explicit z-index on this
+             `position: relative` wrapper would create a stacking context that
+             traps the booking-detail sheet's fixed zIndex:1100 overlay below
+             it, letting BottomNav's zIndex:1000 paint on top of the sheet
+             wherever they visually overlap. ── */}
+        <div style={{ margin: '0 -16px', background: '#fff', borderTop: '1px solid rgba(0,0,0,0.08)', borderBottom: '1px solid rgba(0,0,0,0.08)', position: 'relative' }}>
           <GanttCalendar
             bookings={calendarBookings} taxis={taxis} showCompleted dayAssignments={dayAssignments}
             onMapClick={() => setView(view === 'map' ? 'calendar' : 'map')}
@@ -873,13 +879,7 @@ export default function CoordinatorHomePage() {
           </div>
         )}
       </div>
-      </div>{/* end scrollable content */}
-
-      {/* Reserves the bottom-nav's own height so the scrollable area above
-          never extends behind it — the nav is a fixed sibling rendered by
-          the layout, outside this page's flex column, so it can't shrink
-          this page's own flex:1 area on its own. */}
-      <div style={{ flexShrink: 0, height: 64 }} />
+      </div>{/* end content */}
 
       {/* Reject modal */}
       {rejectId && (
