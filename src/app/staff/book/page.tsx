@@ -33,7 +33,7 @@ const MSG = {
     waitDuration:   'Waiting duration (minutes)',
     needsApproval:  '⚠ Coordinator approval required',
     autoAssigned:   '✓ Auto-assigned',
-    over60:         'Waiting trips over 60 min need approval first.',
+    over60:         'Waiting trips over 45 min need approval first.',
     bestDriver:     'Best available driver will be assigned automatically.',
     reviewConfirm:  'Review & confirm',
     when:           'When',
@@ -90,7 +90,7 @@ const MSG = {
     waitDuration:   'Durasi tunggu (menit)',
     needsApproval:  '⚠ Perlu persetujuan koordinator',
     autoAssigned:   '✓ Otomatis ditugaskan',
-    over60:         'Perjalanan tunggu lebih dari 60 menit perlu persetujuan.',
+    over60:         'Perjalanan tunggu lebih dari 45 menit perlu persetujuan.',
     bestDriver:     'Driver terbaik yang tersedia akan ditugaskan secara otomatis.',
     reviewConfirm:  'Tinjau & konfirmasi',
     when:           'Kapan',
@@ -330,7 +330,7 @@ export default function BookPage() {
       // client-side) — RLS only lets a staff user see their own bookings, so a client-side query
       // can't see other passengers' bookings to detect this conflict. See /api/bookings.
 
-      const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 60
+      const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 45
       const status        = needsApproval ? 'pending_coordinator_approval' : 'submitted'
 
       const res = await fetch('/api/bookings', {
@@ -375,7 +375,7 @@ export default function BookPage() {
     }
   }
 
-  const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 60
+  const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 45
 
   return (
     <div style={{ fontFamily: "var(--font-inter), 'Inter', sans-serif", minHeight: '100vh', background: C.surface, WebkitFontSmoothing: 'antialiased' }}>

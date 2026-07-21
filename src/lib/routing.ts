@@ -32,12 +32,17 @@ export interface RouteResult {
 
 // Distance-based buffer added on top of drive time, shared by the auto_complete_at
 // calculation (api/bookings/route.ts) and any UI that surfaces the same figure.
-export const LONG_TRIP_KM     = 20
-export const BUFFER_SHORT_SEC = 15 * 60
-export const BUFFER_LONG_SEC  = 40 * 60
+export const MID_TRIP_KM        = 10
+export const LONG_TRIP_KM       = 15
+export const BUFFER_SHORT_SEC   = 15 * 60
+export const BUFFER_MID_SEC     = 55 * 60
+export const BUFFER_LONG_SEC    = 90 * 60
 
 export function getBufferSeconds(oneWayDistanceKm: number | null): number {
-  return oneWayDistanceKm !== null && oneWayDistanceKm > LONG_TRIP_KM ? BUFFER_LONG_SEC : BUFFER_SHORT_SEC
+  if (oneWayDistanceKm === null) return BUFFER_SHORT_SEC
+  if (oneWayDistanceKm > LONG_TRIP_KM) return BUFFER_LONG_SEC
+  if (oneWayDistanceKm > MID_TRIP_KM) return BUFFER_MID_SEC
+  return BUFFER_SHORT_SEC
 }
 
 export function formatDurationMin(sec: number, lang: 'en' | 'id'): string {

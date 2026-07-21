@@ -41,9 +41,6 @@ interface GanttCalendarProps {
   onMapClick?:     () => void
   mapActive?:      boolean
   currentUserId?:  string
-  // Only coordinators get a WhatsApp shortcut to the driver from the duty-assignment
-  // detail sheet — Call stays available to everyone viewing it.
-  isCoordinator?:  boolean
 }
 
 const MSG = {
@@ -121,7 +118,7 @@ const MSG = {
   },
 }
 
-export default function GanttCalendar({ bookings, taxis, showCompleted = false, dayAssignments = [], onMapClick, mapActive = false, onRefresh, currentUserId, isCoordinator = false }: GanttCalendarProps) {
+export default function GanttCalendar({ bookings, taxis, showCompleted = false, dayAssignments = [], onMapClick, mapActive = false, onRefresh, currentUserId }: GanttCalendarProps) {
   const lang = useLang()
   const t    = MSG[lang]
   const dateLocale = lang === 'id' ? idLocale : undefined
@@ -246,7 +243,7 @@ export default function GanttCalendar({ bookings, taxis, showCompleted = false, 
 
       {/* ── Day assignment detail sheet ── */}
       {selectedDayAssignment && (
-        <DayAssignmentSheet assignment={selectedDayAssignment} onClose={() => setSelectedDayAssignment(null)} canWhatsappDriver={isCoordinator} />
+        <DayAssignmentSheet assignment={selectedDayAssignment} onClose={() => setSelectedDayAssignment(null)} />
       )}
     </div>
   )
@@ -710,7 +707,7 @@ function GanttLegend() {
 }
 
 // ── Day assignment detail bottom sheet ─────────────────────
-export function DayAssignmentSheet({ assignment: a, onClose, canWhatsappDriver = false }: { assignment: DayAssignment; onClose: () => void; canWhatsappDriver?: boolean }) {
+export function DayAssignmentSheet({ assignment: a, onClose }: { assignment: DayAssignment; onClose: () => void }) {
   const lang = useLang()
   const t    = MSG[lang]
   const dateLocale = lang === 'id' ? idLocale : undefined
@@ -767,28 +764,24 @@ export function DayAssignmentSheet({ assignment: a, onClose, canWhatsappDriver =
           </Row>
         )}
 
-        {/* Contact actions — Call is available to anyone viewing this sheet;
-            WhatsApp is coordinator-only (coordinators reach out to arrange the
-            duty, drivers/staff viewing their own calendar shouldn't get a
-            WhatsApp shortcut to themselves or to other drivers). */}
+        {/* Contact actions — Call and WhatsApp are both available to anyone
+            viewing this sheet. */}
         {a.driver_phone && (
-          <div style={{ display: 'grid', gridTemplateColumns: canWhatsappDriver ? '1fr 1fr' : '1fr', gap: 8, marginTop: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
             <a
               href={`tel:${a.driver_phone}`}
               style={{ padding: '12px 8px', background: '#EFF6FF', color: '#0369A1', border: '1px solid #BAE6FD', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxSizing: 'border-box' }}
             >
               {t.callBtn}
             </a>
-            {canWhatsappDriver && (
-              <a
-                href={`https://wa.me/${toWaNumber(a.driver_phone)}?text=${encodeURIComponent(buildWaMessage(a))}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ padding: '12px 8px', background: '#25D366', color: '#ffffff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxSizing: 'border-box' }}
-              >
-                {t.whatsappBtn}
-              </a>
-            )}
+            <a
+              href={`https://wa.me/${toWaNumber(a.driver_phone)}?text=${encodeURIComponent(buildWaMessage(a))}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ padding: '12px 8px', background: '#25D366', color: '#ffffff', border: 'none', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxSizing: 'border-box' }}
+            >
+              {t.whatsappBtn}
+            </a>
           </div>
         )}
 

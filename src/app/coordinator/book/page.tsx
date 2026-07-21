@@ -61,7 +61,7 @@ const MSG = {
     waitDuration:  'Waiting duration (minutes)',
     needsApproval: '⚠ Coordinator approval required',
     autoAssigned:  '✓ Auto-assigned',
-    over60:        'Waiting trips over 60 min need approval first.',
+    over60:        'Waiting trips over 45 min need approval first.',
     bestDriver:    'Best available driver will be assigned automatically.',
     reviewConfirm: 'Review & confirm',
     passengerLabel:'Passenger',
@@ -137,7 +137,7 @@ const MSG = {
     waitDuration:  'Durasi tunggu (menit)',
     needsApproval: '⚠ Perlu persetujuan koordinator',
     autoAssigned:  '✓ Otomatis ditugaskan',
-    over60:        'Perjalanan tunggu lebih dari 60 menit perlu persetujuan.',
+    over60:        'Perjalanan tunggu lebih dari 45 menit perlu persetujuan.',
     bestDriver:    'Driver terbaik yang tersedia akan ditugaskan secara otomatis.',
     reviewConfirm: 'Tinjau & konfirmasi',
     passengerLabel:'Penumpang',
@@ -420,7 +420,7 @@ export default function CoordinatorBookPage() {
       // to serve multiple (possibly different) vendors with overlapping windows at once.
       // Server also skips this check for coordinators; see /api/bookings.
 
-      const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 60
+      const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 45
       const bookingStatus = needsApproval ? 'pending_coordinator_approval' : 'submitted'
 
       const res = await fetch('/api/bookings', {
@@ -460,7 +460,7 @@ export default function CoordinatorBookPage() {
     }
   }
 
-  const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 60
+  const needsApproval = form.trip_type === 'WAITING' && form.wait_minutes > 45
   if (pageLoading) return <PageLoader />
 
   const selectedPassenger = staffUsers.find(u => u.id === form.passenger_id)

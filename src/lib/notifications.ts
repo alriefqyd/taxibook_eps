@@ -104,7 +104,7 @@ export async function notifyBookingSubmitted(
     userIds: coordinatorIds,
     title: needsApproval ? 'Booking needs approval' : 'New booking submitted',
     body: needsApproval
-      ? `${passengerName} → ${destination} (waiting >60 min)`
+      ? `${passengerName} → ${destination} (waiting >45 min)`
       : `${passengerName} → ${destination}`,
     type: needsApproval ? 'needs_approval' : 'booking_confirmed',
     bookingId,
