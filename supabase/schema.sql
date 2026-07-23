@@ -538,3 +538,35 @@ alter table public.users
 update public.users
   set language = 'id'
   where role = 'driver' and language = 'en';
+
+-- ============================================================
+-- MIGRATION: staff can view the full fleet schedule
+-- Grants staff the same bookings read access coordinators already have.
+-- NOTE: this turned out to be redundant in production — a separate,
+-- undocumented "View bookings" policy (not in this file, applied directly
+-- against the live DB at some point and never backported here) already
+-- grants role IN ('staff','coordinator') unconditional SELECT access. The
+-- actual bug that made staff/home's schedule look empty was a query bug
+-- (unbounded ascending order + flat limit(200) in staff/home/page.tsx
+-- fetched the OLDEST 200 bookings in the table's history instead of the
+-- current/upcoming ones), not RLS. Left in place since it's already applied
+-- and harmless (redundant permissive OR), but don't rely on this comment's
+-- original justification — see staff/home/page.tsx's loadData for the real
+-- fix. schema.sql is known to drift from the live DB; verify RLS policies
+-- against `pg_policies` before assuming this file is authoritative.
+-- ============================================================
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where tablename = 'bookings'
+    and policyname = 'Staff can view all bookings for schedule'
+  ) then
+    execute $p$
+      create policy "Staff can view all bookings for schedule" on public.bookings
+        for select using (
+          exists (select 1 from public.users where id = auth.uid() and role = 'staff')
+        )
+    $p$;
+  end if;
+end;
+$$;

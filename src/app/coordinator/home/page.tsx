@@ -174,6 +174,7 @@ export default function CoordinatorHomePage() {
 
   const [user,             setUser]             = useState<User | null>(null)
   const [pendingAll,       setPendingAll]       = useState<BookingDetail[]>([])
+  const [noTaxiFree,       setNoTaxiFree]       = useState<Record<string, boolean>>({})
   const [calendarBookings, setCalendarBookings] = useState<BookingDetail[]>([])
   const [tripsToday,       setTripsToday]       = useState(0)
   const [issueCount,       setIssueCount]       = useState(0)
@@ -325,11 +326,12 @@ export default function CoordinatorHomePage() {
       })
     )
 
-    const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+    const witaToday     = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+    const witaPastBound = new Date(Date.now() + 8 * 3600000 - 7 * 24 * 3600000).toISOString().slice(0, 10)
     const { data: dayAssign } = await supabase
       .from('driver_day_assignments')
       .select('taxi_id, assign_date, reason, passenger_name_other, passenger_id, start_time, end_time, taxis(name, plate, users!driver_id(name, phone))')
-      .gte('assign_date', witaToday)
+      .gte('assign_date', witaPastBound)
 
     // Resolve registered passenger names in one batch query
     const passengerIds = Array.from(new Set((dayAssign || []).filter((a: any) => a.passenger_id).map((a: any) => a.passenger_id as string)))
@@ -338,6 +340,29 @@ export default function CoordinatorHomePage() {
       const { data: pUsers } = await supabase.from('users').select('id, name').in('id', passengerIds)
       if (pUsers) pUsers.forEach((u: any) => { passengerNames[u.id] = u.name })
     }
+
+    // ── Advisory-only "no taxi free right now" flag per pending-approval booking ──
+    // Mirrors the eligibility/conflict logic the approve endpoint runs server-side, but
+    // day-assignment blocking is intentionally skipped here — this is just a heads-up
+    // shown before the coordinator clicks Approve, not a hard gate (the server remains
+    // the source of truth for whether an assignment actually succeeds).
+    const noTaxiFreeMap: Record<string, boolean> = {}
+    ;(pendingBks || []).forEach((b: any) => {
+      const scheduledWitaDate = new Date(new Date(b.scheduled_at).getTime() + 8 * 3600000).toISOString().slice(0, 10)
+      const isFutureDay = scheduledWitaDate > witaDate
+      const eligibleTaxis = (txs || []).filter((t: any) => t.driver_id && (isFutureDay || t.is_available))
+      const hasFreeTaxi = eligibleTaxis.some((t: any) =>
+        !(allBks || []).some((bk: any) =>
+          bk.id !== b.id
+          && bk.taxi_id === t.id
+          && ['booked', 'on_trip', 'waiting_trip'].includes(bk.status)
+          && new Date(bk.scheduled_at) < new Date(b.auto_complete_at)
+          && new Date(bk.auto_complete_at) > new Date(b.scheduled_at)
+        )
+      )
+      noTaxiFreeMap[b.id] = !hasFreeTaxi
+    })
+    setNoTaxiFree(noTaxiFreeMap)
 
     setPendingAll(pendingBks || [])
     setCalendarBookings(calBks || [])
@@ -420,13 +445,22 @@ export default function CoordinatorHomePage() {
   async function handleApprove(bookingId: string) {
     setProcessing(bookingId); setProcessingAction('approve')
     const token = await getToken()
-    await fetch(`/api/bookings/${bookingId}/approve`, {
+    const res = await fetch(`/api/bookings/${bookingId}/approve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ action: 'approve' }),
     })
+    const data = await res.json().catch(() => null)
     await loadData()
     setProcessing(null); setProcessingAction(null)
+
+    // Approval always succeeds as a decision even when no taxi could be attached —
+    // make that loudly visible instead of leaving it to silently sit unassigned.
+    if (res.ok && data?.assigned === false) {
+      alert(lang === 'id'
+        ? '✅ Disetujui — tapi belum ada taksi yang tersedia untuk jadwal ini sekarang. Booking ini muncul di Dispatch Board sebagai "belum ditugaskan"; tugaskan driver secara manual begitu taksi tersedia.'
+        : '✅ Approved — but no taxi is currently available for this time slot. This booking now shows on the Dispatch Board as unassigned; assign a driver manually once one frees up.')
+    }
   }
 
   async function handleReject(bookingId: string) {
@@ -663,7 +697,7 @@ export default function CoordinatorHomePage() {
               </p>
             </div>
             {pendingApproval.map(b => (
-              <BookingCard key={b.id} booking={b} isProcessing={processing === b.id} processingAction={processing === b.id ? processingAction : null} onApprove={() => handleApprove(b.id)} onReject={() => setRejectId(b.id)} onCancel={b.created_by === user?.id ? () => handleCancel(b.id) : undefined} />
+              <BookingCard key={b.id} booking={b} noTaxiFree={!!noTaxiFree[b.id]} isProcessing={processing === b.id} processingAction={processing === b.id ? processingAction : null} onApprove={() => handleApprove(b.id)} onReject={() => setRejectId(b.id)} onCancel={b.created_by === user?.id ? () => handleCancel(b.id) : undefined} />
             ))}
           </div>
         )}
@@ -988,8 +1022,9 @@ function buildWaMessage(b: BookingDetail): string {
 }
 
 // ── Booking card ──────────────────────────────────────────────────────────────
-function BookingCard({ booking: b, isProcessing, processingAction, onApprove, onReject, onReassign, onCancel }: {
+function BookingCard({ booking: b, noTaxiFree, isProcessing, processingAction, onApprove, onReject, onReassign, onCancel }: {
   booking: BookingDetail
+  noTaxiFree?: boolean
   isProcessing: boolean
   processingAction?: 'approve' | 'reject' | 'cancel' | null
   onApprove: () => void
@@ -1069,6 +1104,17 @@ function BookingCard({ booking: b, isProcessing, processingAction, onApprove, on
           </>
         )}
       </div>
+
+      {needsApproval && noTaxiFree && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '6px 10px', marginBottom: 8 }}>
+          <span style={{ fontSize: 13, flexShrink: 0 }}>⚠️</span>
+          <span style={{ fontSize: 11, color: '#991B1B', fontWeight: 600 }}>
+            {lang === 'id'
+              ? 'Tidak ada taksi yang tersedia sekarang untuk jadwal ini.'
+              : 'No taxi is currently available for this time slot.'}
+          </span>
+        </div>
+      )}
 
       {needsApproval && (
         <>

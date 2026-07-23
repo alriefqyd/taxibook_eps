@@ -144,6 +144,13 @@ export default function StaffHomePage() {
   const PULL_THRESHOLD = 60
 
   async function loadData(userId: string) {
+    // Bound the fleet-wide query to a relevant window — without this, ordering ascending
+    // with a flat limit grabs the OLDEST rows in the table's entire history once it grows
+    // past the limit, so today's/upcoming bookings (including the viewer's own) silently
+    // never reach the client. Mirrors the calStart/calEnd window coordinator/home uses.
+    const calStart = new Date(); calStart.setHours(0, 0, 0, 0); calStart.setDate(calStart.getDate() - 7)
+    const calEnd   = new Date(); calEnd.setHours(23, 59, 59, 999); calEnd.setDate(calEnd.getDate() + 90)
+
     const [{ data: bks }, { data: allBks }, { data: txs }] = await Promise.all([
       // Current user's bookings — for "My bookings" list
       supabase
@@ -157,19 +164,21 @@ export default function StaffHomePage() {
       supabase
         .from('booking_details')
         .select('*')
+        .gte('scheduled_at', calStart.toISOString())
+        .lt('scheduled_at', calEnd.toISOString())
         .not('status', 'in', '("cancelled","rejected","submitted","pending_coordinator_approval")')
         .order('scheduled_at', { ascending: true })
-        .limit(200),
+        .limit(1000),
       supabase
         .from('taxis')
         .select('*, users!driver_id(name)')
         .eq('is_active', true)
         .order('name'),
     ])
-    const witaToday = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+    const witaPastBound = new Date(Date.now() + 8 * 3600000 - 7 * 24 * 3600000).toISOString().slice(0, 10)
     supabase.from('driver_day_assignments')
       .select('taxi_id, assign_date, start_time, end_time, reason, passenger_id, passenger_name_other, taxis(name, plate, users!driver_id(name, phone))')
-      .gte('assign_date', witaToday)
+      .gte('assign_date', witaPastBound)
       .then(async ({ data }) => {
         const rows = data || []
         const passengerIds = Array.from(new Set(rows.filter((a: any) => a.passenger_id).map((a: any) => a.passenger_id as string)))
@@ -645,19 +654,29 @@ function DayGantt({ bookings, taxis, cursor, scrollRef, onSelectBooking, current
                 const endH   = hasRange ? Math.min(parseHour(fullDayAssignment.end_time!), HOUR_END)     : HOUR_END
                 const left   = (startH - HOUR_START) * HOUR_W
                 const width  = Math.max((endH - startH) * HOUR_W, 4)
+                // Grey out once it's over — the whole viewed day is in the past, or (for a
+                // partial-day duty) today's window has already ended — same treatment as a
+                // completed regular booking block, instead of the active amber highlight.
+                const nowH   = today.getHours() + today.getMinutes() / 60
+                const isPast = cursorDateStr < format(today, 'yyyy-MM-dd')
+                  || (isSameDay(cursor, today) && hasRange && nowH > endH)
                 return (
                   <div
                     onClick={() => onSelectDayAssignment?.(fullDayAssignment)}
                     style={{
                       position: 'absolute', left, width, top: 4, bottom: 4,
-                      background: 'repeating-linear-gradient(135deg, rgba(254,179,0,0.14) 0px, rgba(254,179,0,0.14) 7px, rgba(254,179,0,0.26) 7px, rgba(254,179,0,0.26) 14px)',
-                      border: '1.5px solid #FCD34D', borderLeft: '4px solid #F59E0B', borderRadius: 8,
+                      background: isPast
+                        ? '#F1F5F9'
+                        : 'repeating-linear-gradient(135deg, rgba(254,179,0,0.14) 0px, rgba(254,179,0,0.14) 7px, rgba(254,179,0,0.26) 7px, rgba(254,179,0,0.26) 14px)',
+                      border: isPast ? '1.5px solid #CBD5E1' : '1.5px solid #FCD34D',
+                      borderLeft: isPast ? '4px solid #94a3b8' : '4px solid #F59E0B', borderRadius: 8,
                       zIndex: 2, display: 'flex', alignItems: 'center', gap: 5, paddingLeft: 8, overflow: 'hidden',
                       cursor: onSelectDayAssignment ? 'pointer' : 'default',
-                      boxShadow: '0 1px 3px rgba(146,64,14,0.12)',
+                      boxShadow: isPast ? 'none' : '0 1px 3px rgba(146,64,14,0.12)',
+                      opacity: isPast ? 0.8 : 1,
                     }}>
-                    <span style={{ fontSize: 11, flexShrink: 0 }}>📋</span>
-                    <span style={{ fontSize: 9, fontWeight: 800, color: '#7e5700', letterSpacing: '0.05em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <span style={{ fontSize: 11, flexShrink: 0 }}>{isPast ? '✓' : '📋'}</span>
+                    <span style={{ fontSize: 9, fontWeight: 800, color: isPast ? '#64748B' : '#7e5700', letterSpacing: '0.05em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {hasRange ? `${fullDayAssignment.start_time!.slice(0, 5)}–${fullDayAssignment.end_time!.slice(0, 5)}` : t.fullDayBadge}
                     </span>
                   </div>
@@ -1041,10 +1060,11 @@ function WeekView({ bookings, cursor, onSelectBooking, dayAssignments = [] }: { 
         <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', borderBottom:'1px solid rgba(0,0,0,0.08)' }}>
           {days.map(d => {
             const isToday = isSameDay(d, today)
+            const isPastDay = d < today && !isToday
             const dayStr  = format(d, 'yyyy-MM-dd')
             const assignCount = dayAssignments.filter(a => a.assign_date === dayStr).length
             return (
-              <div key={d.toISOString()} style={{ textAlign:'center', padding:'8px 2px', background: isToday ? '#006064' : assignCount > 0 ? 'rgba(254,179,0,0.12)' : 'transparent', borderRight:'1px solid rgba(0,0,0,0.08)' }}>
+              <div key={d.toISOString()} style={{ textAlign:'center', padding:'8px 2px', background: isToday ? '#006064' : assignCount > 0 ? (isPastDay ? 'rgba(148,163,184,0.12)' : 'rgba(254,179,0,0.12)') : 'transparent', borderRight:'1px solid rgba(0,0,0,0.08)' }}>
                 <p style={{ fontSize:'8px', fontWeight:700, color: isToday ? 'rgba(255,255,255,0.6)' : '#9ca3af', margin:'0 0 2px', textTransform:'uppercase' }}>
                   {format(d,'EEE',{locale:idLocale})}
                 </p>
@@ -1052,7 +1072,7 @@ function WeekView({ bookings, cursor, onSelectBooking, dayAssignments = [] }: { 
                   {format(d,'d')}
                 </p>
                 {assignCount > 0 && !isToday && (
-                  <p style={{ fontSize:'8px', fontWeight:700, color:'#7e5700', margin:0 }}>★ {assignCount}</p>
+                  <p style={{ fontSize:'8px', fontWeight:700, color: isPastDay ? '#64748B' : '#7e5700', margin:0 }}>{isPastDay ? '✓' : '★'} {assignCount}</p>
                 )}
               </div>
             )
@@ -1064,11 +1084,12 @@ function WeekView({ bookings, cursor, onSelectBooking, dayAssignments = [] }: { 
           {days.map(d => {
             const dayBks = bookings.filter(b => isSameDay(new Date(b.scheduled_at), d))
             const dayStr = format(d, 'yyyy-MM-dd')
+            const isPastDay = d < today && !isSameDay(d, today)
             const assignCount = dayAssignments.filter(a => a.assign_date === dayStr).length
             return (
-              <div key={d.toISOString()} style={{ borderRight:'1px solid rgba(0,0,0,0.08)', padding:'4px 2px', minHeight:120, background: assignCount > 0 ? 'rgba(254,179,0,0.06)' : 'transparent', overflow:'hidden', minWidth:0 }}>
+              <div key={d.toISOString()} style={{ borderRight:'1px solid rgba(0,0,0,0.08)', padding:'4px 2px', minHeight:120, background: assignCount > 0 ? (isPastDay ? 'rgba(148,163,184,0.08)' : 'rgba(254,179,0,0.06)') : 'transparent', overflow:'hidden', minWidth:0 }}>
                 {assignCount > 0 && (
-                  <div style={{ fontSize:'7px', fontWeight:700, color:'#7e5700', background:'rgba(254,179,0,0.18)', borderRadius:3, padding:'1px 2px', marginBottom:3, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  <div style={{ fontSize:'7px', fontWeight:700, color: isPastDay ? '#64748B' : '#7e5700', background: isPastDay ? 'rgba(148,163,184,0.2)' : 'rgba(254,179,0,0.18)', borderRadius:3, padding:'1px 2px', marginBottom:3, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                     {t.fullDayShort}
                   </div>
                 )}
